@@ -18,13 +18,14 @@ def tree_Fscore(inferred, reference, rooted=False, verbose=True):
     splits_inferred = inferred.root.find_splits(symmetric=(not rooted), branch_lengths=False)
     splits_reference = reference.root.find_splits(symmetric=(not rooted), branch_lengths=False)
 
+    RF = len(splits_inferred ^ splits_reference) # Robinson-Foulds is size of symmetric difference
     both = len(splits_inferred & splits_reference)
     precision = float(both)/len(splits_inferred)
     recall = float(both)/len(splits_reference)
     F1 = 2*(precision*recall)/(precision+recall)
     if verbose:
-        print("precision: {:.2f}%\t\trecall: {:.2f}%\t\tF1: {:.2f}%".format(100*precision, 100*recall, 100*F1))
-    return F1, precision, recall
+        print("RF: {:.2f}\t\tprecision: {:.2f}%\t\trecall: {:.2f}%\t\tF1: {:.2f}%".format(RF, 100*precision, 100*recall, 100*F1))
+    return F1, precision, recall, RF
 
 def quartet_test():
     # TODO
@@ -140,7 +141,7 @@ class NoahClade(Phylo.BaseTree.Clade):
             splits = set()
         all_term = self.get_terminals()
         for node in self.find_clades():
-            # try calling reset_taxasets to fix this
+            # if this assert fails, try calling reset_taxasets to fix it
             assert node.taxa_set is not None
             split = tuple(np.nonzero(node.taxa_set)[0])
             if branch_lengths:
