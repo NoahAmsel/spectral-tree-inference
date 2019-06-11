@@ -12,6 +12,13 @@ def random_discrete_tree(m, n, k, proba_bounds=(0.50, 0.95)):
     tree.root.gen_subtree_data(root_data, transition_maker, num_classes=k, proba_bounds=proba_bounds)
     return tree
 
+def random_gaussian_tree(m, n, std_bounds=(0.1, 0.3)):
+    tree = NoahClade.NoahClade.randomized(m)
+    root_data = np.random.uniform(0, 1, n)
+    transition_maker = NoahClade.NoahClade.gen_linear_transition
+    tree.root.gen_subtree_data(root_data, transition_maker, std_bounds=std_bounds)
+    return tree
+
 def grow_tree_recover(m, n, k, proba_bounds=(0.50, 0.95), verbose=True):
     reference_tree = random_discrete_tree(m, n, k, proba_bounds=proba_bounds)
     if verbose:

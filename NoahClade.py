@@ -24,7 +24,7 @@ def tree_Fscore(inferred, reference, rooted=False, verbose=True):
     recall = float(both)/len(splits_reference)
     F1 = 2*(precision*recall)/(precision+recall)
     if verbose:
-        print("RF: {:.2f}\t\tprecision: {:.2f}%\t\trecall: {:.2f}%\t\tF1: {:.2f}%".format(RF, 100*precision, 100*recall, 100*F1))
+        print("RF: {:.2f}\t\tF1: {:.2f}%".format(RF, 100*precision, 100*recall, 100*F1))
     return F1, precision, recall, RF
 
 def quartet_test():
@@ -133,7 +133,7 @@ class NoahClade(Phylo.BaseTree.Clade):
             self.taxa_set = np.logical_or.reduce([child.taxa_set for child in self.clades])
         return labels
 
-    def find_splits(self, symmetric=True, branch_lengths=True):
+    def find_splits(self, symmetric=True, branch_lengths=False):
         # TODO: reset_taxasets automatically?? otherwise there could be errors
         if branch_lengths:
             splits = dict()
@@ -155,6 +155,9 @@ class NoahClade(Phylo.BaseTree.Clade):
                 else:
                     splits.add(split_other)
         return splits
+
+    def taxaset2ixs(self, taxa_set):
+        return tuple(np.nonzero(node.taxa_set)[0])
 
     def labels2taxaset(self, subset, all_labels=None):
         if all_labels is None:
@@ -217,6 +220,13 @@ class NoahClade(Phylo.BaseTree.Clade):
             data = np.array(data)
             return np.random.normal(loc=data*w+b, scale=std, size=data.shape[0])
         return transition
+
+    @staticmethod
+    def gen_linear_transition(std_bounds=(0.3, 1)):
+        w = np.random.gamma(shape=2., scale=1.)
+        b = np.random.uniform(0, 1)
+        std = np.random.uniform(*std_bounds)
+        return NoahClade.affine_transition_gaussian(w, b, std)
 
 # TODO: for convenience, write a subclass of Tree that calls these methods
 # on the root so you don't have to constantly type tree.root.do_something

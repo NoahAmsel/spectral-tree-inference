@@ -56,7 +56,9 @@ def estimate_tree_topology(observations, labels=None, discrete=True, bifurcating
     if discrete:
         M = similarity_matrix(observations)
     else:
-        M = np.cov(observations, bias=True)
+        # TODO: should this be biased or not?
+        #M = np.cov(observations, bias=False)
+        M = np.corrcoef(observations)
 
     # initialize leaf nodes
     G = [NoahClade.leaf(i, labels=labels, data=observations[i,:]) for i in range(m)]
