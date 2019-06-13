@@ -2,74 +2,151 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pylab as plt
-import Bio.Phylo as Phylo
-import Bio
-import Bio.Phylo.TreeConstruction
-import cProfile
 import NoahClade
+
+from reconstruct_tree import estimate_tree_topology, similarity_matrix
+from trials import random_discrete_tree, random_gaussian_tree
+import random
 
 from importlib import reload
 #reload(NoahClade)
-import reconstruct_tree
-from reconstruct_tree import estimate_tree_topology, similarity_matrix
-from trials import random_discrete_tree, random_gaussian_tree
+
+def score_sum(A, M):
+    M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    return s[1:].sum()
+
+def score_sum_tracker(A, M):
+    M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
+    s = np.linalg.svd(M_A, compute_uv=False)
+
+    m = M.shape[0]
+    leafset = tuple(np.nonzero(A)[0])
+    s1 = s[0]
+    s2 = s[1]
+    s23 = s[1:].sum()
+    size = min(A.sum(), (~A).sum())
+    frob = np.linalg.norm(M_A)
+    score_sum_tracker.records.append({"|A|": size, "|A|/|T|":size/m, "m": m, "leafset": leafset, "s1":s1, "s2":s2, "s23":s23, "frob":frob})
+
+    return s[1:].sum()
+score_sum_tracker.records = []
 
 # %%
-import random
-def profile_sig2():
-    Ms = [100, 300]
-    Ns = [10_000, 100_000]
+def profile_sig2(discrete=True, k=4):
+    reps = 10
+    Ms = [50, 100]
+    Ns = [1_000, 10_000]
     rows = []
-    for m in Ms:
-        ref_tree = random_gaussian_tree(m, 1, std_bounds=(0.1, 0.3))
-        #ref_tree = random_discrete_tree(m, n, 2)
-        #ref_tree.root.ascii()
-        for n in Ns:
-            ref_tree.root.gen_subtree_data(np.random.uniform(0, 1, n), NoahClade.NoahClade.gen_linear_transition, std_bounds=(0.1, 0.3))
-            obs, labels = ref_tree.root.observe()
-            ref_tree.root.reset_taxasets(labels)
-            M = np.corrcoef(obs)
-            non_terms = ref_tree.get_nonterminals()
-            for node in non_terms:
-                A = node.taxa_set
-                M_A = M[np.ix_(A, ~A)]
-                if M_A.shape[0] > 1 and M_A.shape[1] > 1:
-                    s = np.linalg.svd(M_A, compute_uv=False)
-                    s1 = s[0]
-                    s2 = s[1]
-                    s23 = s[1:].sum()
-                    size = min(A.sum(), (~A).sum())
-                    rows.append({"|A|": size, "|A|/|T|": size/m, "n":n, "m":m, "mn":"{0},{1}".format(m,n), "s1":s1, "s2":s2, "s23":s23, "real":True})
+    i = 1
+    total_iters = reps*len(Ms)*len(Ns)
+    for rep in range(reps):
+        for m in Ms:
+            if discrete:
+                ref_tree = random_discrete_tree(m, 1, k)
+                trans = NoahClade.NoahClade.gen_symmetric_transition
+            else:
+                ref_tree = random_gaussian_tree(m, 1, std_bounds=(0.1, 0.3))
+                trans = NoahClade.NoahClade.gen_linear_transition
+            #ref_tree.root.ascii()
+            for n in Ns:
+                if discrete:
+                    root_data = np.random.choice(a=k, size=n)
+                    ref_tree.root.gen_subtree_data(root_data, trans, proba_bounds=(0.75, 0.95))
                 else:
-                    s1 = np.linalg.norm(M_A)
-                    s2 = 0
-            for node in non_terms:
-                other = random.choice(non_terms)
-                bad_A = node.taxa_set ^ other.taxa_set
-                M_A = M[np.ix_(bad_A, ~bad_A)]
-                if M_A.shape[0] > 1 and M_A.shape[1] > 1:
-                    s = np.linalg.svd(M_A, compute_uv=False)
-                    s1 = s[0]
-                    s2 = s[1]
-                    s23 = s[1:].sum()
-                    size = min(bad_A.sum(), (~bad_A).sum())
-                    rows.append({"|A|": size, "|A|/|T|": size/m, "n":n, "m":m, "mn":"{0},{1}".format(m,n), "s1":s1, "s2":s2, "s23":s23, "real":False})
+                    root_data = np.random.uniform(0, 1, n)
+                    ref_tree.root.gen_subtree_data(root_data, trans, std_bounds=(0.1, 0.3))
+                obs, labels = ref_tree.root.observe()
+                ref_tree.root.reset_taxasets(labels)
+                if discrete:
+                    M = similarity_matrix(obs)
                 else:
-                    s1 = np.linalg.norm(M_A)
-                    s2 = 0
-    return pd.DataFrame(rows)
+                    M = np.corrcoef(obs)
+                non_terms = ref_tree.get_nonterminals()
 
-data = profile_sig2()
+                splits = []
+                for node in non_terms:
+                    # loop thru all the real splits
+                    splits.append((node.taxa_set, True))
+                    other = random.choice(non_terms)
+                    # loop thru some fake ones
+                    bad_A = node.taxa_set ^ other.taxa_set
+                    splits.append((bad_A, False))
+
+                for A, real in splits:
+                    M_A = M[np.ix_(A, ~A)]
+                    if M_A.shape[0] > 1 and M_A.shape[1] > 1:
+                        s = np.linalg.svd(M_A, compute_uv=False)
+                        s1 = s[0]
+                        s2 = s[1]
+                        s23 = s[1:].sum()
+                        frob = np.linalg.norm(M_A)
+                        size = min(A.sum(), (~A).sum())#A.sum()#min(A.sum(), (~A).sum())
+                        rows.append({"|A|": size, "|A|/|T|": size/m, "n":n, "m":m, "mn":"{0},{1}".format(m,n), "s1":s1, "s2":s2, "s23":s23, "frob":frob, "real":real})
+                print("{0} / {1}".format(i, total_iters))
+                i += 1
+    return rows
+
+ref_tree = random_discrete_tree(100, 1, 10_000)
+trans = NoahClade.NoahClade.gen_symmetric_transition
+root_data = np.random.choice(a=k, size=n)
+ref_tree.root.gen_subtree_data(root_data, trans, proba_bounds=(0.75, 0.95))
+obs, labels = ref_tree.root.observe()
+M = similarity_matrix(obs)
+
+def stat_comp(dataset, x, y, mm=100, nn=10_000, order=1):
+    data_sub = dataset[(dataset['m'] == mm) & (dataset['n'] == nn)]
+    assert len(data_sub) > 0
+
+    print("="*40)
+    print("="*40)
+    sns.relplot(x=x, y=y, col="mn", hue='real', data=dataset, alpha=.3, col_wrap=2)
+    plt.figure()
+    sns.lmplot(x=x, y=y, col="mn", hue='real', data=dataset, col_wrap=2, scatter_kws={"alpha":.3}, order=order)
+    plt.figure()
+    sns.lmplot(x=x, y=y, hue='real', data=data_sub, order=order)
+    plt.figure()
+    sns.regplot(x=x, y=y, data=data_sub[data_sub['real']], scatter_kws={"alpha":.3}, color='b', order=order)
+    plt.figure()
+    sns.regplot(x=x, y=y, data=data_sub[~data_sub['real']], scatter_kws={"alpha":.3}, color='orange', order=order)
+    plt.figure()
+
+    means = data_sub.groupby(['|A|', "real"]).mean().reset_index()
+    sns.regplot(x=x, y=y, data=means[means['real']], scatter_kws={"alpha":.3}, color='b', order=order)
+    plt.figure()
+    sns.regplot(x=x, y=y, data=means[~means['real']], scatter_kws={"alpha":.3}, color='orange', order=order)
+    plt.figure()
+
+# %%
+
+data = pd.DataFrame(profile_sig2(True))
 data.sample(10)
 
-data_sub = data[(data['m'] == 300) & (data['n'] == 100_000)]
+data['s1^2'] = data['s1']**2
 
-sns.regplot(x='|A|/|T|', y='s2', data=data_sub[data_sub['real']], scatter_kws={"alpha":.3})
+stat_comp(data, x='|A|', y='s2')
 
-sns.regplot(x='|A|/|T|', y='s2', data=data_sub[~data_sub['real']], scatter_kws={"alpha":.3})
+stat_comp(data, x='|A|/|T|', y='s23')
 
-sns.relplot(x="|A|/|T|", y="s2", col="mn", hue='real', data=data, alpha=.4, col_wrap=2)
+stat_comp(data, x='|A|/|T|', y='s1', order=2)
 
+# WHY DO THESE LOOK BAD
+
+
+data_sub = data[(data['m'] == 100) & (data['n'] == 10_000)]
+#data_sub['s2/'] = data_sub['s2']/np.sqrt(data_sub['|A|/|T|']*(1-data_sub['|A|/|T|']))
+
+data_sub_real = data_sub[data_sub['real']]
+data_sub_fake = data_sub[~data_sub['real']]
+
+sns.regplot(x='|A|', y='s23', data=data_sub[data_sub['real']], scatter_kws={"alpha":.3})
+sns.regplot(x='|A|', y='s2', data=data_sub[~data_sub['real']], scatter_kws={"alpha":.3})
+
+sns.regplot(x='|A|', y='s23', data=data_sub_real.groupby('|A|').mean().reset_index(inplace=False), scatter_kws={"alpha":.3})
+sns.regplot(x='|A|', y='s2', data=data_sub_fake.groupby('|A|').mean().reset_index(inplace=False), scatter_kws={"alpha":.3})
+
+sns.relplot(x="frob", y="s2", col="mn", hue='real', data=data, alpha=.4, col_wrap=2)
+sns.regplot(x='|A|', y='s2', data=data.groupby('|A|').mean().reset_index(inplace=False))
 
 sns.regplot(x='|A|/|T|', y='s1', data=data_sub[data_sub['real']], scatter_kws={"alpha":.3})
 xx = np.linspace(0,140)
@@ -97,7 +174,6 @@ def moves_away(split, good_splits):
 records['moves_away'] = records.apply(lambda row: moves_away(set(row['leafset']), [set(good) for good in good_splits]), axis=1)
 
 sns.relplot(x="|A|/|T|", y="moves_away", hue='real', data=records)
-
 sns.relplot(x="moves_away", y="s2", hue='real', data=records, alpha=.3)
 
 sns.regplot(x='|A|/|T|', y='s2', data=records[records['real']], scatter_kws={"alpha":.3})
@@ -105,32 +181,31 @@ sns.regplot(x='|A|/|T|', y='s2', data=records[~records['real']], scatter_kws={"a
 records.sample(10)
 # %%
 
-if __name__ == "__main__":
-    # %%
+# %%
 
-    m = 64
-    n = 20_000
-    k = 4
-    ref_tree = random_discrete_tree(m, n, k, proba_bounds=(0.8, 0.9))
-    ref_tree.root.ascii()
-    obs, labels = ref_tree.root.observe()
-    sim = similarity_matrix(obs)
-    #S = ['taxon32', 'taxon18']
-    #Sc = ['taxon32', 'taxon18']
-    #A = ref_tree.root.labels2taxaset(S)
-    #Ac = ref_tree.root.labels2taxaset(Sc)
+m = 64
+n = 20_000
+k = 4
+ref_tree = random_discrete_tree(m, n, k, proba_bounds=(0.8, 0.9))
+ref_tree.root.ascii()
+obs, labels = ref_tree.root.observe()
+sim = similarity_matrix(obs)
+#S = ['taxon32', 'taxon18']
+#Sc = ['taxon32', 'taxon18']
+#A = ref_tree.root.labels2taxaset(S)
+#Ac = ref_tree.root.labels2taxaset(Sc)
 
-    # taxon12, taxon5, taxon56 taxon26
-    R_S = sim[(11,4),:][:,(55,25)]
+# taxon12, taxon5, taxon56 taxon26
+R_S = sim[(11,4),:][:,(55,25)]
 
-    #R_S = sim[(25,4),:][:,(56,53)]
-    #R_S = sim[(25,4),:][:,(56,53)]
-    s1, s2 = np.linalg.svd(R_S, compute_uv=False)
-    print("="*30)
-    print("\u03C31 \t", s1)
-    print("\u03C32 \t", s2)
-    print("||R^(S)||_F \t", np.linalg.norm(R_S))
-    print("\u03C31^2 - \u03C32^2 \t", s1**2 - s2**2)
-    print("det(R^(S)) \t", np.linalg.det(R_S))
-    print("(\u03C31^2 - \u03C32^2)^2 \t", (s1**2 - s2**2)**2)
-    print("||R^(S)||_F^4 - 4det(R^(S)) \t",np.linalg.norm(R_S)**4 - 4*(np.linalg.det(R_S)**2))
+#R_S = sim[(25,4),:][:,(56,53)]
+#R_S = sim[(25,4),:][:,(56,53)]
+s1, s2 = np.linalg.svd(R_S, compute_uv=False)
+print("="*30)
+print("\u03C31 \t", s1)
+print("\u03C32 \t", s2)
+print("||R^(S)||_F \t", np.linalg.norm(R_S))
+print("\u03C31^2 - \u03C32^2 \t", s1**2 - s2**2)
+print("det(R^(S)) \t", np.linalg.det(R_S))
+print("(\u03C31^2 - \u03C32^2)^2 \t", (s1**2 - s2**2)**2)
+print("||R^(S)||_F^4 - 4det(R^(S)) \t",np.linalg.norm(R_S)**4 - 4*(np.linalg.det(R_S)**2))

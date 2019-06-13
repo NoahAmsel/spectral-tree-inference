@@ -2,6 +2,7 @@ import numpy as np
 import Bio.Phylo as Phylo
 from Bio.Phylo.Consensus import _bitstring_topology, _BitString
 from string import ascii_lowercase
+import scipy.linalg
 
 # TODO: right now this uses Biopython, but also check out dendropy
 
@@ -10,7 +11,7 @@ def random_string(stringLength=5):
     letters = list(ascii_lowercase)
     return ''.join(np.random.choice(letters) for _ in range(stringLength))
 
-def tree_Fscore(inferred, reference, rooted=False, verbose=True):
+def tree_Fscore(inferred, reference, rooted=False):
     term_names_inferred = set(term.name for term in inferred.find_clades(terminal=True))
     term_names_reference = set(term.name for term in reference.find_clades(terminal=True))
     assert term_names_inferred == term_names_reference
@@ -23,8 +24,6 @@ def tree_Fscore(inferred, reference, rooted=False, verbose=True):
     precision = float(both)/len(splits_inferred)
     recall = float(both)/len(splits_reference)
     F1 = 2*(precision*recall)/(precision+recall)
-    if verbose:
-        print("RF: {:.2f}\t\tF1: {:.2f}%".format(RF, 100*precision, 100*recall, 100*F1))
     return F1, precision, recall, RF
 
 def quartet_test():
@@ -213,6 +212,19 @@ class NoahClade(Phylo.BaseTree.Clade):
     # that way you can look up the branch length
     # from scipy.linalg import expm
     # T = expm(Q*t)
+    @staticmethod
+    def jukes_cantor_transition(num_classes, alpha=1.0, proba_bounds=(0.50, 0.95)):
+        k = num_classes
+        Q = np.full((k, k), alpha)
+        np.fill_diagonal(Q, (1-k)*alpha)
+        # NOTES ON PICKING t
+        # if you want the probability of not transitioning to be p
+        # then set a*t = - log[(k*p - 1)/(k-1)] / k
+        p = np.random.uniform(proba_bounds[0], proba_bounds[1])
+        t = -np.log((k*p - 1) / (k-1))/k
+        # if you want the determinant of the transition matrix to be delta
+        # set a*t = log(delta) / [k*(k-1)]
+        return NoahClade.transition_from_transition_matrix(scipy.linalg.expm(Q*t))
 
     @staticmethod
     def affine_transition_gaussian(w, b, std):
@@ -223,9 +235,9 @@ class NoahClade(Phylo.BaseTree.Clade):
 
     @staticmethod
     def gen_linear_transition(std_bounds=(0.3, 1)):
-        w = np.random.gamma(shape=2., scale=1.)
-        b = np.random.uniform(0, 1)
-        std = np.random.uniform(*std_bounds)
+        w = np.random.uniform(1.2,2)#np.random.gamma(shape=1., scale=1.)
+        b = np.random.uniform(0, 0.5)
+        std = .8#np.random.uniform(*std_bounds)
         return NoahClade.affine_transition_gaussian(w, b, std)
 
 # TODO: for convenience, write a subclass of Tree that calls these methods

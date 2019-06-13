@@ -5,10 +5,18 @@ import NoahClade
 
 from reconstruct_tree import estimate_tree_topology_multiclass
 
+# TODO: move these inside NoahClade
 def random_discrete_tree(m, n, k, proba_bounds=(0.50, 0.95)):
     tree = NoahClade.NoahClade.randomized(m)
     root_data = np.random.choice(a=k, size=n)
     transition_maker = NoahClade.NoahClade.gen_symmetric_transition
+    tree.root.gen_subtree_data(root_data, transition_maker, num_classes=k, proba_bounds=proba_bounds)
+    return tree
+
+def random_JC_tree(m, n, k, proba_bounds=(0.75, 0.95)):
+    tree = NoahClade.NoahClade.randomized(m)
+    root_data = np.random.choice(a=k, size=n)
+    transition_maker = NoahClade.NoahClade.jukes_cantor_transition
     tree.root.gen_subtree_data(root_data, transition_maker, num_classes=k, proba_bounds=proba_bounds)
     return tree
 

@@ -17,10 +17,6 @@ def first_sv(A, M):
     s = np.linalg.svd(M_A, compute_uv=False)
     return s[0]
 
-def weird_measure(M_A):
-    s = np.linalg.svd(M_A, compute_uv=False)
-    return (np.linalg.norm(M_A)**2 - (s[0] - s[1])**2)/(2*np.linalg.det(M_A))**2
-
 def score_split(A, M):
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
     s = np.linalg.svd(M_A, compute_uv=False)
