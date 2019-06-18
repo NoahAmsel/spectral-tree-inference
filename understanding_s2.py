@@ -5,7 +5,7 @@ import matplotlib.pylab as plt
 import NoahClade
 
 from reconstruct_tree import estimate_tree_topology, similarity_matrix
-from trials import random_discrete_tree, random_gaussian_tree
+from NoahClade import random_discrete_tree, random_gaussian_tree
 import random
 
 from importlib import reload
@@ -19,7 +19,8 @@ def score_sum(A, M):
 def score_sum_tracker(A, M):
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
     s = np.linalg.svd(M_A, compute_uv=False)
-
+    if s.size <= 1:
+        return 0
     m = M.shape[0]
     leafset = tuple(np.nonzero(A)[0])
     s1 = s[0]
@@ -68,10 +69,11 @@ def profile_sig2(discrete=True, k=4):
                 for node in non_terms:
                     # loop thru all the real splits
                     splits.append((node.taxa_set, True))
-                    other = random.choice(non_terms)
-                    # loop thru some fake ones
-                    bad_A = node.taxa_set ^ other.taxa_set
-                    splits.append((bad_A, False))
+                    for _ in range(2):
+                        other = random.choice(non_terms)
+                        # loop thru some fake ones
+                        bad_A = node.taxa_set ^ other.taxa_set
+                        splits.append((bad_A, False))
 
                 for A, real in splits:
                     M_A = M[np.ix_(A, ~A)]
@@ -87,12 +89,7 @@ def profile_sig2(discrete=True, k=4):
                 i += 1
     return rows
 
-ref_tree = random_discrete_tree(100, 1, 10_000)
-trans = NoahClade.NoahClade.gen_symmetric_transition
-root_data = np.random.choice(a=k, size=n)
-ref_tree.root.gen_subtree_data(root_data, trans, proba_bounds=(0.75, 0.95))
-obs, labels = ref_tree.root.observe()
-M = similarity_matrix(obs)
+# %%
 
 def stat_comp(dataset, x, y, mm=100, nn=10_000, order=1):
     data_sub = dataset[(dataset['m'] == mm) & (dataset['n'] == nn)]
@@ -119,20 +116,23 @@ def stat_comp(dataset, x, y, mm=100, nn=10_000, order=1):
 
 # %%
 
-data = pd.DataFrame(profile_sig2(True))
+data = pd.DataFrame(profile_sig2(False))
 data.sample(10)
 
 data['s1^2'] = data['s1']**2
+data['s1x10^4'] = data['s1']*(1e4)
+data['s2x10^4'] = data['s2']*(1e4)
 
-stat_comp(data, x='|A|', y='s2')
+stat_comp(data, x='|A|/|T|', y='s2x10^4')
 
-stat_comp(data, x='|A|/|T|', y='s23')
+stat_comp(data, x='|A|/|T|', y='s1x10^4')
 
-stat_comp(data, x='|A|/|T|', y='s1', order=2)
+stat_comp(data, x='|A|/|T|', y='s1x10^4', order=2)
 
-# WHY DO THESE LOOK BAD
+# WHY DO THESE LOOK BAD? Oh you hae to just multiply them by a large number for them to show up
 
-
+# %%
+# OLD
 data_sub = data[(data['m'] == 100) & (data['n'] == 10_000)]
 #data_sub['s2/'] = data_sub['s2']/np.sqrt(data_sub['|A|/|T|']*(1-data_sub['|A|/|T|']))
 
@@ -156,6 +156,92 @@ plt.plot(xx, 10*np.sqrt(xx))
 sns.regplot(x='|A|/|T|', y='s1', data=data_sub[~data_sub['real']], scatter_kws={"alpha":.3})
 
 sns.relplot(x="|A|/|T|", y="s1", col="mn", hue='real', data=data, alpha=.3, col_wrap=2)
+# %%
+
+
+# How does distance on the tree affect similarity?
+from itertools import combinations, product
+
+ref_tree = random_discrete_tree(64, 10_000, 4)
+#trans = NoahClade.NoahClade.gen_symmetric_transition
+#root_data = np.random.choice(a=4, size=n)
+#ref_tree.root.gen_subtree_data(root_data, trans, proba_bounds=(0.75, 0.95))
+ref_tree.root.ascii()
+obs, labels = ref_tree.root.observe()
+M = similarity_matrix(obs)
+
+random_gaussian_tree(64, 10_000, std_bounds=(0.1, 0.3))
+obs, labels = ref_tree.root.observe()
+M = np.corrcoef(obs)
+
+RRROW = []
+for left_ix, right_ix in combinations(range(len(labels)), 2):
+    dist = ref_tree.distance(labels[left_ix], labels[right_ix])
+    RRROW.append({"dist":dist, "sim": M[left_ix, right_ix]})
+sns.regplot(x='dist', y='sim', data=pd.DataFrame(RRROW))
+
+# %%
+def moves_away(split, good_splits):
+    return min(len(split ^ good)/len(split) for good in good_splits)
+
+def profile_me(discrete=True, k=4):
+    reps = 10
+    Ms = [50, 100]
+    Ns = [1_000, 10_000]
+    records = []
+    i = 1
+    total_iters = reps*len(Ms)*len(Ns)
+    for rep in range(reps):
+        for m in Ms:
+            if discrete:
+                ref_tree = random_discrete_tree(m, 1, k)
+                trans = NoahClade.NoahClade.gen_symmetric_transition
+            else:
+                ref_tree = random_gaussian_tree(m, 1, std_bounds=(0.1, 0.3))
+                trans = NoahClade.NoahClade.gen_linear_transition
+            #ref_tree.root.ascii()
+            for n in Ns:
+                if discrete:
+                    root_data = np.random.choice(a=k, size=n)
+                    ref_tree.root.gen_subtree_data(root_data, trans, proba_bounds=(0.75, 0.95))
+                else:
+                    root_data = np.random.uniform(0, 1, n)
+                    ref_tree.root.gen_subtree_data(root_data, trans, std_bounds=(0.1, 0.3))
+                obs, labels = ref_tree.root.observe()
+                ref_tree.root.reset_taxasets(labels)
+
+
+                score_sum_tracker.records = []
+                estimate_tree_topology(obs, labels=labels, scorer=score_sum_tracker, discrete=discrete)
+                good_splits = ref_tree.root.find_splits(branch_lengths=False)
+                good_splits_sets = [set(good) for good in good_splits]
+                for record in score_sum_tracker.records:
+                    record['real'] = record['leafset'] in good_splits
+                    record['moves_away'] = moves_away(set(record['leafset']), good_splits_sets)
+                    record['n'] = n
+                records += score_sum_tracker.records
+                print("{0} / {1}".format(i, total_iters))
+                i += 1
+    return records
+
+# %%
+data = pd.DataFrame(profile_me(False))
+# LINEAR = data
+# DISCRETE = data
+data['mn'] = data['m'].astype('str').str.cat(data['n'].astype('str'), sep=",")
+
+data.sample(10)
+
+data['s1^2'] = data['s1']**2
+data['s1x10^4'] = data['s1']*(1e4)
+data['s2x10^4'] = data['s2']*(1e4)
+
+stat_comp(data, x='|A|/|T|', y='s2x10^4', order=1)
+stat_comp(data, x='|A|/|T|', y='s1x10^4', order=2)
+
+stat_comp(data, x='moves_away', y='s2x10^4', order=1)
+
+stat_comp(data, x='moves_away', y='s1x10^4', order=1)
 
 # %%
 score_sum_tracker.records = []
@@ -169,8 +255,6 @@ good_splits = ref_tree.root.find_splits(branch_lengths=False)
 records['real'] = records['leafset'].isin(good_splits)
 records.sample(10)
 
-def moves_away(split, good_splits):
-    return min(len(split ^ good)/len(split) for good in good_splits)
 records['moves_away'] = records.apply(lambda row: moves_away(set(row['leafset']), [set(good) for good in good_splits]), axis=1)
 
 sns.relplot(x="|A|/|T|", y="moves_away", hue='real', data=records)

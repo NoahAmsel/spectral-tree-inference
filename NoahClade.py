@@ -155,8 +155,12 @@ class NoahClade(Phylo.BaseTree.Clade):
                     splits.add(split_other)
         return splits
 
-    def taxaset2ixs(self, taxa_set):
+    def taxaset2ixs(self):
         return tuple(np.nonzero(node.taxa_set)[0])
+
+    @staticmethod
+    def taxaset2ixs(taxa_set):
+        return tuple(np.nonzero(taxa_set)[0])
 
     def labels2taxaset(self, subset, all_labels=None):
         if all_labels is None:
@@ -198,6 +202,7 @@ class NoahClade(Phylo.BaseTree.Clade):
             T[i,:] = np.concatenate((off_diags[:i], [diag], off_diags[i:]))
         return NoahClade.transition_from_transition_matrix(T)
 
+    # TODO: is it slower to use a matrix? can't we just write this function?
     @staticmethod
     def gen_symmetric_transition(num_classes, proba_bounds=(0.50, 0.95)):
         #assert isinstance(num_classes, int) and num_classes > 0
@@ -239,6 +244,30 @@ class NoahClade(Phylo.BaseTree.Clade):
         b = np.random.uniform(0, 0.5)
         std = .8#np.random.uniform(*std_bounds)
         return NoahClade.affine_transition_gaussian(w, b, std)
+
+
+# TODO: move these somewhere better (inside NoahClade?)
+def random_discrete_tree(m, n, k, proba_bounds=(0.50, 0.95)):
+    tree = randomized(m)
+    root_data = np.random.choice(a=k, size=n)
+    transition_maker = gen_symmetric_transition
+    tree.root.gen_subtree_data(root_data, transition_maker, num_classes=k, proba_bounds=proba_bounds)
+    return tree
+
+def random_JC_tree(m, n, k, proba_bounds=(0.75, 0.95)):
+    tree = randomized(m)
+    root_data = np.random.choice(a=k, size=n)
+    transition_maker = jukes_cantor_transition
+    tree.root.gen_subtree_data(root_data, transition_maker, num_classes=k, proba_bounds=proba_bounds)
+    return tree
+
+def random_gaussian_tree(m, n, std_bounds=(0.1, 0.3)):
+    tree = randomized(m)
+    root_data = np.random.uniform(0, 1, n)
+    transition_maker = gen_linear_transition
+    tree.root.gen_subtree_data(root_data, transition_maker, std_bounds=std_bounds)
+    return tree
+
 
 # TODO: for convenience, write a subclass of Tree that calls these methods
 # on the root so you don't have to constantly type tree.root.do_something
