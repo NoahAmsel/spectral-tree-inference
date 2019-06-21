@@ -2,6 +2,7 @@ from itertools import combinations
 import numpy as np
 from NoahClade import NoahClade
 import Bio.Phylo as Phylo
+import scipy.spatial.distance
 
 def second_sv(A, M):
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
@@ -41,20 +42,37 @@ def similarity_matrix(observations, classes=None):
     #M = np.linalg.det(confusion_matrices/sqrt(n))
     return M
 
+def JC_similarity_matrix(observations, classes=None):
+    # TODO: use classes argument to make this robust to missing data
+    if classes is None:
+        classes = np.unique(observations)
+    else:
+        assert False
+    k = len(classes)
+
+    normalized_hamming_distance = scipy.spatial.distance.pdist(observations, metric='hamming')
+    # under J-C model, even independent sequences have a maximum hamming distance of (k-1)/k
+    # in which case determinant is 0
+    normalized_hamming_distance = np.clip(normalized_hamming_distance, a_min=None, a_max=(k-1)/k)
+    expected_dets = (1 - normalized_hamming_distance*k/(k-1))**(k-1)
+    dm  = scipy.spatial.distance.squareform(expected_dets)
+    # under jukes-cantor model, base frequencies are equal at all nodes
+    # so for diag elements, take determinant of (1/k)* I_k
+    np.fill_diagonal(dm, (1/k)**k)
+    return dm
+
+def linear_similarity_matrix(observations):
+    return np.corrcoef(observations)**2
+
 # TODO: remove scorer argument when we've settled on one
-def estimate_tree_topology(observations, labels=None, discrete=True, bifurcating=False, scorer=score_split):
+def estimate_tree_topology(observations, labels=None, similarity=similarity_matrix, bifurcating=False, scorer=score_split):
     m, n = observations.shape
 
     """if labels is None:
         labels = [str(i) for i in range(m)]
     assert len(labels) == m"""
 
-    if discrete:
-        M = similarity_matrix(observations)
-    else:
-        # TODO: should this be biased or not?
-        #M = np.cov(observations, bias=False)
-        M = np.corrcoef(observations)**2
+    M = similarity(observations)
 
     # initialize leaf nodes
     G = [NoahClade.leaf(i, labels=labels, data=observations[i,:]) for i in range(m)]
@@ -103,12 +121,32 @@ def estimate_tree_topology(observations, labels=None, discrete=True, bifurcating
     return Phylo.BaseTree.Tree(NoahClade(clades=[G[i] for i in available_clades])) #, Sigma, sv1, sv2
 
 def estimate_tree_topology_multiclass(observations, labels=None, bifurcating=False):
-    return estimate_tree_topology(observations, labels=labels, discrete=True, bifurcating=bifurcating)
+    return estimate_tree_topology(observations, labels=labels, similarity=similarity_matrix, bifurcating=bifurcating)
 
 def estimate_tree_topology_continuous(observations, labels=None, bifurcating=False):
-    return estimate_tree_topology(observations, labels=labels, discrete=False, bifurcating=bifurcating)
+    return estimate_tree_topology(observations, labels=labels, similarity=linear_similarity_matrix, bifurcating=bifurcating)
 
-#
+def estimate_tree_topology_Jukes_Cantor(observations, labels=None, bifurcating=False):
+    return estimate_tree_topology(observations, labels=labels, similarity=JC_similarity_matrix, bifurcating=bifurcating)
+
+
+import numpy as np
+import matplotlib.pylab as plt
+def fun(p):
+    return (1 - p*4/3)**3
+
+def test_plot(p, sample_sizes, fun=fun):
+    ests = [fun(np.random.binomial(n=1, p=p, size=(n)).mean()) for n in sample_sizes]
+    true = fun(p)
+    print(true)
+    print(sum(ests)/len(ests))
+    fig = plt.figure()
+    plt.plot(ests)
+    plt.plot([true]*len(sample_sizes))
+    fig.show()
+
+
+
 # def tracking_estimate_tree_topology(observations, labels=None, discrete=True, bifurcating=False, scorer=score_split, good_splits):
 #     m, n = observations.shape
 #

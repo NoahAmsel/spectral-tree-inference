@@ -11,7 +11,7 @@ from itertools import combinations, product
 
 from importlib import reload
 #reload(baselines)
-from reconstruct_tree import estimate_tree_topology, similarity_matrix
+from reconstruct_tree import estimate_tree_topology, similarity_matrix, linear_similarity_matrix, JC_similarity_matrix
 from baselines import *
 from NoahClade import random_discrete_tree, random_gaussian_tree
 
@@ -171,12 +171,6 @@ def score_quartet_sum(A, M):
     Ac_pairs = list(combinations(range(nAc), 2))
     return sum(det22(M_A[np.ix_(pair1, pair2)])**2 for pair1, pair2 in product(A_pairs, Ac_pairs))
 
-def quartet_sum_alt(M_A):
-    nA, nAc = M_A.shape
-    A_pairs = list(combinations(range(nA), 2)) # the `list' is unnecessary but makes debugging easier
-    Ac_pairs = list(combinations(range(nAc), 2))
-    return sum(det22(M_A[np.ix_(pair1, pair2)])**2 for pair1, pair2 in product(A_pairs, Ac_pairs))
-
 def score_sqrt_sum(A, M):
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
     M_A = np.sqrt(M_A)
@@ -192,48 +186,27 @@ def score_weird5(A, M):
     s_square_sum = (s**2).sum()
     return s1_square*(s_square_sum - s1_square)/s_square_sum
 
-# %%
-M_A = np.array([[1,2,3],[5,6,7]])
-M_A = np.random.uniform(size=(2,3))
-s1, s2 = np.linalg.svd(M_A, compute_uv=False)
-quartet_sum(M_A)
-(s1*s2)**2
-quartet_sum(M_A)/(s1**2)
-s2**2
+def score_energy(A, M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
 
-#M_A = np.array([[1,2,3,4],[5,6,7,8],[-9,-10,-11,-12],[13,14,15,16]])
-#M_A = np.random.uniform(size=(3,3))
-x,y,z,w,a,b,c,d,p,q = np.random.uniform(low=0.75, high=0.95, size=(10))
-# 4x4
-# M_A = np.array([[x*p*z, x*p*q*b, x*p*q*c, x*p*w], [y*p*z, y*p*q*b, y*p*q*c, y*p*w], [a*q*p*z, a*p*q*b, a*p*q*c, a*q*p*w], [d*q*p*z, d*p*q*b, d*p*q*c, d*q*p*w]])
-# 4 x 3
-M_A = np.array([[x*p*z, x*p*q*b, x*p*q*c, x*p*w], [y*p*z, y*p*q*b, y*p*q*c, y*p*w], [a*q*p*z, a*p*q*b, a*p*q*c, a*q*p*w]])
-print(M_A)
-s = np.linalg.svd(M_A, compute_uv=False)
-print(s)
-s1, s2 = s[:2]
-quartet_sum_alt(M_A)
-(s1*s2)**2
+    #if s.size <= 1:
+    #    return 0
+    # TODO: sum of abs of eigenvalue - mean of eigenvalues
 
-(s1*s2)**2/(1 - (s3*s4)**2)
-(s1*s2)**2/((1-s3)**2)
-(s1**2)*((s2 + s3)**2)
-print(s2**2, s3**2, s2+s3, (s2+s3)**2, )
-np.sqrt((s2**2 + s3**2))
+def score_weird6(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return (s_sq.sum()**2 - (s_sq**2).sum())/2
 
-# %%
-x,y,z,a,b,c,p,q,r,t = np.random.uniform(low=0.75, high=0.95, size=(10))
-M_A = np.array([[a*b*p*q*t, a*y*p*q*t*r, a*z*p*q*t], [c*b*p*q*t, c*y*p*q*r, c*z*p*t], [x*b*p*q*t*r, x*y*p*r, x*z*p*r]])
-M_A
-s = np.linalg.svd(M_A, compute_uv=False)
-s1, s2, s3 = s
-print(s)
-LHS = quartet_sum_alt(M_A)
-RHS = (s[0]**2)*(s[1]**2 + s[2]**2)
-100*(LHS - RHS)/LHS
-(s[0]**2)*(s[1]**2 + s[2])
-np.linalg.norm(M_A)**2
-(s**2).sum()
+def score_weird7(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return ((s.sum()**2 - (s**2).sum())/2) / s_sq[0]
+
+
 
 # %%
 
@@ -241,9 +214,13 @@ def comp_scorers(m, Ns, k, scorers, n_trees=6, obs_per_tree=2, proba_bounds=(0.7
     # Ns is array of n
     if discrete:
         transition_maker = NoahClade.NoahClade.gen_symmetric_transition
+        #similarity = similarity_matrix
+        similarity = JC_similarity_matrix
+        # THIS DOES NOT DO JUKES CANTOR CORRECTION
         #transition_maker = NoahClade.NoahClade.jukes_cantor_transition
     else:
         transition_maker = NoahClade.NoahClade.gen_linear_transition
+        similarity = linear_similarity_matrix
     stats = []
     itr = 1
     total_iters = n_trees*obs_per_tree*len(Ns)*(len(scorers)+len(baselines))
@@ -256,13 +233,13 @@ def comp_scorers(m, Ns, k, scorers, n_trees=6, obs_per_tree=2, proba_bounds=(0.7
         for _ in range(obs_per_tree):
             for n in Ns:
                 root_data = np.random.choice(a=k, size=n)
-                ref_tree.root.gen_subtree_data(root_data, transition_maker)
+                ref_tree.root.gen_subtree_data(root_data, transition_maker, proba_bounds=proba_bounds)
                 observations, labels = ref_tree.root.observe()
                 #print("ref")
                 #ref_tree.root.ascii()
                 scorer_methods = []
                 for scorer in scorers:
-                    scorer_method = partial(estimate_tree_topology, scorer=scorer, discrete=discrete)
+                    scorer_method = partial(estimate_tree_topology, scorer=scorer, similarity=similarity)
                     scorer_method.__name__ = scorer.__name__[6:]
                     scorer_methods.append(scorer_method)
                 for method in scorer_methods+baselines:
@@ -307,54 +284,6 @@ testerest(ref_tree, "taxon56", 'taxon34', n)
 
 if __name__ == "__main__":
 
-    m = 64
-    n = 1_000
-    k = 4
-    ref_tree = random_discrete_tree(m, n, k, proba_bounds=(0.8, 0.9))
-    ref_tree.root.ascii()
-    obs, labels = ref_tree.root.observe()
-    sim = similarity_matrix(obs)
-
-
-
-    #A = ref_tree.root.labels2taxaset(['taxon2', 'taxon57', 'taxon24'])
-    # good, big
-    A = ref_tree.root.labels2taxaset(['taxon39', 'taxon12', 'taxon21', 'taxon2'])
-    # good, small
-    A = ref_tree.root.labels2taxaset(['taxon24', 'taxon26', 'taxon58'])
-    # bad, big
-    A = ref_tree.root.labels2taxaset(['taxon19', 'taxon6', 'taxon52', 'taxon47',])
-    # bad, small
-    A = ref_tree.root.labels2taxaset(['taxon22', 'taxon42', 'taxon24', 'taxon16'])
-
-    M_A = sim[np.ix_(A, ~A)]
-    s = np.linalg.svd(M_A, compute_uv=False)
-    print("="*30)
-    LHS = score_quartet_sum(A, sim)
-    RHS = (s[0]**2)*(s**2)[1:].sum()
-    (s[0]**2)*(s[1]**2)
-    print(LHS, RHS, 100*(LHS - RHS)/LHS)
-    print(s)
-    print(s**2)
-
-
-    np.linalg.norm(s)
-    LHS/RHS
-    (s**2)[1:].sum()
-    (s[1:].sum())**2
-
-    #ref_tree.root.reset_taxasets(labels)
-    A = ref_tree.root.clades[0].taxa_set
-    M_A = sim[np.ix_(A, ~A)]
-    s = np.linalg.svd(M_A, compute_uv=False)
-    print("="*30)
-    LHS = quartet_sum(A, sim)
-    RHS = (s[0]**2)*(s**2)[1:].sum()
-    print(LHS, RHS, 100*(LHS - RHS)/LHS)
-    print(s)
-    print(s**2)
-    # %%
-
     stats5 = pd.DataFrame(comp_scorers(m=64, Ns=[1_000, 3_000, 10_000], k=4, scorers=[score_sum], baselines=[neighbor_joining, NJ, NJ_JC]))
     sns.catplot(data=stats5, x="method", y="RF", inner="stick", col="n", bw=.8, scale="count", kind="violin", col_wrap=3)
 
@@ -363,10 +292,12 @@ if __name__ == "__main__":
     scorers = [score_plain, score_plain12, score_plain_trace, score_sum, score_sumtrace, score_weird]
 
     # keep n < 10^6
-    stats = pd.DataFrame(comp_scorers(m=64, Ns=[300, 1_000, 3_000, 10_000, 30_000], k=4, scorers=[score_sum, score_weird5]))
+    stats = pd.DataFrame(comp_scorers(m=64, Ns=[300, 1_000, 3_000, 10_000, 30_000], k=4, scorers=[score_plain, score_weird6]))
 
     sns.catplot(data=stats, x="method", y="RF", inner="stick", col="n", bw=.8, scale="count", kind="violin", col_wrap=3)
     #plt.show()
+
+    # stats = pd.DataFrame(comp_scorers(m=20, Ns=[300, 500, 1_000, 1_500, 2_000], k=4, scorers=[score_sum, score_weird6, score_quartet_sum]))
 
     scorers2 = [score_plain, score_sum, score_weird02, score_weird03]
     stats2 = pd.DataFrame(comp_scorers(m=80, Ns=[300, 1_000, 3_000, 10_000, 30_000], k=4, n_trees=4, obs_per_tree=3, scorers=scorers2))
@@ -381,6 +312,6 @@ if __name__ == "__main__":
     NNNs=[300, 1_000, 3_000, 10_000, 30_000, 100_000]
     stats = pd.DataFrame(comp_scorers(m=128, Ns=[3_000, 10_000, 30_000,], k=4, scorers=[score_sum, score_sqrt_sum], baselines=[], discrete=False), n_trees=10) #NJ_continuous
 
-    stats = pd.DataFrame(comp_scorers(m=30, Ns=[300, 1_000, 3_000, 10_000,], k=4, scorers=[score_sum, score_hack3, score_quartet_sum], baselines=[NJ_continuous], discrete=False, n_trees=4))
+    stats = pd.DataFrame(comp_scorers(m=30, Ns=[1_000, 3_000, 10_000,], k=4, scorers=[score_sum, score_weird6, score_quartet_sum], baselines=[NJ_continuous], discrete=False, n_trees=4))
 
     sns.catplot(data=stats, x="method", y="RF", inner="stick", col="n", bw=.8, scale="count", kind="violin", col_wrap=3)

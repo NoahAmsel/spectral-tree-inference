@@ -190,7 +190,7 @@ class NoahClade(Phylo.BaseTree.Clade):
         return transition
 
     @staticmethod
-    def gen_discrete_transition(num_classes, proba_bounds=(0.50, 0.95)):
+    def gen_discrete_transition(num_classes, proba_bounds):
         # TODO: refactor this for jesus sake
         # this is too slow
         #assert isinstance(num_classes, int) and num_classes > 0
@@ -204,7 +204,7 @@ class NoahClade(Phylo.BaseTree.Clade):
 
     # TODO: is it slower to use a matrix? can't we just write this function?
     @staticmethod
-    def gen_symmetric_transition(num_classes, proba_bounds=(0.50, 0.95)):
+    def gen_symmetric_transition(num_classes, proba_bounds):
         #assert isinstance(num_classes, int) and num_classes > 0
         diag = np.random.uniform(proba_bounds[0], proba_bounds[1])
         off_diag = (1. - diag)/(num_classes - 1)
@@ -218,7 +218,7 @@ class NoahClade(Phylo.BaseTree.Clade):
     # from scipy.linalg import expm
     # T = expm(Q*t)
     @staticmethod
-    def jukes_cantor_transition(num_classes, alpha=1.0, proba_bounds=(0.50, 0.95)):
+    def jukes_cantor_transition(num_classes, proba_bounds, alpha=1.0):
         k = num_classes
         Q = np.full((k, k), alpha)
         np.fill_diagonal(Q, (1-k)*alpha)
@@ -239,7 +239,7 @@ class NoahClade(Phylo.BaseTree.Clade):
         return transition
 
     @staticmethod
-    def gen_linear_transition(std_bounds=(0.3, 1)):
+    def gen_linear_transition(std_bounds):
         w = np.random.uniform(1.2,2)#np.random.gamma(shape=1., scale=1.)
         b = np.random.uniform(0, 0.5)
         std = .8#np.random.uniform(*std_bounds)
@@ -247,24 +247,24 @@ class NoahClade(Phylo.BaseTree.Clade):
 
 
 # TODO: move these somewhere better (inside NoahClade?)
-def random_discrete_tree(m, n, k, proba_bounds=(0.50, 0.95)):
-    tree = randomized(m)
+def random_discrete_tree(m, n, k, proba_bounds):
+    tree = NoahClade.randomized(m)
     root_data = np.random.choice(a=k, size=n)
-    transition_maker = gen_symmetric_transition
+    transition_maker = NoahClade.gen_symmetric_transition
     tree.root.gen_subtree_data(root_data, transition_maker, num_classes=k, proba_bounds=proba_bounds)
     return tree
 
-def random_JC_tree(m, n, k, proba_bounds=(0.75, 0.95)):
-    tree = randomized(m)
+def random_JC_tree(m, n, k, proba_bounds):
+    tree = NoahClade.randomized(m)
     root_data = np.random.choice(a=k, size=n)
-    transition_maker = jukes_cantor_transition
+    transition_maker = NoahClade.jukes_cantor_transition
     tree.root.gen_subtree_data(root_data, transition_maker, num_classes=k, proba_bounds=proba_bounds)
     return tree
 
-def random_gaussian_tree(m, n, std_bounds=(0.1, 0.3)):
-    tree = randomized(m)
+def random_gaussian_tree(m, n, std_bounds):
+    tree = NoahClade.randomized(m)
     root_data = np.random.uniform(0, 1, n)
-    transition_maker = gen_linear_transition
+    transition_maker = NoahClade.gen_linear_transition
     tree.root.gen_subtree_data(root_data, transition_maker, std_bounds=std_bounds)
     return tree
 

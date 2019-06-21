@@ -8,6 +8,10 @@ import scipy.spatial.distance
 import NoahClade
 
 from NoahClade import random_JC_tree, random_discrete_tree
+from reconstruct_tree import similarity_matrix
+from scipy.special import xlogy
+from sklearn.metrics import confusion_matrix
+from itertools import product
 
 def neighbor_joining(observations, labels=None):
     if labels is None:
@@ -56,6 +60,11 @@ def NJ_JC(observations, labels=None):
     dm = distance_correction(hamming, k)
     return NJ(dm, labels=labels)
 
+def NJ_logdet(observations, labels=None, classes=None):
+    similarity = similarity_matrix(observations, classes=classes)
+    dm = -np.log(similarity)
+    return NJ(dm, labels=labels)
+
 def NJ_continuous(observations, labels=None):
     m = observations.shape[0]
     if labels is None:
@@ -95,12 +104,22 @@ if __name__ == "__main__":
     D(pab)
     D(pac)+D(pbc)
 
+    mut_info(pab)
+    mut_info(pac)
+    mut_info(pbc)
+
 def joint_prob(X1, X2):
     p12 = confusion_matrix(X1, X2)
     return p12 / p12.sum()
 
+def xlgx(x):
+    return xlogy(x, x)/np.log(2) # convert log to log_2
+
 def joint_ent(pxy):
-    return -(pxy*np.nan_to_num(np.log2(pxy))).sum()
+    return -(xlgx(pxy)).sum()
+
+
+from sklearn.metrics import mutual_info_score
 
 def mut_info(pxy):
     px = pxy.sum(axis=1, keepdims=True)
@@ -108,7 +127,9 @@ def mut_info(pxy):
     py = pxy.sum(axis=0, keepdims=True)
     py = py / py.sum()
     denom = px.dot(py)
-    return (pxy*np.nan_to_num(np.log2(pxy/denom))).sum()
+    # return (pxy*np.nan_to_num(np.log2(pxy/denom))).sum()
+    # for numerical reasons this is cleaner:
+    return (xlgx(pxy/denom)*denom).sum()
 
 def D(pxy):
     Hxy = joint_ent(pxy)
@@ -117,17 +138,19 @@ def D(pxy):
     D = d / Hxy if d>0 else 0
     return d
 
-from itertools import product
 def mut_info_pdist(observations):
     m, n = observations.shape
     return [[D(joint_prob(observations[i,:], observations[j,:])) for j in range(m)] for i in range(m)]
 
+
+
+
 # %%
-if __name__ == "__main__":
+def test_correction(m, n, k, proba_bounds):
     score = 0
-    NNN = 30
+    NNN = 50
     for _ in range(NNN):
-        ref_tree = random_JC_tree(m=32, n=10_000, k=2, proba_bounds=(0.80, 0.95))
+        ref_tree = random_JC_tree(m=m, n=n, k=k, proba_bounds=proba_bounds)
         observations, labels = ref_tree.root.observe()
         T2 = NJ_hamming(observations, labels)
         T3 = NJ_JC(observations, labels)
@@ -142,14 +165,17 @@ if __name__ == "__main__":
         if jc_F1 > plain_F1:
             score += 1
         print("plain {0:.3f}%\t\tjc {1:.3f}%".format(100*plain_F1, 100*jc_F1))
-    print(score/NNN)
+    return score/NNN
+
+if __name__ == "__main__":
+    test_correction(m=64, n=10_000, k=4, proba_bounds=(0.85, 0.95))
 
 
 # %%
 if __name__ == "__main__":
 
     #ref_tree = random_JC_tree(m=32, n=40_000, k=20, proba_bounds=(0.75, 0.95))
-    ref_tree = random_JC_tree(m=20, n=20_000, k=2, proba_bounds=(0.75, 0.95))
+    ref_tree = random_JC_tree(m=32, n=20_000, k=2, proba_bounds=(0.75, 0.95))
     ref_tree.root.ascii()
     observations, labels = ref_tree.root.observe()
     T1 = neighbor_joining(observations, labels)
