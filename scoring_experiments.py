@@ -11,7 +11,7 @@ from itertools import combinations, product
 
 from importlib import reload
 #reload(baselines)
-from reconstruct_tree import estimate_tree_topology, similarity_matrix, linear_similarity_matrix, JC_similarity_matrix
+from reconstruct_tree import estimate_tree_topology, similarity_matrix, linear_similarity_matrix, JC_similarity_matrix, normalized_similarity_matrix, adj_jc
 from baselines import *
 from NoahClade import random_discrete_tree, random_gaussian_tree
 
@@ -133,12 +133,21 @@ def score_weird03(A, M):
     gap = (s[0]**2 - s[1]**2)**2
     return (pseudo_frob - gap)/4
 
+# almost as good
 def score_hack1(A, M):
     M_A = M[np.ix_(A, ~A)]
     s = np.linalg.svd(M_A, compute_uv=False)
     if s.size <= 1:
         return 0
     norm = np.sqrt(M_A.shape[0]*M_A.shape[1])
+    return s[1:].sum() / norm
+
+def score_hack1half(A, M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    if s.size <= 1:
+        return 0
+    norm = M_A.shape[0]*M_A.shape[1]
     return s[1:].sum() / norm
 
 def score_hack2(A, M):
@@ -148,6 +157,24 @@ def score_hack2(A, M):
         return 0
     norm = min(M_A.shape[0],M_A.shape[1])
     return s[1:].sum() / norm
+
+def score_hack2half(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    if s.size <= 1:
+        return 0
+    sizeA, sizeAc = M_A.shape
+    norm = sizeA*(sizeA-1)*sizeAc*(sizeAc-1)
+    return s[1:].sum() / norm
+
+def score_hack2and34(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    if s.size <= 1:
+        return 0
+    sizeA, sizeAc = M_A.shape
+    norm = sizeA*(sizeA-1)*sizeAc*(sizeAc-1)
+    return s[1:].sum() / np.sqrt(norm)
 
 def score_weird04(A, M):
     M_A = M[np.ix_(A, ~A)]
@@ -186,14 +213,6 @@ def score_weird5(A, M):
     s_square_sum = (s**2).sum()
     return s1_square*(s_square_sum - s1_square)/s_square_sum
 
-def score_energy(A, M):
-    M_A = M[np.ix_(A, ~A)]
-    s = np.linalg.svd(M_A, compute_uv=False)
-
-    #if s.size <= 1:
-    #    return 0
-    # TODO: sum of abs of eigenvalue - mean of eigenvalues
-
 def score_weird6(A,M):
     M_A = M[np.ix_(A, ~A)]
     s = np.linalg.svd(M_A, compute_uv=False)
@@ -206,11 +225,29 @@ def score_weird7(A,M):
     s_sq = s**2
     return ((s.sum()**2 - (s**2).sum())/2) / s_sq[0]
 
+# utter shit
+def score_nuke(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    return s.sum()
 
+def score_frob_norm(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return (s_sq.sum() - s_sq[0]) / s_sq[0]
 
+# utter shit
+def score_energy(A, M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    mean_s = s.mean()
+    return np.abs(s-mean_s).sum()
+    #if s.size <= 1:
+    #    return 0
 # %%
 
-def comp_scorers(m, Ns, k, scorers, n_trees=6, obs_per_tree=2, proba_bounds=(0.75, 0.95), baselines=[], discrete=True):
+def comp_scorers(m, Ns, k, scorers, n_trees=12, obs_per_tree=1, proba_bounds=(0.75, 0.95), std_bounds=(0.1, 0.3), baselines=[], discrete=True):
     # Ns is array of n
     if discrete:
         transition_maker = NoahClade.NoahClade.gen_symmetric_transition
@@ -229,7 +266,7 @@ def comp_scorers(m, Ns, k, scorers, n_trees=6, obs_per_tree=2, proba_bounds=(0.7
         if discrete:
             ref_tree = random_discrete_tree(m, 1, k, proba_bounds=proba_bounds)
         else:
-            ref_tree = random_gaussian_tree(m, 1, std_bounds=(0.1, 0.3))
+            ref_tree = random_gaussian_tree(m, 1, std_bounds=std_bounds)
         for _ in range(obs_per_tree):
             for n in Ns:
                 root_data = np.random.choice(a=k, size=n)
@@ -251,51 +288,45 @@ def comp_scorers(m, Ns, k, scorers, n_trees=6, obs_per_tree=2, proba_bounds=(0.7
                     itr += 1
     return stats
 
+def clean_stats(data, Ns=None):
+    if Ns is not None:
+        data = data[data['n'].isin(Ns)]
+    return data
+
+def violin(data, Ns=None):
+    sns.catplot(data=clean_stats(data, Ns=Ns), x="method", y="RF", inner="stick", col="n", bw=.8, scale="count", kind="violin", col_wrap=3)
+
+def box(data, Ns=None):
+    sns.boxplot(data=clean_stats(data, Ns=Ns), x="n", y="RF", hue='method')
+
+def lines(data, Ns=None):
+    sns.pointplot(data=clean_stats(data, Ns=Ns), x="n", y="RF", hue='method', dodge=0.2)
+
 # %%
-
-def get_parent(tree, child_clade):
-    node_path = tree.get_path(child_clade)
-    return node_path[-2]
-
-def p(my_clade):
-    _, counts = np.unique(my_clade.data, return_counts=True)
-    mat = np.diag(counts/len(my_clade.data))
-    return mat
-    return np.linalg.det(mat)
-
-from sklearn.metrics import confusion_matrix
-def testerest(tree, lab1, lab2, n):
-    #tree = ref_tree
-    #lab1 = "taxon56"
-    #lab2 = 'taxon34'
-    x = ref_tree.find_any(lab1)
-    y = ref_tree.find_any(lab2)
-    a = get_parent(tree, x)
-    assert a is get_parent(tree, y)
-    pxy = np.linalg.det(confusion_matrix(x.data, y.data) / n)
-    print(p(x)*p(y)/pxy, p(a))
-
-p(get_parent(ref_tree, "taxon56"))
-
-np.linalg.det(ref_tree.find_any("taxon56").transition.matrix)
-p(get_parent(ref_tree, "taxon56"))
-p(ref_tree.find_any("taxon56"))
-testerest(ref_tree, "taxon56", 'taxon34', n)
 
 if __name__ == "__main__":
 
-    stats5 = pd.DataFrame(comp_scorers(m=64, Ns=[1_000, 3_000, 10_000], k=4, scorers=[score_sum], baselines=[neighbor_joining, NJ, NJ_JC]))
-    sns.catplot(data=stats5, x="method", y="RF", inner="stick", col="n", bw=.8, scale="count", kind="violin", col_wrap=3)
+    normed = partial(estimate_tree_topology, scorer=score_weird6, similarity=normalized_similarity_matrix)
+    normed.__name__ = 'normed'
 
+    adjusted = partial(estimate_tree_topology, scorer=score_sum, similarity=adj_jc)
+    adjusted.__name__ = 'adjusted'
 
-    # %%
-    scorers = [score_plain, score_plain12, score_plain_trace, score_sum, score_sumtrace, score_weird]
+    stats = pd.DataFrame(comp_scorers(m=64, Ns=[300, 1_000, 3_000, 10_000, 30_000], k=4, scorers=[score_sum, score_weird6], baselines=[normed], n_trees=20))
+    violin(stats)
+    box(stats, Ns=[1000, 3000, 10_000, 30_000])
+    lines(stats, Ns=[1000, 3000, 10_000, 30_000])
 
-    # keep n < 10^6
-    stats = pd.DataFrame(comp_scorers(m=64, Ns=[300, 1_000, 3_000, 10_000, 30_000], k=4, scorers=[score_plain, score_weird6]))
+    stats = pd.DataFrame(comp_scorers(m=100, Ns=[1_000, 3_000, 10_000], k=4, scorers=[score_hack2half, score_hack2and34, score_sum], baselines=[], n_trees=20))
+    violin(stats)
+    box(stats)
+    lines(stats)
 
-    sns.catplot(data=stats, x="method", y="RF", inner="stick", col="n", bw=.8, scale="count", kind="violin", col_wrap=3)
-    #plt.show()
+    # these are really all the same
+    stats = pd.DataFrame(comp_scorers(m=64, Ns=[300, 1_000, 3_000, 10_000, 30_000], k=4, scorers=[score_plain, score_sum, score_hack3], baselines=[], n_trees=50))
+    violin(stats)
+    box(stats)
+    lines(stats)
 
     # stats = pd.DataFrame(comp_scorers(m=20, Ns=[300, 500, 1_000, 1_500, 2_000], k=4, scorers=[score_sum, score_weird6, score_quartet_sum]))
 
@@ -309,9 +340,8 @@ if __name__ == "__main__":
 
     # %%
     # continuous
-    NNNs=[300, 1_000, 3_000, 10_000, 30_000, 100_000]
-    stats = pd.DataFrame(comp_scorers(m=128, Ns=[3_000, 10_000, 30_000,], k=4, scorers=[score_sum, score_sqrt_sum], baselines=[], discrete=False), n_trees=10) #NJ_continuous
+    stats = pd.DataFrame(comp_scorers(m=30, Ns=[3_000, 10_000, 30_000, 40_000, 50_000], k=4, scorers=[score_sum, score_weird6], baselines=[NJ_continuous], discrete=False, n_trees=10, std_bounds=(0.1, 0.7)))
+    #stats = pd.DataFrame(comp_scorers(m=30, Ns=[1_000, 3_000, 10_000,], k=4, scorers=[score_sum, score_weird6, score_quartet_sum], baselines=[NJ_continuous], discrete=False, n_trees=4))
 
-    stats = pd.DataFrame(comp_scorers(m=30, Ns=[1_000, 3_000, 10_000,], k=4, scorers=[score_sum, score_weird6, score_quartet_sum], baselines=[NJ_continuous], discrete=False, n_trees=4))
-
-    sns.catplot(data=stats, x="method", y="RF", inner="stick", col="n", bw=.8, scale="count", kind="violin", col_wrap=3)
+    violin(stats)
+    lines(stats)

@@ -408,8 +408,16 @@ A = ref_tree.root.labels2taxaset(['taxon19', 'taxon6', 'taxon52', 'taxon47',])
 # bad, small
 A = ref_tree.root.labels2taxaset(['taxon24', 'taxon27', 'taxon4', 'taxon32'])
 
+def score_weird6(M_A):
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return (s_sq.sum()**2 - (s_sq**2).sum())/2
+
+M_A.shape
+det22(M_A[(2,3),:][:,(4,5)])**2
+
 for _ in range(10):
-    A = np.random.binomial(1, 0.3, size=m)
+    A = np.random.binomial(1, 0.3, size=m).astype(bool)
 
     M_A = sim[np.ix_(A, ~A)]
     s = np.linalg.svd(M_A, compute_uv=False)
@@ -417,7 +425,8 @@ for _ in range(10):
     print("="*30)
     LHS = score_quartet_sum(A, sim)
     #RHS = (s[0]**2)*(s**2)[1:].sum()
-    RHS = sum([aaa*bbb for aaa, bbb in list(combinations(s_sq, 2))])
+    #RHS = sum([aaa*bbb for aaa, bbb in list(combinations(s_sq, 2))])
+    RHS = score_weird6(M_A)
     print(LHS)
     print(RHS)
     print(100*(LHS - RHS)/LHS)

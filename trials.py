@@ -7,7 +7,7 @@ import NoahClade
 from reconstruct_tree import estimate_tree_topology_multiclass
 from baselines import NJ_JC, NJ_hamming
 
-def grow_tree_recover(m, n, k, proba_bounds=(0.50, 0.95), verbose=True):
+def grow_tree_recover(m, n, k, proba_bounds, verbose=True):
     reference_tree = random_discrete_tree(m, n, k, proba_bounds=proba_bounds)
     if verbose:
         reference_tree.root.ascii()

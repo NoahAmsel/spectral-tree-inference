@@ -62,7 +62,7 @@ def NJ_JC(observations, labels=None):
 
 def NJ_logdet(observations, labels=None, classes=None):
     similarity = similarity_matrix(observations, classes=classes)
-    dm = -np.log(similarity)
+    dm = -np.log(np.clip(similarity, a_min=1e-20, a_max=None))
     return NJ(dm, labels=labels)
 
 def NJ_continuous(observations, labels=None):

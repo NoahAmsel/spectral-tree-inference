@@ -1,5 +1,5 @@
 .git/*
 __pycache__
 figures
-trees
+matlab_tests
 *.DS_Store

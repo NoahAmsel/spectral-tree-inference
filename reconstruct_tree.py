@@ -42,6 +42,12 @@ def similarity_matrix(observations, classes=None):
     #M = np.linalg.det(confusion_matrices/sqrt(n))
     return M
 
+def normalized_similarity_matrix(observations, classes=None):
+    sim = similarity_matrix(observations, classes)
+    diag = sim.diagonal().reshape(1,-1)
+    return sim / np.sqrt(diag*diag.T)
+    # return sim / diag*diag.T
+
 def JC_similarity_matrix(observations, classes=None):
     # TODO: use classes argument to make this robust to missing data
     if classes is None:
@@ -61,6 +67,15 @@ def JC_similarity_matrix(observations, classes=None):
     np.fill_diagonal(dm, (1/k)**k)
     return dm
 
+def adj_jc(observations, classes=None):
+    sim = JC_similarity_matrix(observations, classes=classes)
+    if classes is None:
+        classes = np.unique(observations)
+    else:
+        assert False
+    k = len(classes)
+    return sim**(1/k)
+
 def linear_similarity_matrix(observations):
     return np.corrcoef(observations)**2
 
@@ -75,7 +90,7 @@ def estimate_tree_topology(observations, labels=None, similarity=similarity_matr
     M = similarity(observations)
 
     # initialize leaf nodes
-    G = [NoahClade.leaf(i, labels=labels, data=observations[i,:]) for i in range(m)]
+    G = [NoahClade.leaf(i, labels=labels, data=observations[i,:], m=m) for i in range(m)]
 
     available_clades = set(range(len(G)))   # len(G) == m
     # initialize Sigma
@@ -86,10 +101,10 @@ def estimate_tree_topology(observations, labels=None, similarity=similarity_matr
         A = G[i].taxa_set | G[j].taxa_set
         Sigma[i,j] = scorer(A, M)
         Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
-        sv1[i,j] = first_sv(A, M)
-        sv1[j,i] = sv1[i,j]
-        sv2[i,j] = second_sv(A, M)
-        sv2[j,i] = sv2[i,j]
+        #sv1[i,j] = first_sv(A, M)
+        #sv1[j,i] = sv1[i,j]
+        #sv2[i,j] = second_sv(A, M)
+        #sv2[j,i] = sv2[i,j]
 
     # merge
     while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
@@ -145,6 +160,67 @@ def test_plot(p, sample_sizes, fun=fun):
     plt.plot([true]*len(sample_sizes))
     fig.show()
 
+# experiments
+# TODO: remove scorer argument when we've settled on one
+def normalized_estimate_tree_topology(observations, labels=None, similarity=similarity_matrix, bifurcating=False, scorer=score_split):
+    m, n = observations.shape
+
+    """if labels is None:
+        labels = [str(i) for i in range(m)]
+    assert len(labels) == m"""
+
+    M = similarity(observations)
+
+    # initialize leaf nodes
+    G = [NoahClade.leaf(i, labels=labels, data=observations[i,:], m=m) for i in range(m)]
+
+    available_clades = set(range(len(G)))   # len(G) == m
+    # initialize Sigma
+    Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
+    sv1 = np.full((2*m,2*m), np.nan)
+    sv2 = np.full((2*m,2*m), np.nan)
+    for i,j in combinations(available_clades, 2):
+        A = G[i].taxa_set | G[j].taxa_set
+        Sigma[i,j] = scorer(A, M)
+        Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
+        sv1[i,j] = first_sv(A, M)
+        sv1[j,i] = sv1[i,j]
+        sv2[i,j] = second_sv(A, M)
+        sv2[j,i] = sv2[i,j]
+
+    # merge
+    while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
+        left, right = min(combinations(available_clades, 2), key=lambda pair: Sigma[pair])
+        G.append(NoahClade(clades=[G[left], G[right]], score=Sigma[left, right]))
+        ##
+        A = G[-1].taxa_set
+        M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
+        u, s, vh = np.linalg.svd(M_A, full_matrices=False)
+        M[left,:] = M[left,:]/u[:,0]
+        ##
+        new_ix = len(G) - 1
+        available_clades.remove(left)
+        available_clades.remove(right)
+        for other_ix in available_clades:
+            A = G[other_ix].taxa_set | G[-1].taxa_set
+            Sigma[other_ix, new_ix] = scorer(A, M)
+            Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
+            sv1[other_ix, new_ix] = first_sv(A, M)
+            sv1[new_ix, other_ix] = sv1[other_ix, new_ix]
+            sv2[other_ix, new_ix] = second_sv(A, M)
+            sv2[new_ix, other_ix] = sv2[other_ix, new_ix]
+        available_clades.add(new_ix)
+
+    # HEYYYY why does ariel do something special for the last THREE groups? (rather than last two)
+    # think about what would happen if at the end we have three groups: 1 leaf, 1 leaf, n-2 leaves
+    # how would we know which leaf to attach, since score would be 0 for both??
+
+    # return Phylo.BaseTree.Tree(G[-1])
+
+    # for a bifurcating tree we're combining the last two available clades
+    # for an unrooted one it's the last three because
+    # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
+    return Phylo.BaseTree.Tree(NoahClade(clades=[G[i] for i in available_clades])) #, Sigma, sv1, sv2
 
 
 # def tracking_estimate_tree_topology(observations, labels=None, discrete=True, bifurcating=False, scorer=score_split, good_splits):
