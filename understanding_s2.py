@@ -26,6 +26,15 @@ def score_quartet_sum(A, M):
     Ac_pairs = list(combinations(range(nAc), 2))
     return sum(det22(M_A[np.ix_(pair1, pair2)])**2 for pair1, pair2 in product(A_pairs, Ac_pairs))
 
+def my_formula(M_A):
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return (s_sq.sum()**2 - (s_sq**2).sum())/2
+
+def sum_sq(M_A):
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return s_sq[1:].sum()
 
 def score_sum(A, M):
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
@@ -359,7 +368,11 @@ np.sqrt((s2**2 + s3**2))
 x,y,z,a,b,c,p,q,r,t = np.random.uniform(low=0.75, high=0.95, size=(10))
 M_A = np.array([[a*b*p*q*t, a*y*p*q*t*r, a*z*p*q*t], [c*b*p*q*t, c*y*p*q*r, c*z*p*t], [x*b*p*q*t*r, x*y*p*r, x*z*p*r]])
 M_A
-s = np.linalg.svd(M_A, compute_uv=False)
+#s = np.linalg.svd(M_A, compute_uv=False)
+u, s, vt = np.linalg.svd(M_A)
+np.outer(u[:,0]*s[0], vt[0,:])
+u[:,0]/u[0,0]
+[a/a, c/a, x/a] # best rank one approx doesn't really treat these the same
 s1, s2, s3 = s
 print(s)
 LHS = quartet_sum_alt(M_A)
@@ -368,8 +381,6 @@ RHS = (s1**2)*(s2**2)+(s1**2)*(s3**2)+(s2**2)*(s3**2)
 (s[0]**2)*(s[1]**2 + s[2])
 np.linalg.norm(M_A)**2
 (s**2).sum()
-
-
 
 # %%
 x,y,z,w,a,b,q,r = np.random.uniform(low=0.75, high=0.95, size=(8))

@@ -11,7 +11,7 @@ from itertools import combinations, product
 
 from importlib import reload
 #reload(baselines)
-from reconstruct_tree import estimate_tree_topology, similarity_matrix, linear_similarity_matrix, JC_similarity_matrix, normalized_similarity_matrix, adj_jc
+from reconstruct_tree import estimate_tree_topology, similarity_matrix, linear_similarity_matrix, JC_similarity_matrix, adj_jc, normalized_estimate_tree_topology
 from baselines import *
 from NoahClade import random_discrete_tree, random_gaussian_tree
 
@@ -219,12 +219,6 @@ def score_weird6(A,M):
     s_sq = s**2
     return (s_sq.sum()**2 - (s_sq**2).sum())/2
 
-def score_weird7(A,M):
-    M_A = M[np.ix_(A, ~A)]
-    s = np.linalg.svd(M_A, compute_uv=False)
-    s_sq = s**2
-    return ((s.sum()**2 - (s**2).sum())/2) / s_sq[0]
-
 # utter shit
 def score_nuke(A,M):
     M_A = M[np.ix_(A, ~A)]
@@ -236,6 +230,7 @@ def score_frob_norm(A,M):
     s = np.linalg.svd(M_A, compute_uv=False)
     s_sq = s**2
     return (s_sq.sum() - s_sq[0]) / s_sq[0]
+    # shouldn't that be / s_sq[0]**2?
 
 # utter shit
 def score_energy(A, M):
@@ -245,6 +240,56 @@ def score_energy(A, M):
     return np.abs(s-mean_s).sum()
     #if s.size <= 1:
     #    return 0
+
+def overestimate(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return (s_sq.sum())**2 - s_sq[0]**2
+
+# bad
+def score_stable_rank(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return s_sq.sum()/s_sq[0] #frobenius norm sq / operator norm sq
+
+def score_weird7(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    s_sq = s**2
+    return ((s_sq.sum()**2 - (s_sq**2).sum())/2) / s_sq[0]
+
+def score_weird8(A, M): # take sqrt of entries first
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(np.sqrt(M_A), compute_uv=False)
+    s_sq = s**2
+    return (s_sq.sum()**2 - (s_sq**2).sum())/2
+# if you take the cube or the cube root it's definitely worse
+
+def score_weird9(A, M):  #performs about same as weird8 ?
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(np.sqrt(M_A), compute_uv=False)
+    s_sq = s**2
+    pairs = M_A.shape[0]*M_A.shape[1]
+    return ((s_sq.sum()**2 - (s_sq**2).sum())/2)/pairs
+# if you do pairs^2 it's definitely worse
+
+# transforming by taking svd of 1/M_A sucks
+
+def score_stable_sqrt(A, M):  # not great :(
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(np.sqrt(M_A), compute_uv=False)
+    s_sq = s**2
+    return s_sq.sum()/s_sq[0]
+
+def score_weird11(A,M):
+    M_A = M[np.ix_(A, ~A)]
+    s = np.linalg.svd(np.sqrt(M_A), compute_uv=False)
+    s_sq = (s/s[0])**2
+    return ((s_sq.sum()**2 - (s_sq**2).sum())/2)
+    # shouldn't these s's be s_sq ??
+
 # %%
 
 def comp_scorers(m, Ns, k, scorers, n_trees=12, obs_per_tree=1, proba_bounds=(0.75, 0.95), std_bounds=(0.1, 0.3), baselines=[], discrete=True):
@@ -317,16 +362,39 @@ if __name__ == "__main__":
     box(stats, Ns=[1000, 3000, 10_000, 30_000])
     lines(stats, Ns=[1000, 3000, 10_000, 30_000])
 
-    stats = pd.DataFrame(comp_scorers(m=100, Ns=[1_000, 3_000, 10_000], k=4, scorers=[score_hack2half, score_hack2and34, score_sum], baselines=[], n_trees=20))
+    stats = pd.DataFrame(comp_scorers(m=100, Ns=[1_000, 3_000, 10_000], k=4, scorers=[score_weird7, score_weird8, score_weird9, score_sum], baselines=[], n_trees=50))
+    stats2 = pd.DataFrame(comp_scorers(m=100, Ns=[1_000, 3_000, 10_000], k=4, scorers=[score_weird11], baselines=[], n_trees=50))
+    #stats = stats.append(stats2)
+    violin(stats)
+    box(stats)
+    lines(stats.append(stats2))
+    len(stats)
+
+    print(("="*40+"\n")*5)
+    #from reconstruct_tree import normalized_estimate_tree_topology
+    stats = pd.DataFrame(comp_scorers(m=100, Ns=[1_000, 3_000, 10_000], k=4, scorers=[score_plain], baselines=[normalized_estimate_tree_topology, normalized_estimate_tree_topology_OLD, normed], n_trees=30))
     violin(stats)
     box(stats)
     lines(stats)
+
+    from reconstruct_tree import normalized_similarity_matrix
+    normed = partial(estimate_tree_topology, scorer=score_plain, similarity=normalized_similarity_matrix)
+    normed.__name__ = 'normed'
+    stats2 = pd.DataFrame(comp_scorers(m=100, Ns=[1_000, 3_000, 10_000], k=4, scorers=[], baselines=[normed], n_trees=30))
+
+    stats[stats['method'].isin(["plain", 'normed'])].groupby(['method', 'n']).mean()
+
+    stats = stats.append(stats2)
 
     # these are really all the same
     stats = pd.DataFrame(comp_scorers(m=64, Ns=[300, 1_000, 3_000, 10_000, 30_000], k=4, scorers=[score_plain, score_sum, score_hack3], baselines=[], n_trees=50))
     violin(stats)
     box(stats)
     lines(stats)
+
+    (1+0.1**2)/(0.1**4)
+    (1/0.1)**4
+    (1/0.1)**2
 
     # stats = pd.DataFrame(comp_scorers(m=20, Ns=[300, 500, 1_000, 1_500, 2_000], k=4, scorers=[score_sum, score_weird6, score_quartet_sum]))
 
@@ -345,3 +413,5 @@ if __name__ == "__main__":
 
     violin(stats)
     lines(stats)
+
+    stats.groupby(['n', 'method']).mean()

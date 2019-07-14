@@ -3,6 +3,7 @@ import Bio.Phylo as Phylo
 from Bio.Phylo.Consensus import _bitstring_topology, _BitString
 from string import ascii_lowercase
 import scipy.linalg
+from itertools import zip_longest
 
 # TODO: right now this uses Biopython, but also check out dendropy
 
@@ -98,6 +99,21 @@ class NoahClade(Phylo.BaseTree.Clade):
         tree.root.reset_taxasets()
         return tree
 
+    @classmethod
+    def complete_binary(cls, depth, proba_bounds, k=4, n=1):
+        m = 2**depth
+        leaves = [cls.leaf(i, m=m) for i in range(m)]
+        while len(leaves)>1:
+            halfway = int(len(leaves)/2)
+            leaves = [cls(clades=[left, right]) for left, right in zip_longest(leaves[:halfway], leaves[halfway:])]
+        root = leaves[0]
+        root.reset_taxasets()
+
+        root_data = np.random.choice(a=k, size=n)
+        transition_maker = cls.gen_symmetric_transition
+        root.gen_subtree_data(root_data, transition_maker, num_classes=k, proba_bounds=proba_bounds)
+        return Phylo.BaseTree.Tree.from_clade(root)
+
     def observe(self, labels=None):
         if labels is None:
             # keep this separate because the below breaks when leaves have the same name
@@ -108,7 +124,7 @@ class NoahClade(Phylo.BaseTree.Clade):
             leaflabel2data = {leaf.name: leaf.data for leaf in self.get_terminals()}
             return np.array([leaflabel2data[label] for label in labels]), labels
 
-    def gen_subtree_data(self, root_data, transition_generator, **transition_generator_args):
+    def gen_subtree_data(self, root_data, transition_generator=None, **transition_generator_args):
         self.data = root_data
         if not self.is_terminal():
             for child in self:
@@ -155,8 +171,11 @@ class NoahClade(Phylo.BaseTree.Clade):
                     splits.add(split_other)
         return splits
 
-    def taxaset2ixs(self):
-        return tuple(np.nonzero(node.taxa_set)[0])
+    def my_taxaset2ixs(self, invert=False):
+        if invert:
+            return tuple(np.nonzero(~self.taxa_set)[0])
+        else:
+            return tuple(np.nonzero(self.taxa_set)[0])
 
     @staticmethod
     def taxaset2ixs(taxa_set):
