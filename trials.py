@@ -1,18 +1,19 @@
 # %%
 import numpy as np
-
+import dendropy
 import reconstruct_tree
+import utils
 
-def grow_tree_recover(m, n, k, proba_bounds, verbose=True):
-    reference_tree = random_discrete_tree(m, n, k, proba_bounds=proba_bounds)
+"""def grow_tree_recover(m, n, k, proba_bounds, verbose=True):
+    reference_tree = balanced_binary(np.log2(m)) #random_discrete_tree(m, n, k, proba_bounds=proba_bounds)
     if verbose:
-        reference_tree.root.ascii()
+        reference_tree.print_plot()
     observations, labels = reference_tree.root.observe()
     inferred_tree = estimate_tree_topology_multiclass(observations, labels=labels)
     if verbose:
         Phylo.draw_ascii(inferred_tree)
     NoahClade.tree_Fscore(inferred_tree, reference_tree)
-    print(NoahClade.equal_topology(inferred_tree, reference_tree))
+    print(NoahClade.equal_topology(inferred_tree, reference_tree))"""
 
 def load_tree_recover(reference_tree, n, k=None, proba_bounds=(0.50, 0.95), verbose=True, format='newick'):
     # if tree is a file, load the tree it contains
@@ -42,7 +43,7 @@ def even_branch_lengths(tree):
         node.branch_length = 1
 
 def load_observations_recover(reference_tree_path=None, observation_matrix_path=None, comparison_tree_path=None, verbose=False, format='newick', method=estimate_tree_topology_multiclass):
-    reference_tree = Phylo.read(reference_tree_path, format)
+    reference_tree = dendropy.read(reference_tree_path, format)
     reference_tree.root = NoahClade.NoahClade.convertClade(reference_tree.root)
     if verbose:
         print("="*40)
