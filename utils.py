@@ -1,5 +1,6 @@
-import dendropy
+from collections import defaultdict
 import numpy as np
+import dendropy
 from dendropy.interop import seqgen
 
 def new_default_namespace(num_taxa):
@@ -23,8 +24,8 @@ def merge_children(children, **kwargs):
     return node
 
 # TODO: change depth arg to #leaves arg
-def balanced_binary(depth, namespace=None):
-    num_taxa = 2**depth
+def balanced_binary(num_taxa, namespace=None):
+    assert num_taxa == 2**int(np.log2(num_taxa))
     if namespace is None:
         namespace = new_default_namespace(num_taxa)
     else:
@@ -44,11 +45,11 @@ def lopsided_tree(num_taxa, namespace=None):
     else:
         assert num_taxa == len(namespace)
 
-    nodes = [leaf(i, namespace, edge_length=1) for i in range(num_taxa)]
+    nodes = [leaf(i, namespace, edge_length=1.) for i in range(num_taxa)]
     while len(nodes) > 1:
         a = nodes.pop()
         b = nodes.pop()
-        nodes.append(merge_children((a,b)))
+        nodes.append(merge_children((a,b), edge_length=1.0))
 
     return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
 
@@ -70,9 +71,34 @@ def charmatrix2array(charmatrix):
 def array2charmatrix(matrix, alphabet):
     pass
 
+def array2distance_matrix(matrix, namespace=None):
+    m, m2 = matrix.shape
+    assert m == m2, "Distance matrix must be square"
+    if namespace is None:
+        namespace = new_default_namespace(m)
+    else:
+        assert len(namespace) >= m, "Namespace too small for distance matrix"
+
+    dict_form = defaultdict(dict)
+    for i in range(m):
+        for j in range(m):
+            dict_form[namespace[i]][namespace[j]] = matrix[i,j]
+    dm = dendropy.calculate.phylogeneticdistance.PhylogeneticDistanceMatrix()
+    dm.compile_from_dict(dict_form, namespace)
+    return dm
+
+# %%
 if __name__ == "__main__":
+
     t = balanced_binary(4)
     t.print_plot()
+
+    name = t.taxon_namespace
+    len(name)
+    mmm = np.array([[0,2,3,4],[2,0,7,8],[3,7,0,9],[4,8,9,0]])
+    distmat = array2distance_matrix(mmm, name)
+    dtable = distmat.as_data_table()
+    dtable.write_csv("stdout")
 
     trees = dendropy.TreeList([t])
     trees
@@ -84,7 +110,10 @@ if __name__ == "__main__":
 
     all_data = temp_dataset_maker(trees, 1000, 1)
     t0_data = all_data[0]
-    observations, _ = charmatrix2array(t0_data)
+    observations, alpha = charmatrix2array(t0_data)
+
+    observations
+    list(alpha)
 
     """model = dendropy.model.discrete.Jc69() #
     model = dendropy.model.discrete.DiscreteCharacterEvolver()

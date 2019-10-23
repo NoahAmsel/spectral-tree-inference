@@ -1,15 +1,24 @@
 from itertools import combinations
 import numpy as np
 import scipy.spatial.distance
+import dendropy     #should this library be independent of dendropy? is that even possible?
 import utils
 
-def score_split(A, M):
+def sv2(A, M):
+    """Second Singular Value"""
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
     s = np.linalg.svd(M_A, compute_uv=False)
     if s.size <= 1:
         return 0    # automatically rank 1, so we say "the second eigenvalue" is 0
     else:
         return s[1] # the second eigenvalue
+
+def sum_squared_quartets(A, M):
+    """Normalized Sum of Squared Quartets"""
+    M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
+    norm_sq = np.linalg.norm(M_A)**2
+    num = norm_sq**2 - np.linalg.norm(M_A.T.dot(M_A))**2
+    return num / norm_sq
 
 def paralinear_distance(observations, classes=None):
     # build the similarity matrix M -- this is pretty optimized, at least assuming k << n
@@ -27,11 +36,14 @@ def paralinear_distance(observations, classes=None):
     #M = np.linalg.det(confusion_matrices/sqrt(n))
 
     diag = M.diagonal()
+    # assert np.count_nonzero(diag) > 0, "Sequence was so short that some characters never appeared"
     similarity = M / np.sqrt(np.outer(diag,diag))
     similarity = np.clip(similarity, a_min=1e-20, a_max=None)
     return -np.log(similarity)
+paralinear_distance.__str__ = "Paralinear Distance"
 
 def JC_distance_matrix(observations, classes=None):
+    """Jukes-Cantor Corrected Distance"""
     assert classes is None
     if classes is None:
         classes = np.unique(observations)
@@ -42,17 +54,20 @@ def JC_distance_matrix(observations, classes=None):
     return - (k-1) * np.log(inside_log)
 
 def correlation_distance_matrix(observations):
-    corr = np.corrcoef(observations)
+    """Correlation Distance"""
+    corr = np.abs(np.corrcoef(observations))
     corr = np.clip(corr, a_min=1e-16, a_max=None)
-    return np.log(corr)
+    return -np.log(corr)
 
-def estimate_tree_topology(distance_matrix, namespace=None, scorer=score_split, bifurcating=False):
+def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
     m, m2 = distance_matrix.shape
     assert m == m2, "Distance matrix must be square"
     if namespace is None:
         namespace = utils.new_default_namespace(m)
     else:
         assert len(namespace) >= m, "Namespace too small for distance matrix"
+
+    M = np.exp(-distance_matrix*scaler)
 
     # initialize leaf nodes
     G = [utils.leaf(i, namespace) for i in range(m)]
@@ -95,13 +110,29 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=score_split, 
     # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
     return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)))
 
+def estimate_edge_lengths(tree, distance_matrix):
+    pass
+
+def neighbor_joining(distance_matrix, namespace=None):
+    return utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
+
+# %%
 if __name__ == "__main__":
-    from utils import *
-    t = balanced_binary(4)
-    all_data = temp_dataset_maker(t, 1000, 0.1)
-    observations, _ = charmatrix2array(all_data[0])
-    dist = JC_distance_matrix(observations)
-    dist[:5,:5]
+    import dendropy
+    ref = utils.balanced_binary(8)
+    #all_data = utils.temp_dataset_maker(ref, 1000, 0.01)[0]
+    all_data = dendropy.model.discrete.simulate_discrete_chars(1000, ref, dendropy.model.discrete.Jc69(), mutation_rate=0.05)
+    observations, _ = utils.charmatrix2array(all_data)
+    dist = paralinear_distance(observations)
+    dist
+    inf = neighbor_joining(dist)
+    print('ref:')
+    ref.print_plot()
+    print("inf:")
+    inf.print_plot()
+
+    print([leaf.distance_from_root() for leaf in ref.leaf_nodes()])
+
 
     dist = paralinear_distance(observations)
     dist[:5,:5]
@@ -110,3 +141,6 @@ if __name__ == "__main__":
     np.log(dist[:5,:5])
 
     scipy.spatial.distance.pdist(observations, metric='hamming')
+
+    mm = np.array([[1,2],[-3, -1]])
+    np.linalg.norm(mm)**2

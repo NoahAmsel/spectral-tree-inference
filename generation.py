@@ -36,8 +36,7 @@ class Transition(ABC):
     def generate_descendents_data(self, node, seed_data, scalar):
         node.seqence = seed_data
         for child in node.child_nodes():
-            temp = self.transition(seed_data, child.edge_length)
-            self.generate_descendents_data(child, temp, scalar)
+            self.generate_descendents_data(child, self.transition(seed_data, child.edge_length), scalar)
 
     def generate_sequences(self, tree, seq_len=None, seed_data=None, scalar=1.0):
         if seed_data is None:
@@ -113,7 +112,7 @@ class GTR(Transition):
 
     def seqgen(self, tree, seq_len=None, seed_data=None, scaler=None):
         tree_list = dendropy.TreeList([tree])
-        self.seqgen_list(tree_list, seq_len=seq_len, seed_data=seed_data, scaler=scaler)
+        return self.seqgen_list(tree_list, seq_len=seq_len, seed_data=seed_data, scaler=scaler)[0]
 
     def seqgen_list(self, tree_list, seq_len=None, seed_data=None, scaler=None):
         # seqgen only works for Amino Acid or Nucleotide data
@@ -154,7 +153,7 @@ class Jukes_Cantor(GTR):
         """
         #return self.transition_function(t).matrix[0,0]
         #return 0.25 + 0.75 * np.exp(-4.*t/3.)
-        return 1./k + self.k_ratio * np.exp(- t / self.k_ratio)
+        return 1./self.k + self.k_ratio * np.exp(- t / self.k_ratio)
 
     def p2t(self, p):
         """
@@ -169,23 +168,63 @@ class Jukes_Cantor(GTR):
 
 # %%
 
-if __name__ == "__main__":
-    jc = Jukes_Cantor(4)
-    t = utils.lopsided_tree(4)
-    trees = dendropy.TreeList([t])
-    seqlists = jc.seqgen(trees, 100, scaler=0.3)
-    type(seqlists)
-    seqs = seqlists[0]
+class GeneralTimeReversible(dendropy.model.discrete.DiscreteCharacterEvolutionModel):
+    def __init__(self, state_alphabet, stationary_freqs, transition_rates=None, rng=None):
+        super().__init__(state_alphabet=state_alphabet, stationary_freqs=stationary_freqs, rng=rng)
+        self.k = len(state_alphabet) # TODO DOES THIS WORK??
+        if transition_rates:
+            assert len(transition_rates) == nchoose2(self.k)
+        # save these in case we can use seqgen
+        self.stationary_freqs = stationary_freqs / stationary_freqs.sum()
+        self.transition_rates = transition_rates
+        Q = scipy.spatial.distance.squareform(self.transition_rates)
+        Q *= self.stationary_freqs
+        # set diagonal so that rows sum to 0
+        np.fill_diagonal(Q, Q.diagonal()-Q.sum(axis=1))
+        self.Q = Q
 
-    mat, _ = utils.charmatrix2array(seqs)
-    mat.shape
+    def corrected_substitution_rate(rate):
+        return - 1./self.Q.diagonal().dot(self.stationary_freqs)
+
+    def pij(state_i, state_j, tlen, rate=1.0):
+        pass
+
+    def pmatrix(tlen, rate=1.0):
+        pass
+
+    def pvector(state, tlen, rate=1.0):
+        pass
+
+    def qmatrix(rate=1.0):
+        return self.Q*rate
+
+# %%
+
+if __name__ == "__main__":
+    tt = utils.balanced_binary(512)
+    jc = Jukes_Cantor(4)
+    seqs = jc.seqgen(tt, 100, scaler=0.3)
+    type(seqs)
+    print(seqs[255].symbols_as_string())
+
+    my_model = dendropy.model.discrete.Jc69() #
+    #my_model = dendropy.model.discrete.DiscreteCharacterEvolver()
+    mat = dendropy.model.discrete.simulate_discrete_chars(1000, tt, my_model)
+    print(mat[255].symbols_as_string())
 
     jc.p2transition_function(0.90).matrix
     jc.paralinear2t(0.5)
 
+# %%
 
-    model = dendropy.model.discrete.Jc69() #
-    my_model = dendropy.model.discrete.DiscreteCharacterEvolver()
-    mat = dendropy.model.discrete.simulate_discrete_chars(100, t, my_model)
-    hh = mat[0]
-    hh.symbols_as_string()
+if __name__ == "__main__":
+    #tt = dendropy.simulate.treesim.discrete_birth_death_tree(birth_rate=1.0, death_rate=0.0, ntax=20)
+    #tt = dendropy.simulate.treesim.birth_death_tree(birth_rate=1.0, death_rate=0.0, num_total_tips=20)
+    tt = dendropy.model.birthdeath.uniform_pure_birth_tree(utils.new_default_namespace(20))
+    #tt = utils.lopsided_tree(16)
+    tt.print_plot()
+    ls = [e.length for e in tt.edges()]
+    len(ls)
+    max(ls)
+    min(ls)
+    print([leaf.distance_from_root() for leaf in tt.leaf_nodes()])
