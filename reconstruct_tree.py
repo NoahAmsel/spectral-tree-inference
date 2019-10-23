@@ -4,8 +4,9 @@ import scipy.spatial.distance
 import dendropy     #should this library be independent of dendropy? is that even possible?
 import utils
 
-def sv2(A, M):
+def sv2(A1, A2, M):
     """Second Singular Value"""
+    A = A1 | A2
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
     s = np.linalg.svd(M_A, compute_uv=False)
     if s.size <= 1:
@@ -13,8 +14,9 @@ def sv2(A, M):
     else:
         return s[1] # the second eigenvalue
 
-def sum_squared_quartets(A, M):
+def sum_squared_quartets(A1, A2, M):
     """Normalized Sum of Squared Quartets"""
+    A = A1 | A2
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
     norm_sq = np.linalg.norm(M_A)**2
     num = norm_sq**2 - np.linalg.norm(M_A.T.dot(M_A))**2
@@ -78,13 +80,8 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
     sv1 = np.full((2*m,2*m), np.nan)
     sv2 = np.full((2*m,2*m), np.nan)
     for i,j in combinations(available_clades, 2):
-        A = G[i].taxa_set | G[j].taxa_set
-        Sigma[i,j] = scorer(A, M)
+        Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, M)
         Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
-        #sv1[i,j] = first_sv(A, M)
-        #sv1[j,i] = sv1[i,j]
-        #sv2[i,j] = second_sv(A, M)
-        #sv2[j,i] = sv2[i,j]
 
     # merge
     while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
@@ -94,8 +91,7 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
         available_clades.remove(left)
         available_clades.remove(right)
         for other_ix in available_clades:
-            A = G[other_ix].taxa_set | G[-1].taxa_set
-            Sigma[other_ix, new_ix] = scorer(A, M)
+            Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, M)
             Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
         available_clades.add(new_ix)
 

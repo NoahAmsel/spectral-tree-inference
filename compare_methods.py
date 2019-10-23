@@ -112,6 +112,7 @@ def experiment(tree_list, sequence_model, Ns, methods, reps_per_tree=1):
     results = []
     total_trials = len(tree_list)*len(Ns)*len(methods)*reps_per_tree
     i = 0
+    print("\t===== Experiment =====")
     for reference_tree in tree_list:
         for _ in range(reps_per_tree):
             sequences = sequence_model(seq_len=max(Ns), tree_model=reference_tree)
@@ -143,22 +144,48 @@ def correct(result_frame, x="n", y="correct", hue="method"):
     sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=dodge)
 
 # %%
-def my_weird(A, M):
-    pass
-# %%
+def weird1(A1, A2, M):
+    A = A1 | A2
+    M1 = M[np.ix_(A1, ~A)]
+    M2 = M[np.ix_(A2, ~A)]
+    U1, S1, Vh1 = np.linalg.svd(M1, compute_uv=True)
+    vh1 = Vh1[1,:]
+    U2, S2, Vh2 = np.linalg.svd(M2, compute_uv=True)
+    vh2 = Vh2[1,:]
+    return 1. - np.inner(vh1/np.linalg.norm(vh1), vh2/np.linalg.norm(vh2))
 
+def weird2(A1, A2, M):
+    A = A1 | A2
+    M1 = M[np.ix_(A1, ~A)]
+    M2 = M[np.ix_(A2, ~A)]
+
+    M1 = M1/np.linalg.norm(M1, axis=1, keepdims=True)
+    M2 = M2/np.linalg.norm(M2, axis=1, keepdims=True)
+    return -np.linalg.norm(M1.dot(M2.T))/np.sqrt(len(A1)*len(A2))
+# %%
 if __name__ == "__main__":
-    t = utils.balanced_binary(128)
+    #t = utils.balanced_binary(128)
     trees = dendropy.TreeList([utils.balanced_binary(128), utils.lopsided_tree(128)])
     jc_model = dendropy.model.discrete.Jc69()
     seqgen = partial(dendropy.model.discrete.simulate_discrete_chars, seq_model=jc_model, mutation_rate=0.1)
     Ns = np.geomspace(100, 1_000, num=4).astype(int)
-    methods = [Reconstruction_Method(reconstruct_tree.neighbor_joining), Reconstruction_Method(), Reconstruction_Method(scorer=reconstruct_tree.sum_squared_quartets)]
+    methods = [Reconstruction_Method(reconstruct_tree.neighbor_joining), Reconstruction_Method(), Reconstruction_Method(scorer=reconstruct_tree.sum_squared_quartets), Reconstruction_Method(scorer=weird2)]
     results = experiment(trees, seqgen, Ns=Ns, methods=methods)
     df = results2frame(results)
     correct(df)
     accuracy(df)
 
-    mat = dendropy.model.discrete.simulate_discrete_chars(1000, trees[0], my_model)
+    """
+    import cProfile
+    cProfile.run("results = experiment(trees, seqgen, Ns=Ns, methods=methods)")
+    """
+
+    """mat = dendropy.model.discrete.simulate_discrete_chars(1000, trees[0], my_model)
     observations, _ = utils.charmatrix2array(mat)
-    observations.shape
+    observations.shape"""
+
+# %%
+if __name__ == "__main__":
+    import pstats
+    p = pstats.Stats('profile.txt')
+    p.sort_stats('cumulative').print_stats(500)
