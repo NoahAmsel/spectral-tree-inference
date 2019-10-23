@@ -1,13 +1,15 @@
+from functools import partial
+import datetime
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pylab as plt
 import dendropy
+
 import reconstruct_tree
 import generation
 import utils
-
-from functools import partial
 
 """
 p = partial(reconstruct_tree.estimate_tree_topology, scorer=reconstruct_tree.sv2)
@@ -53,8 +55,7 @@ class Reconstruction_Method:
         elif self.core == reconstruct_tree.neighbor_joining:
             s = "NJ"
         else:
-            s = ""
-
+            s = self.core.__name__
         return s
 
 class Experiment_Datum:
@@ -65,13 +66,34 @@ class Experiment_Datum:
         inferred_tree.update_bipartitions()
         reference_tree.update_bipartitions()
         self.ref_tree = reference_tree
-        self.inf_tree = inferred_tree   # take this out for space/speed
+        # self.inf_tree = inferred_tree   # take this out for space/speed
         self.false_positives, self.false_negatives = dendropy.calculate.treecompare.false_positives_and_negatives(reference_tree, inferred_tree, is_bipartitions_updated=True)
-        self.RF = dendropy.calculate.treecompare.symmetric_difference(reference_tree, inferred_tree, is_bipartitions_updated=True)
+        self.total_reference = len(reference_tree.bipartition_encoding)
+        self.total_inferred = len(inferred_tree.bipartition_encoding)
+        self.timestamp = datetime.datetime.now()
 
     @property
     def m(self):
-        return len(t.leaf_edges())
+        return len(self.ref_tree.leaf_edges())
+
+    @property
+    def RF(self):
+        # source: https://dendropy.org/_modules/dendropy/calculate/treecompare.html#symmetric_difference
+        return self.false_positives + self.false_negatives
+
+    @property
+    def precision(self):
+        true_positives = self.total_inferred - self.false_positives
+        return true_positives / self.total_inferred
+
+    @property
+    def recall(self):
+        true_positives = self.total_inferred - self.false_positives
+        return true_positives / self.total_reference
+
+    @property
+    def F1(self):
+        return 2*(self.precision * self.recall)/(self.precision + self.recall)
 
     @property
     def correct(self):
@@ -82,7 +104,7 @@ class Experiment_Datum:
             "n": self.n,
             "m": self.m,
             "correct": self.correct,
-            "RF": self.RF,
+            "F1%": 100*self.F1,
             "method": str(self.method),
             }
 
@@ -112,23 +134,27 @@ def box(result_frame, x="n", y="RF", hue="method"):
     sns.boxplot(data=result_frame, x=x, y=y, hue=hue)
 
 # TODO: change RF to F1 something normalized like F1
-def accuracy(result_frame, x="n", y="RF", hue="method"):
-    sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=0.2)
+def accuracy(result_frame, x="n", y="F1%", hue="method"):
+    dodge = 0.1*(df['method'].nunique() - 1)
+    sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=dodge)
 
 def correct(result_frame, x="n", y="correct", hue="method"):
-    sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=0.2)
+    dodge = 0.1*(df['method'].nunique() - 1)
+    sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=dodge)
 
 # %%
-generation.Jukes_Cantor(4).paralinear_distance(0.2)
-generation.Jukes_Cantor(4).t2p(0.1)
+def my_weird(A, M):
+    pass
+# %%
 
 if __name__ == "__main__":
     t = utils.balanced_binary(128)
-    trees = dendropy.TreeList([t])
+    trees = dendropy.TreeList([utils.balanced_binary(128), utils.lopsided_tree(128)])
     jc_model = dendropy.model.discrete.Jc69()
     seqgen = partial(dendropy.model.discrete.simulate_discrete_chars, seq_model=jc_model, mutation_rate=0.1)
     Ns = np.geomspace(100, 1_000, num=4).astype(int)
-    results = experiment(trees, seqgen, Ns=Ns, methods=[Reconstruction_Method(reconstruct_tree.neighbor_joining), Reconstruction_Method()], reps_per_tree=3)
+    methods = [Reconstruction_Method(reconstruct_tree.neighbor_joining), Reconstruction_Method(), Reconstruction_Method(scorer=reconstruct_tree.sum_squared_quartets)]
+    results = experiment(trees, seqgen, Ns=Ns, methods=methods)
     df = results2frame(results)
     correct(df)
     accuracy(df)
