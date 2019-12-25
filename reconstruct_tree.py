@@ -42,7 +42,6 @@ def paralinear_distance(observations, classes=None):
     similarity = M / np.sqrt(np.outer(diag,diag))
     similarity = np.clip(similarity, a_min=1e-20, a_max=None)
     return -np.log(similarity)
-paralinear_distance.__str__ = "Paralinear Distance"
 
 def JC_distance_matrix(observations, classes=None):
     """Jukes-Cantor Corrected Distance"""
@@ -107,6 +106,7 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
     return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)))
 
 def estimate_edge_lengths(tree, distance_matrix):
+    # check the PAUP* documentation
     pass
 
 def neighbor_joining(distance_matrix, namespace=None):

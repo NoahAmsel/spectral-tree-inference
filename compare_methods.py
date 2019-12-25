@@ -1,5 +1,6 @@
 from functools import partial
 import datetime
+import pickle
 
 import numpy as np
 import pandas as pd
@@ -106,7 +107,7 @@ class Experiment_Datum:
             "correct": self.correct,
             "F1%": 100*self.F1,
             "method": str(self.method),
-            }
+        }
 
 def experiment(tree_list, sequence_model, Ns, methods, reps_per_tree=1):
     results = []
@@ -162,6 +163,7 @@ def weird2(A1, A2, M):
     M1 = M1/np.linalg.norm(M1, axis=1, keepdims=True)
     M2 = M2/np.linalg.norm(M2, axis=1, keepdims=True)
     return -np.linalg.norm(M1.dot(M2.T))/np.sqrt(len(A1)*len(A2))
+
 # %%
 if __name__ == "__main__":
     #t = utils.balanced_binary(128)
@@ -185,6 +187,31 @@ if __name__ == "__main__":
     observations.shape"""
 
 # %%
+if __name__ == "__main__":
+    JC = generation.Jukes_Cantor(4)
+    trees = dendropy.TreeList([utils.balanced_binary(num_taxa=128, edge_length=JC.paralinear2t(delta)) for delta in [0.55, 0.6, 0.65, 0.7]])
+    jc_model = dendropy.model.discrete.Jc69()
+    seqgen = partial(dendropy.model.discrete.simulate_discrete_chars, seq_model=jc_model, mutation_rate=1.)
+    Ns = [500]
+    methods = [Reconstruction_Method(reconstruct_tree.neighbor_joining), Reconstruction_Method()]
+    results = experiment(trees, seqgen, Ns=Ns, methods=methods, reps_per_tree=100)
+    df = results2frame(results)
+    correct(df)
+    accuracy(df)
+
+    len(results)
+
+    with open("data/results.pkl", "wb") as f:
+        pickle.dump(results, f)
+
+    df.to_pickle("data/df.pkl")
+
+    f = open("data/results.pkl", "rb")
+    ppp = pickle.load(f)
+    ppp
+    f.close()
+# %%
+
 if __name__ == "__main__":
     import pstats
     p = pstats.Stats('profile.txt')

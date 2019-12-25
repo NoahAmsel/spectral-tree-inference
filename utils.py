@@ -23,36 +23,35 @@ def merge_children(children, **kwargs):
         node.taxa_set = np.logical_or.reduce(tuple(child.taxa_set for child in children))
     return node
 
-# TODO: change depth arg to #leaves arg
-def balanced_binary(num_taxa, namespace=None):
-    assert num_taxa == 2**int(np.log2(num_taxa))
+def balanced_binary(num_taxa, namespace=None, edge_length=1.):
+    assert num_taxa == 2**int(np.log2(num_taxa)), "The number of leaves in a balanced binary tree must be a power of 2."
     if namespace is None:
         namespace = new_default_namespace(num_taxa)
     else:
-        assert num_taxa == len(namespace)
+        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
 
-    nodes = [leaf(i, namespace, edge_length=1.) for i in range(num_taxa)]
+    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
     while len(nodes) > 1:
-        nodes = [merge_children(nodes[2*i : 2*i+2], edge_length=1.) for i in range(len(nodes)//2)]
+        nodes = [merge_children(nodes[2*i : 2*i+2], edge_length=edge_length) for i in range(len(nodes)//2)]
 
     return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
 
-# TODO:
-def lopsided_tree(num_taxa, namespace=None):
+def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
     # one node splits off at each step
     if namespace is None:
         namespace = new_default_namespace(num_taxa)
     else:
-        assert num_taxa == len(namespace)
+        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
 
-    nodes = [leaf(i, namespace, edge_length=1.) for i in range(num_taxa)]
+    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
     while len(nodes) > 1:
         a = nodes.pop()
         b = nodes.pop()
-        nodes.append(merge_children((a,b), edge_length=1.0))
+        nodes.append(merge_children((a,b), edge_length=edge_length))
 
     return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
 
+# TODO: get rid of this
 def temp_dataset_maker(tree_list, seq_len, scaler):
     s = seqgen.SeqGen()
     #s.model = "GTR"
@@ -124,3 +123,36 @@ if __name__ == "__main__":
     pdm = dendropy.PhylogeneticDistanceMatrix(t)
     print(pdm)
     tt = pdm.as_data_table()
+
+import dendropy
+from dendropy.simulate import treesim
+taxa = dendropy.TaxonNamespace(["z1", "z2", "z3", "z4", "z5", "z6", "z7", "z8", "z9", "z10", "z11", "z12", "z13", "z14", "z15", "z16"])
+tree = treesim.pure_kingman_tree(
+        taxon_namespace=taxa,)
+        #pop_size=10000)
+
+
+tree = treesim.birth_death_tree(birth_rate=1., death_rate=0., num_total_tips=len(taxa), taxon_namespace=taxa)
+
+
+tree = treesim.birth_death_tree(birth_rate=1., death_rate=2., is_retain_extinct_tips=True, num_total_tips=len(taxa), taxon_namespace=taxa)
+
+tree.minmax_leaf_distance_from_root()
+
+print(tree.as_python_source())
+
+print(tree.as_ascii_plot())
+
+
+for e in tree.edges():
+    print(e.length)
+
+for n in tree.nodes():
+    print(n.edge_length)
+
+e = tree.edges()[5]
+e.length
+
+
+n0 = tree.nodes()[0]
+n0.branch

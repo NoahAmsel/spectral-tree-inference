@@ -3,3 +3,4 @@ __pycache__
 figures
 matlab_tests
 *.DS_Store
+data/*

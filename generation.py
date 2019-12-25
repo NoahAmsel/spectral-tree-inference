@@ -112,9 +112,9 @@ class GTR(Transition):
 
     def seqgen(self, tree, seq_len=None, seed_data=None, scaler=None):
         tree_list = dendropy.TreeList([tree])
-        return self.seqgen_list(tree_list, seq_len=seq_len, seed_data=seed_data, scaler=scaler)[0]
+        return self.seqgen_batch(tree_list, seq_len=seq_len, seed_data=seed_data, scaler=scaler)[0]
 
-    def seqgen_list(self, tree_list, seq_len=None, seed_data=None, scaler=None):
+    def seqgen_batch(self, tree_list, seq_len=None, seed_data=None, scaler=None):
         # seqgen only works for Amino Acid or Nucleotide data
         assert self.k == 4 or self.k == 20
         if seed_data is not None:
@@ -162,6 +162,8 @@ class Jukes_Cantor(GTR):
         """
         #return -(3./4) * np.log((4./3)*p - (1./3))
         return - self.k_ratio * np.log( p / self.k_ratio - 1./(self.k-1))
+
+
 
     def p2transition_function(self, p):
         return self.transition_function(self.p2t(p))
@@ -214,7 +216,7 @@ if __name__ == "__main__":
 
     jc.p2transition_function(0.90).matrix
     jc.paralinear2t(0.5)
-
+    jc.p2t(0.85)
 # %%
 
 if __name__ == "__main__":
