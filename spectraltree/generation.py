@@ -4,8 +4,6 @@ import scipy.linalg
 import scipy.spatial.distance
 import dendropy
 
-import utils
-
 def nchoose2(n):
     return int(n*(n-1)/2)
 
@@ -209,6 +207,7 @@ class GeneralTimeReversible(dendropy.model.discrete.DiscreteCharacterEvolutionMo
 # %%
 
 if __name__ == "__main__":
+    import spectraltree.utils
     tt = utils.balanced_binary(512)
     jc = Jukes_Cantor(4)
     seqs = jc.seqgen(tt, 100, scaler=0.3)
@@ -225,10 +224,9 @@ if __name__ == "__main__":
     jc.p2t(0.85)
 # %%
 
-if __name__ == "__main__":
     #tt = dendropy.simulate.treesim.discrete_birth_death_tree(birth_rate=1.0, death_rate=0.0, ntax=20)
     #tt = dendropy.simulate.treesim.birth_death_tree(birth_rate=1.0, death_rate=0.0, num_total_tips=20)
-    tt = dendropy.model.birthdeath.uniform_pure_birth_tree(utils.new_default_namespace(20))
+    tt = dendropy.model.birthdeath.uniform_pure_birth_tree(utils.default_namespace(20))
     #tt = utils.lopsided_tree(16)
     tt.print_plot()
     ls = [e.length for e in tt.edges()]

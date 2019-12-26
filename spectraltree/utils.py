@@ -1,9 +1,8 @@
 from collections import defaultdict
 import numpy as np
 import dendropy
-from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree
 
-def new_default_namespace(num_taxa):
+def default_namespace(num_taxa):
     return dendropy.TaxonNamespace([str(i) for i in range(num_taxa)])
 
 def leaf(i, namespace, **kwargs):
@@ -26,7 +25,7 @@ def merge_children(children, **kwargs):
 def balanced_binary(num_taxa, namespace=None, edge_length=1.):
     assert num_taxa == 2**int(np.log2(num_taxa)), "The number of leaves in a balanced binary tree must be a power of 2."
     if namespace is None:
-        namespace = new_default_namespace(num_taxa)
+        namespace = default_namespace(num_taxa)
     else:
         assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
 
@@ -39,7 +38,7 @@ def balanced_binary(num_taxa, namespace=None, edge_length=1.):
 def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
     # one node splits off at each step
     if namespace is None:
-        namespace = new_default_namespace(num_taxa)
+        namespace = default_namespace(num_taxa)
     else:
         assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
 
@@ -63,7 +62,7 @@ def array2distance_matrix(matrix, namespace=None):
     m, m2 = matrix.shape
     assert m == m2, "Distance matrix must be square"
     if namespace is None:
-        namespace = new_default_namespace(m)
+        namespace = default_namespace(m)
     else:
         assert len(namespace) >= m, "Namespace too small for distance matrix"
 

@@ -2,7 +2,7 @@ from itertools import combinations
 import numpy as np
 import scipy.spatial.distance
 import dendropy     #should this library be independent of dendropy? is that even possible?
-import utils
+import spectraltree.utils
 
 def sv2(A1, A2, M):
     """Second Singular Value"""
@@ -64,14 +64,14 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
     m, m2 = distance_matrix.shape
     assert m == m2, "Distance matrix must be square"
     if namespace is None:
-        namespace = utils.new_default_namespace(m)
+        namespace = spectraltree.utils.default_namespace(m)
     else:
         assert len(namespace) >= m, "Namespace too small for distance matrix"
 
     M = np.exp(-distance_matrix*scaler)
 
     # initialize leaf nodes
-    G = [utils.leaf(i, namespace) for i in range(m)]
+    G = [spectraltree.utils.leaf(i, namespace) for i in range(m)]
 
     available_clades = set(range(len(G)))   # len(G) == m
     # initialize Sigma
@@ -85,7 +85,7 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
     # merge
     while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
         left, right = min(combinations(available_clades, 2), key=lambda pair: Sigma[pair])
-        G.append(utils.merge_children((G[left], G[right])))
+        G.append(spectraltree.utils.merge_children((G[left], G[right])))
         new_ix = len(G) - 1
         available_clades.remove(left)
         available_clades.remove(right)
@@ -103,22 +103,22 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
     # for a bifurcating tree we're combining the last two available clades
     # for an unrooted one it's the last three because
     # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)))
+    return dendropy.Tree(taxon_namespace=namespace, seed_node=spectraltree.utils.merge_children((G[i] for i in available_clades)))
 
 def estimate_edge_lengths(tree, distance_matrix):
     # check the PAUP* documentation
     pass
 
 def neighbor_joining(distance_matrix, namespace=None):
-    return utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
+    return spectraltree.utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
 
 # %%
 if __name__ == "__main__":
     import dendropy
-    ref = utils.balanced_binary(8)
-    #all_data = utils.temp_dataset_maker(ref, 1000, 0.01)[0]
+    ref = spectraltree.utils.balanced_binary(8)
+    #all_data = spectraltree.utils.temp_dataset_maker(ref, 1000, 0.01)[0]
     all_data = dendropy.model.discrete.simulate_discrete_chars(1000, ref, dendropy.model.discrete.Jc69(), mutation_rate=0.05)
-    observations, _ = utils.charmatrix2array(all_data)
+    observations, _ = spectraltree.utils.charmatrix2array(all_data)
     dist = paralinear_distance(observations)
     dist
     inf = neighbor_joining(dist)
