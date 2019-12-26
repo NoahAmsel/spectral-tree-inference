@@ -12,6 +12,8 @@ def nchoose2(n):
 # TODO: make t and optional argument in all these functions
 # and write a wrapper to add the statement
 # if t is None: t = self.t
+# TODO: replace "sequence" with a name specified by an attribute of the transition
+# maybe rewrite this a subclass of https://dendropy.org/_modules/dendropy/model/discrete.html#DiscreteCharacterEvolutionModel
 class Transition(ABC):
     """
     Abstract superclass for all kinds of transitions
@@ -34,7 +36,7 @@ class Transition(ABC):
         return self(input_sequence, t=t)
 
     def generate_descendents_data(self, node, seed_data, scalar):
-        node.seqence = seed_data
+        node.sequence = seed_data
         for child in node.child_nodes():
             self.generate_descendents_data(child, self.transition(seed_data, child.edge_length), scalar)
 
@@ -47,11 +49,17 @@ class Transition(ABC):
             assert seq_len == len(seed_data)
 
         self.generate_descendents_data(tree.seed_node, seed_data, scalar)
-        #return dendropy.charmatrix()
+
+        sequences = np.zeros((len(tree.leaf_nodes()), seq_len))
+        for leaf_ix, leaf in enumerate(tree.leaf_nodes()):
+            sequences[leaf_ix, :] = leaf.sequence
+        return sequences
 
     def generate_sequences_list(self, tree_list, seq_len=None, seed_data=None, scalar=1.0):
+        matrices = []
         for tree in tree_list:
-            self.generate_sequences(tree, seq_len=seq_len, seed_data=seed_data, scalar=scalar)
+            matrices.append(self.generate_sequences(tree, seq_len=seq_len, seed_data=seed_data, scalar=scalar))
+        return matrices
 
     @staticmethod
     def transition_function_from_matrix(T):
@@ -142,7 +150,7 @@ class GTR(Transition):
         return d0.char_matrices
 
 class Jukes_Cantor(GTR):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes=4):
         base_frequencies = np.ones(num_classes)
         transition_rates = np.ones(nchoose2(num_classes))
         super().__init__(base_frequencies=base_frequencies, transition_rates=transition_rates)
@@ -162,8 +170,6 @@ class Jukes_Cantor(GTR):
         """
         #return -(3./4) * np.log((4./3)*p - (1./3))
         return - self.k_ratio * np.log( p / self.k_ratio - 1./(self.k-1))
-
-
 
     def p2transition_function(self, p):
         return self.transition_function(self.p2t(p))

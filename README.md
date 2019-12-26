@@ -28,3 +28,15 @@ tree = treesim.birth_death_tree(birth_rate=1., death_rate=2., is_retain_extinct_
 ```
 
 tree.minmax_leaf_distance_from_root()
+
+
+### Simulating data
+```
+tt = utils.balanced_binary(2**10)
+jc = Jukes_Cantor(4)
+jc.generate_sequences(tt, seq_len=10_000)
+```
+
+
+### Using seqgen
+This is actually slower than the simulation code I made, even when you batch them. 

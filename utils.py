@@ -1,7 +1,7 @@
 from collections import defaultdict
 import numpy as np
 import dendropy
-from dendropy.interop import seqgen
+from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree
 
 def new_default_namespace(num_taxa):
     return dendropy.TaxonNamespace([str(i) for i in range(num_taxa)])
@@ -50,17 +50,6 @@ def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
         nodes.append(merge_children((a,b), edge_length=edge_length))
 
     return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
-
-# TODO: get rid of this
-def temp_dataset_maker(tree_list, seq_len, scaler):
-    s = seqgen.SeqGen()
-    #s.model = "GTR"
-    s.seq_len = seq_len
-    #s.num_partitions = 1 # what does this even do?
-    s.scale_branch_lens = scaler
-    d0 = s.generate(tree_list)
-    #print(s._compose_arguments())
-    return d0.char_matrices
 
 def charmatrix2array(charmatrix):
     #charmatrix[taxon].values()
@@ -124,35 +113,28 @@ if __name__ == "__main__":
     print(pdm)
     tt = pdm.as_data_table()
 
-import dendropy
-from dendropy.simulate import treesim
-taxa = dendropy.TaxonNamespace(["z1", "z2", "z3", "z4", "z5", "z6", "z7", "z8", "z9", "z10", "z11", "z12", "z13", "z14", "z15", "z16"])
-tree = treesim.pure_kingman_tree(
-        taxon_namespace=taxa,)
-        #pop_size=10000)
+if __name__ == "__main__":
+    tree = treesim.birth_death_tree(birth_rate=1., death_rate=0., num_total_tips=len(taxa), taxon_namespace=taxa)
 
 
-tree = treesim.birth_death_tree(birth_rate=1., death_rate=0., num_total_tips=len(taxa), taxon_namespace=taxa)
+    tree = treesim.birth_death_tree(birth_rate=1., death_rate=2., is_retain_extinct_tips=True, num_total_tips=len(taxa), taxon_namespace=taxa)
+
+    tree.minmax_leaf_distance_from_root()
+
+    print(tree.as_python_source())
+
+    print(tree.as_ascii_plot())
 
 
-tree = treesim.birth_death_tree(birth_rate=1., death_rate=2., is_retain_extinct_tips=True, num_total_tips=len(taxa), taxon_namespace=taxa)
+    for e in tree.edges():
+        print(e.length)
 
-tree.minmax_leaf_distance_from_root()
+    for n in tree.nodes():
+        print(n.edge_length)
 
-print(tree.as_python_source())
-
-print(tree.as_ascii_plot())
-
-
-for e in tree.edges():
-    print(e.length)
-
-for n in tree.nodes():
-    print(n.edge_length)
-
-e = tree.edges()[5]
-e.length
+    e = tree.edges()[5]
+    e.length
 
 
-n0 = tree.nodes()[0]
-n0.branch
+    n0 = tree.nodes()[0]
+    n0.branch
