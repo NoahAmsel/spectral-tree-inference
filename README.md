@@ -39,7 +39,7 @@ tree.minmax_leaf_distance_from_root()
 
 ### Generating sequence data
 ```
-tree = balanced_binary(2**5)
+tree = balanced_binary(2**5, edge_length=0.1)
 jc = Jukes_Cantor()
 observations = jc.generate_sequences(tree, seq_len=10_000)
 ```
@@ -50,6 +50,7 @@ This is actually slower than the simulation code I made, even when you batch the
 ## reconstructing a tree
 ```
 distance_matrix = paralinear_distance(observations)
-recovered_tree = estimate_tree_topology(distance_matrix)
+recovered_tree = estimate_tree_topology(distance_matrix, namespace=tree.taxon_namespace)
 print(recovered_tree.as_ascii_plot())
+dendropy.calculate.treecompare.false_positives_and_negatives(recovered_tree, tree, is_bipartitions_updated=False) 
 ```

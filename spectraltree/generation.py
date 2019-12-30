@@ -234,3 +234,18 @@ if __name__ == "__main__":
     max(ls)
     min(ls)
     print([leaf.distance_from_root() for leaf in tt.leaf_nodes()])
+
+if __name__=="__main__":
+    # branch length tests
+    from spectraltree import *
+    std_jc = dendropy.model.discrete.Jc69()
+    tree = balanced_binary(2, edge_length=0.25)
+    mat = dendropy.model.discrete.simulate_discrete_chars(1000, tree, std_jc)
+    tree.seed_node.sequence
+
+    tree = balanced_binary(2**10)
+    jc = Jukes_Cantor()
+    observations = jc.generate_sequences(tree, seq_len=10_000)
+    distance_matrix = JC_distance_matrix(observations)
+    recovered_tree = estimate_tree_topology(distance_matrix)
+    print(recovered_tree.as_ascii_plot())
