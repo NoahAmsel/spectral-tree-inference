@@ -12,14 +12,8 @@ import reconstruct_tree
 import generation
 import utils
 
-"""
-p = partial(reconstruct_tree.estimate_tree_topology, scorer=reconstruct_tree.sv2)
-str(p.keywords['scorer'])
-p.keywords['scorer'].__name__
-"""
-
 # TODO this should be a subclass of partial
-class Reconstruction_Method:
+class Reconstruction_Method(partial):
     def __init__(self, core=reconstruct_tree.estimate_tree_topology, distance=reconstruct_tree.paralinear_distance, **kwargs):
         self.core = core
         self.distance = distance
@@ -30,11 +24,11 @@ class Reconstruction_Method:
 
     @property
     def scorer(self):
-        return self.kwargs.get('scorer',None)
+        return self.kwargs.get('scorer', None)
 
     @property
     def scaler(self):
-        return self.kwargs.get('scaler',None)
+        return self.kwargs.get('scaler', None)
 
     def __call__(self, observations, namespace=None):
         distance_matrix = self.distance(observations)

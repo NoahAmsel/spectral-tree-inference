@@ -55,8 +55,16 @@ def charmatrix2array(charmatrix):
     alphabet = charmatrix.state_alphabets[0]
     return np.array([[state_id.index for state_id in charmatrix[taxon].values()] for taxon in charmatrix]), alphabet
 
-def array2charmatrix(matrix, alphabet):
-    pass
+def array2charmatrix(matrix, alphabet=None, namespace=None):
+    if namespace is None:
+        namespace = default_namespace(matrix.shape[0])
+    else:
+        assert len(namespace) == matrix.shape[0]
+    if alphabet is None:
+        alphabet = dendropy.new_standard_state_alphabet(val for val in np.unique(matrix))
+
+    str_matrix = matrix.astype('str') # there must be a faster way...
+    return dendropy.StandardCharacterMatrix.from_dict({taxon: str_matrix[i,:] for (i, taxon) in enumerate(namespace)}, default_state_alphabet=alphabet)
 
 def array2distance_matrix(matrix, namespace=None):
     m, m2 = matrix.shape

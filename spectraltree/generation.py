@@ -7,245 +7,219 @@ import dendropy
 def nchoose2(n):
     return int(n*(n-1)/2)
 
-# TODO: make t and optional argument in all these functions
-# and write a wrapper to add the statement
-# if t is None: t = self.t
-# TODO: replace "sequence" with a name specified by an attribute of the transition
-# maybe rewrite this a subclass of https://dendropy.org/_modules/dendropy/model/discrete.html#DiscreteCharacterEvolutionModel
 class Transition(ABC):
     """
-    Abstract superclass for all kinds of transitions
+    Transition for use with dendropy's `DiscreteCharacterEvolver` class.
+    A transition describes how a sequence evolves along the edge from a parent node to a child node.
     """
+
     @abstractmethod
-    def transition_function(self, t):
+    def simulate_descendant_states(self, ancestral_states, edge_length, mutation_rate=1.):
         pass
 
     @abstractmethod
-    def random_sequence(self, n):
+    def stationary_sample(self, seq_len, rng=None):
         pass
 
-    def __call__(self, input_sequence, t):
-        return self.transition_function(t)(input_sequence)
+class GaussianTransition(Transition):
+    def __init__(self, w, b):
+        self.w = w
+        self.b = b
 
-    def transition(self, input_sequence, t):
-        """
-        Alias for self.__call__
-        """
-        return self(input_sequence, t=t)
+    def simulate_descendant_states(self, ancestral_states, edge_length, mutation_rate=1.):
+        return np.random.normal(loc=(ancestral_states*self.w + self.b), scale=edge_length*mutation_rate)
 
-    def generate_descendents_data(self, node, seed_data, scalar):
-        node.sequence = seed_data
-        for child in node.child_nodes():
-            self.generate_descendents_data(child, self.transition(seed_data, child.edge_length), scalar)
+    def stationary_sample(self, seq_len, rng=None):
+        return np.zeros(seq_len)
 
-    def generate_sequences(self, tree, seq_len=None, seed_data=None, scalar=1.0):
-        if seed_data is None:
-            assert seq_len is not None
-            assert seq_len > 0
-            seed_data = self.random_sequence(seq_len)
-        else:
-            assert seq_len == len(seed_data)
-
-        self.generate_descendents_data(tree.seed_node, seed_data, scalar)
-
-        sequences = np.zeros((len(tree.leaf_nodes()), seq_len))
-        for leaf_ix, leaf in enumerate(tree.leaf_nodes()):
-            sequences[leaf_ix, :] = leaf.sequence
-        return sequences
-
-    def generate_sequences_list(self, tree_list, seq_len=None, seed_data=None, scalar=1.0):
-        matrices = []
-        for tree in tree_list:
-            matrices.append(self.generate_sequences(tree, seq_len=seq_len, seed_data=seed_data, scalar=scalar))
-        return matrices
-
-    @staticmethod
-    def transition_function_from_matrix(T):
-        def transition(input_sequence):
-            num_classes = T.shape[0] # TODO should this be [1]
-            num_samples = len(input_sequence)
-            # this is optimized for num_classes << num_samples
-            # since each call to np.random.choice is extremely slow, we limit
-            # ourselves to only num_classes calls rather than doing each of num_samples
-            # coordinates in a separate call
-            redundant_samples = [np.random.choice(a=num_classes, size=num_samples, p=T[i,:]) for i in range(num_classes)]
-            mask = np.array([np.array(input_sequence) == i for i in range(num_classes)])
-            return (redundant_samples*mask).sum(axis=0)
-        transition.matrix = T
-        return transition
-
-class GTR(Transition):
+class DiscreteTransition(Transition):
     """
-    General time-reversible model.
-    See https://en.wikipedia.org/wiki/Models_of_DNA_evolution
+    Transition over discrete set of states. Replaces dendropy's
+    `DiscreteCharacterEvolutionModel` class, using numpy to improve speed.
+    To use, subclass and implement the `pmatrix` method, which returns the
+    transition matrix.
     """
-    def __init__(self, base_frequencies, transition_rates):
-        self.k = len(base_frequencies)
-        assert len(transition_rates) == nchoose2(self.k)
-        # save these in case we can use seqgen
-        self.base_frequencies = base_frequencies / base_frequencies.sum()
-        self.transition_rates = transition_rates
-        Q = scipy.spatial.distance.squareform(self.transition_rates)
-        Q *= self.base_frequencies
-        # set diagonal so that rows sum to 0
-        np.fill_diagonal(Q, Q.diagonal()-Q.sum(axis=1))
-        self.Q = GTR.scale_rate_matrix(Q, self.base_frequencies)
+
+    def __init__(self, stationary_freqs):
+        super().__init__()
+        self._k = len(stationary_freqs)
+        self._stationary_freqs = stationary_freqs / stationary_freqs.sum()
 
     @property
-    def k_ratio(self):
-        return (self.k-1) / self.k
+    def k(self):
+        return self._k
+
+    @property
+    def stationary_freqs(self):
+        return self._stationary_freqs
+
+    @abstractmethod
+    def pmatrix(self, tlen, mutation_rate=1.):
+        pass
+
+    def simulate_descendant_states(self, ancestral_states, edge_length, mutation_rate=1.):
+        T = self.pmatrix(edge_length, mutation_rate)
+        return self.transition(T, ancestral_states)
+
+    def stationary_sample(self, seq_len, rng=None):
+        return np.random.choice(a=list(range(self.k)), size=seq_len, p=self.stationary_freqs)
 
     @staticmethod
-    def scale_rate_matrix(unscaled_Q, baseline_frequences):
-        expected_transitions = - unscaled_Q.diagonal().dot(baseline_frequences)
+    def transition(T, ancestral_states):
+        num_classes = T.shape[0] # TODO should we add support for different numbers of states in different levels?
+        num_samples = len(ancestral_states)
+        # this is optimized for num_classes << num_samples
+        # since each call to np.random.choice is extremely slow, we limit
+        # ourselves to only num_classes calls rather than doing each of num_samples
+        # coordinates in a separate call
+        redundant_samples = [np.random.choice(a=num_classes, size=num_samples, p=T[i,:]) for i in range(num_classes)]
+        mask = np.array([np.array(ancestral_states) == i for i in range(num_classes)])
+        return (redundant_samples*mask).sum(axis=0)
+
+class FixedDiscreteTransition(DiscreteTransition):
+    def __init__(self, pmatrix, stationary_freqs):
+        assert pmatrix.shape[0] == pmatrix.shape[1] == len(stationary_freqs)
+        assert np.all(pmatrix >= 0)
+        super().__init__(stationary_freqs)
+        self._pmatrix = pmatrix
+
+    def pmatrix(self, t=None, mutation_rate=1.):
+        return self._pmatrix
+
+class ContinuousTimeDiscreteTransition(DiscreteTransition):
+    def __init__(self, stationary_freqs, Q):
+        assert Q.shape[0] == Q.shape[1] == len(stationary_freqs)
+        super().__init__(stationary_freqs)
+        assert np.allclose(Q.sum(axis=1), np.zeros(self.k))
+        self._Q = self.scale_rate_matrix(Q, self.stationary_freqs)
+
+    @property
+    def Q(self):
+        return self._Q
+
+    @staticmethod
+    def scale_rate_matrix(unscaled_Q, stationary_freqs):
+        expected_transitions = - unscaled_Q.diagonal().dot(stationary_freqs)
         return unscaled_Q / expected_transitions
 
-    def transition_function(self, t):
-        return GTR.transition_function_from_matrix(scipy.linalg.expm(self.Q*t))
+    def pmatrix(self, t, mutation_rate=1.):
+        return scipy.linalg.expm(self.Q * t * mutation_rate)
 
-    def random_sequence(self, length):
-        length = int(length)
-        return np.random.choice(a=list(range(self.k)), size=length, p=self.base_frequencies)
-
-    def paralinear_distance(self, t):
+    def paralinear_distance(self, t, mutation_rate=1.):
         """
         Paralinear distance is - log det e^(Q*t) = -Tr(Q*t)
         """
-        return -np.trace(self.Q) * t
+        return -np.trace(self.Q) * t * mutation_rate
 
-    def paralinear2t(self, dist):
-        return - dist / np.trace(self.Q)
+    def paralinear2t(self, dist, mutation_rate=1.):
+        return dist / (-np.trace(self.Q) * mutation_rate)
 
-    def seqgen(self, tree, seq_len=None, seed_data=None, scaler=None):
-        tree_list = dendropy.TreeList([tree])
-        return self.seqgen_batch(tree_list, seq_len=seq_len, seed_data=seed_data, scaler=scaler)[0]
-
-    def seqgen_batch(self, tree_list, seq_len=None, seed_data=None, scaler=None):
-        # seqgen only works for Amino Acid or Nucleotide data
-        assert self.k == 4 or self.k == 20
-        if seed_data is not None:
-            if seq_len is None:
-                seq_len = len(seed_data)
-            else:
-                assert seq_len == len(seed_data)
-
-        s = dendropy.interop.seqgen.SeqGen()
-        if self.k == 4:
-            s.char_model = "GTR"
-        elif self.k == 20:
-            s.char_model = "GENERAL"
-        s.seq_len = seq_len
-        s.state_freqs = ",".join([str(s) for s in self.base_frequencies])
-        s.general_rates = ",".join([str(r) for r in self.transition_rates])
-        if scaler is not None:
-            s.scale_branch_lens = scaler
-        if seed_data is not None:
-            states = np.array(list("ACGT" if k == 4 else "ARNDCQEGHILKMFPSTWYV"))
-            s.ancestral_seq = states[seed_data]
-        print(s._compose_arguments())
-        d0 = s.generate(tree_list)
-        print(type(d0))
-        return d0.char_matrices
+class GTR(ContinuousTimeDiscreteTransition):
+    def __init__(self, stationary_freqs, transition_rates):
+        assert len(transition_rates) == nchoose2(len(stationary_freqs))
+        # save this in case we can use seqgen
+        Q = scipy.spatial.distance.squareform(transition_rates)
+        Q *= stationary_freqs
+        # set diagonal so that rows sum to 0
+        np.fill_diagonal(Q, Q.diagonal() - Q.sum(axis=1))
+        super().__init__(stationary_freqs, Q)
+        self._transition_rates = transition_rates
 
 class Jukes_Cantor(GTR):
     def __init__(self, num_classes=4):
         base_frequencies = np.ones(num_classes)
         transition_rates = np.ones(nchoose2(num_classes))
-        super().__init__(base_frequencies=base_frequencies, transition_rates=transition_rates)
+        super().__init__(stationary_freqs=base_frequencies, transition_rates=transition_rates)
 
-    def t2p(self, t):
+    def k_ratio(self):
+        return (self.k-1) / self.k
+
+    def t2p(self, t, mutation_rate=1.):
         """
         Returns the probability of not transitioning given a branch of length t
         """
-        #return self.transition_function(t).matrix[0,0]
+        #return self.pmatrix(t, mutation_rate)[0,0]
         #return 0.25 + 0.75 * np.exp(-4.*t/3.)
-        return 1./self.k + self.k_ratio * np.exp(- t / self.k_ratio)
+        return 1./self.k + self.k_ratio() * np.exp(- t*mutation_rate / self.k_ratio())
 
-    def p2t(self, p):
+    def p2t(self, p, mutation_rate=1.):
         """
         Returns the branch length t necessary for the probability of not
         transitioning to be p.
         """
         #return -(3./4) * np.log((4./3)*p - (1./3))
-        return - self.k_ratio * np.log( p / self.k_ratio - 1./(self.k-1))
+        return - self.k_ratio() * np.log( p / self.k_ratio() - 1./(self.k-1)) / mutation_rate
 
-    def p2transition_function(self, p):
-        return self.transition_function(self.p2t(p))
+    def p2pmatrix(self, p, mutation_rate=1.):
+        return self.pmatrix(self.p2t(p, mutation_rate))
 
-# %%
+def numpy_matrix_with_characters_on_tree(seq_attr, tree):
+    """
+    Extracts sequences from all leaves and packs them into a numpy matrix.
+    Repalces `extend_char_matrix_with_characters_on_tree` method of `DiscreteCharacterEvolver`, which doesn't use numpy.
+    """
+    sequences = []
+    for leaf_ix, leaf in enumerate(tree.leaf_node_iter()):
+        sequences.append(getattr(leaf, seq_attr)[-1])
+        #sequences.append(np.concatenate(getattr(leaf, seq_attr)))
+    return np.array(sequences)
 
-class GeneralTimeReversible(dendropy.model.discrete.DiscreteCharacterEvolutionModel):
-    def __init__(self, state_alphabet, stationary_freqs, transition_rates=None, rng=None):
-        super().__init__(state_alphabet=state_alphabet, stationary_freqs=stationary_freqs, rng=rng)
-        self.k = len(state_alphabet) # TODO DOES THIS WORK??
-        if transition_rates:
-            assert len(transition_rates) == nchoose2(self.k)
-        # save these in case we can use seqgen
-        self.stationary_freqs = stationary_freqs / stationary_freqs.sum()
-        self.transition_rates = transition_rates
-        Q = scipy.spatial.distance.squareform(self.transition_rates)
-        Q *= self.stationary_freqs
-        # set diagonal so that rows sum to 0
-        np.fill_diagonal(Q, Q.diagonal()-Q.sum(axis=1))
-        self.Q = Q
+def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_states=None, retain_sequences_on_tree=False, rng=None):
+    """
+    Convenience function that generates a matrix of sequence observations from a given sequence model and tree
 
-    def corrected_substitution_rate(rate):
-        return - 1./self.Q.diagonal().dot(self.stationary_freqs)
+    Parameters
+    ----------
 
-    def pij(state_i, state_j, tlen, rate=1.0):
-        pass
+    seq_len       : int
+        Length of sequence (number of characters).
+    tree_model    : |Tree|
+        Tree on which to simulate.
+    seq_model     : |Transition|
+        The character substitution model under which to to evolve the
+        characters.
+    mutation_rate : float
+        Mutation *modifier* rate (should be 1.0 if branch lengths on tree
+        reflect true expected number of changes).
+    root_states   : list
+        Vector of root states (length must equal ``seq_len``).
+    retain_sequences_on_tree : bool
+        If |False|, sequence annotations will be cleared from tree after
+        simulation. Set to |True| if you want to, e.g., evolve and accumulate
+        different sequences on tree, or retain information for other purposes.
+    rng           : random number generator
+        If not given, 'GLOBAL_RNG' will be used.
 
-    def pmatrix(tlen, rate=1.0):
-        pass
+    Returns
+    -------
 
-    def pvector(state, tlen, rate=1.0):
-        pass
+    char_matrix :  |numpy.array|
+        Matrix where each row is the sequence generated for a given leaf.
 
-    def qmatrix(rate=1.0):
-        return self.Q*rate
-
-# %%
+    """
+    seq_evolver = dendropy.model.discrete.DiscreteCharacterEvolver(seq_model=seq_model, mutation_rate=mutation_rate)
+    tree = seq_evolver.evolve_states(
+        tree=tree_model,
+        seq_len=seq_len,
+        root_states=root_states,
+        rng=rng)
+    char_matrix = numpy_matrix_with_characters_on_tree(seq_evolver.seq_attr, tree_model)
+    if not retain_sequences_on_tree:
+        seq_evolver.clean_tree(tree)
+    return char_matrix
 
 if __name__ == "__main__":
-    import spectraltree.utils
-    tt = utils.balanced_binary(512)
-    jc = Jukes_Cantor(4)
-    seqs = jc.seqgen(tt, 100, scaler=0.3)
-    type(seqs)
-    print(seqs[255].symbols_as_string())
+    TT = np.array([[0.9, 0.1], [0.4, 0.6]])
+    my_trans = FixedDiscreteTransition(TT, np.array([0,1]))
+    my_tree = balanced_binary(4)
+    my_tree.edges()[-1].seq_model = FixedDiscreteTransition(np.array([[1,0],[1,0]]), np.array([0,1]))
+    print(simulate_sequences(1000, my_tree, my_trans).mean(axis=1))
 
-    my_model = dendropy.model.discrete.Jc69() #
-    #my_model = dendropy.model.discrete.DiscreteCharacterEvolver()
-    mat = dendropy.model.discrete.simulate_discrete_chars(1000, tt, my_model)
-    print(mat[255].symbols_as_string())
 
-    jc.p2transition_function(0.90).matrix
-    jc.paralinear2t(0.5)
-    jc.p2t(0.85)
-# %%
-
-    #tt = dendropy.simulate.treesim.discrete_birth_death_tree(birth_rate=1.0, death_rate=0.0, ntax=20)
-    #tt = dendropy.simulate.treesim.birth_death_tree(birth_rate=1.0, death_rate=0.0, num_total_tips=20)
-    tt = dendropy.model.birthdeath.uniform_pure_birth_tree(utils.default_namespace(20))
-    #tt = utils.lopsided_tree(16)
-    tt.print_plot()
-    ls = [e.length for e in tt.edges()]
-    len(ls)
-    max(ls)
-    min(ls)
-    print([leaf.distance_from_root() for leaf in tt.leaf_nodes()])
-
-if __name__=="__main__":
-    # branch length tests
-    from spectraltree import *
-    std_jc = dendropy.model.discrete.Jc69()
-    tree = balanced_binary(2, edge_length=0.25)
-    mat = dendropy.model.discrete.simulate_discrete_chars(1000, tree, std_jc)
-    tree.seed_node.sequence
-
-    tree = balanced_binary(2**10)
+if __name__ == "__main__":
     jc = Jukes_Cantor()
-    observations = jc.generate_sequences(tree, seq_len=10_000)
-    distance_matrix = JC_distance_matrix(observations)
-    recovered_tree = estimate_tree_topology(distance_matrix)
-    print(recovered_tree.as_ascii_plot())
+    ttt = 4.
+    print(0.25 + 0.75 * np.exp(-4.*ttt/3.))
+    print(jc.pmatrix(2,2))
+    jc.paralinear_distance(2,2)
+    print(jc.p2t(jc.t2p(0.03, 2.), 2.))
