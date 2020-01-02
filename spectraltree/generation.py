@@ -121,7 +121,7 @@ class ContinuousTimeDiscreteTransition(DiscreteTransition):
         """
         delta = det(P) = exp(- paralinear distance)
         """
-        return np.exp(self.paralinear_distance(t, mutation_rate=mutation_rate))
+        return np.exp(-self.paralinear_distance(t, mutation_rate=mutation_rate))
 
     def similarity2t(self, similarity, mutation_rate=1.):
         """
@@ -175,7 +175,8 @@ class Jukes_Cantor(GTR):
         return self.pmatrix(self.p2t(p, mutation_rate))
 
     def __str__(self):
-        return "Jukes Cantor (k={})".format(self.k)
+        suff = "" if self.k==4 else " (k={})".format(self.k)
+        return "Jukes Cantor" + suff
 
 def numpy_matrix_with_characters_on_tree(seq_attr, tree):
     """

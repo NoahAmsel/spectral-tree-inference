@@ -54,12 +54,21 @@ class Experiment_Datum:
 
     def to_row(self):
         return {
+            "transition": self.sequence_model,
             "n": self.n,
+            "method": str(self.method),
+            "rate": self.mutation_rate,
             "m": self.m,
             "correct": self.correct,
             "F1%": 100*self.F1,
-            "method": str(self.method),
+            "RF": self.RF,
         }
+
+    def __str__(self):
+        first_part = "Method: {}\tn={}\ttransition= {}".format(self.method, self.n, self.sequence_model)
+        rate_part = ("" if self.mutation_rate==1. else "rate= {:.2f}".format(self.mutation_rate))
+        last_part = "m = {}\tF1={:.2f}".format(self.m, self.F1)
+        return "\t".join([first_part, rate_part, last_part])
 
 def save_results(results, filename=None, folder="data"):
     if filename is None:
@@ -87,7 +96,7 @@ def load_results(*files, folder="data", throw_error=True):
         print("Successfully read {} files.".format(successful))
     return total_results
 
-def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data"):
+def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data", overwrite=False):
 
     print("==== Beginning Experiment =====")
     print("\t Transition: ", sequence_model)
@@ -112,7 +121,7 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
                         print("{0} / {1}".format(i, total_trials))
 
     if savepath:
-        previous_results = load_results(savepath, folder=folder, throw_error=False)
+        previous_results = [] if overwrite else load_results(savepath, folder=folder, throw_error=False)
         save_results(previous_results+results, filename=savepath, folder=folder)
         print("Saved to", os.path.join(folder, savepath) if folder else savepath)
 
@@ -122,20 +131,20 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
 def results2frame(results):
     return pd.DataFrame(result.to_row() for result in results)
 
-def violin(result_frame, x="n", y="RF", hue="method"):
+def violin(result_frame, x="n", y="F1%", hue="method"):
     sns.catplot(data=result_frame, x=hue, y=y, inner="stick", col=x, bw=.8, scale="count", kind="violin", col_wrap=3)
 
-def box(result_frame, x="n", y="RF", hue="method"):
-    sns.boxplot(data=result_frame, x=x, y=y, hue=hue)
+def box(result_frame, x="n", y="F1%", hue="method"):
+    return accuracy(result_frame, x=x, y=y, hue=hue, col=col, kind="box")
 
-# TODO: change RF to F1 something normalized like F1
-def accuracy(result_frame, x="n", y="F1%", hue="method"):
-    dodge = 0.1*(df['method'].nunique() - 1)
-    sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=dodge)
+def accuracy(result_frame, x="n", y="F1%", hue="method", col=None, kind="point"):
+    dodge = 0.1*(result_frame['method'].nunique() - 1)
+    return sns.catplot(data=result_frame, x=x, y=y, kind="point", hue=hue, col=col, dodge=dodge, col_wrap=(None if col is None else 3))
 
-def correct(result_frame, x="n", y="correct", hue="method"):
-    dodge = 0.1*(df['method'].nunique() - 1)
-    sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=dodge)
+def correct(result_frame, x="n", y="correct", hue="method", col=None):
+    return accuracy(result_frame, x=x, y=y, hue=hue, col=col)
+    #dodge = 0.1*(result_frame['method'].nunique() - 1)
+    #sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=dodge)
 
 # %%
 def weird1(A1, A2, M):
@@ -159,53 +168,34 @@ def weird2(A1, A2, M):
 
 # %%
 if __name__ == "__main__":
-    #t = utils.balanced_binary(128)
-    trees = dendropy.TreeList([utils.balanced_binary(128), utils.lopsided_tree(128)])
-    jc_model = dendropy.model.discrete.Jc69()
-    seqgen = partial(dendropy.model.discrete.simulate_discrete_chars, seq_model=jc_model, mutation_rate=0.1)
-    Ns = np.geomspace(100, 1_000, num=4).astype(int)
-    methods = [Reconstruction_Method(reconstruct_tree.neighbor_joining), Reconstruction_Method(), Reconstruction_Method(scorer=reconstruct_tree.sum_squared_quartets), Reconstruction_Method(scorer=weird2)]
-    results = experiment(trees, seqgen, Ns=Ns, methods=methods)
-    df = results2frame(results)
-    correct(df)
-    accuracy(df)
+    from spectraltree import *
 
-    """
-    import cProfile
-    cProfile.run("results = experiment(trees, seqgen, Ns=Ns, methods=methods)")
-    """
+    binary_trees = [balanced_binary(m) for m in [64, 128, 256]]
+    lopsided = [lopsided_tree(m) for m in [64, 128]]
+    jc = Jukes_Cantor()
+    Ns = [100, 400, 1600]
+    methods = [Reconstruction_Method(neighbor_joining), Reconstruction_Method()] #, Reconstruction_Method(scorer=reconstruct_tree.sum_squared_quartets), Reconstruction_Method(scorer=weird2)]
+    # first one: delta^2 = 1/2
+    # second one: probability of transitioning to some other state is 15 %
+    mutation_rates = [jc.similarity2t(np.sqrt(1/2)), jc.p2t(0.85)]
 
-    """mat = dendropy.model.discrete.simulate_discrete_chars(1000, trees[0], my_model)
-    observations, _ = utils.charmatrix2array(mat)
-    observations.shape"""
-
-# %%
-if __name__ == "__main__":
-    JC = generation.Jukes_Cantor(4)
-    trees = dendropy.TreeList([utils.balanced_binary(num_taxa=128, edge_length=JC.paralinear2t(delta)) for delta in [0.55, 0.6, 0.65, 0.7]])
-    jc_model = dendropy.model.discrete.Jc69()
-    seqgen = partial(dendropy.model.discrete.simulate_discrete_chars, seq_model=jc_model, mutation_rate=1.)
-    Ns = [500]
-    methods = [Reconstruction_Method(reconstruct_tree.neighbor_joining), Reconstruction_Method()]
-    results = experiment(trees, seqgen, Ns=Ns, methods=methods, reps_per_tree=100)
-    df = results2frame(results)
-    correct(df)
-    accuracy(df)
-
-    len(results)
-
-    with open("data/results.pkl", "wb") as f:
-        pickle.dump(results, f)
-
-    df.to_pickle("data/df.pkl")
-
-    f = open("data/results.pkl", "rb")
-    ppp = pickle.load(f)
-    ppp
-    f.close()
+    results = experiment(tree_list=binary_trees+lopsided,
+                            sequence_model=jc,
+                            Ns=Ns,
+                            methods=methods,
+                            mutation_rates=mutation_rates,
+                            savepath="example_run.pkl",
+                            overwrite=True)
 # %%
 
-if __name__ == "__main__":
-    import pstats
-    p = pstats.Stats('profile.txt')
-    p.sort_stats('cumulative').print_stats(500)
+    df = results2frame(loaded)
+    df["delta^2"] = pd.Series([Jukes_Cantor().similarity(t)**2 for t in df['mutation_rate']]).round(3)
+
+    accuracy(df)
+    accuracy(df, col="delta^2")
+# %%
+
+# if __name__ == "__main__":
+#     import pstats
+#     p = pstats.Stats('profile.txt')
+#     p.sort_stats('cumulative').print_stats(500)
