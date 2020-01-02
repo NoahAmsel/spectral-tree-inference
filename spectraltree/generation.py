@@ -107,12 +107,24 @@ class ContinuousTimeDiscreteTransition(DiscreteTransition):
 
     def paralinear_distance(self, t, mutation_rate=1.):
         """
-        Paralinear distance is - log det e^(Q*t) = -Tr(Q*t)
+        Paralinear distance is - log det P = - log det e^(Q*t) = -Tr(Q*t)
         """
         return -np.trace(self.Q) * t * mutation_rate
 
     def paralinear2t(self, dist, mutation_rate=1.):
         return dist / (-np.trace(self.Q) * mutation_rate)
+
+    def similarity(self, t, mutation_rate=1.):
+        """
+        delta = det(P) = exp(- paralinear distance)
+        """
+        return np.exp(self.paralinear_distance(t, mutation_rate=mutation_rate))
+
+    def similarity2t(self, similarity, mutation_rate=1.):
+        """
+        paralinear distance = - log delta
+        """
+        return self.paralinear2t(-np.log(similarity), mutation_rate=1.)
 
 class GTR(ContinuousTimeDiscreteTransition):
     def __init__(self, stationary_freqs, transition_rates):

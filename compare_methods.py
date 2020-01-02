@@ -1,6 +1,6 @@
-from functools import partial
 import datetime
 import pickle
+import os.path
 
 import numpy as np
 import pandas as pd
@@ -8,56 +8,14 @@ import seaborn as sns
 import matplotlib.pylab as plt
 import dendropy
 
-import reconstruct_tree
-import generation
-import utils
-
-# TODO this should be a subclass of partial
-class Reconstruction_Method(partial):
-    def __init__(self, core=reconstruct_tree.estimate_tree_topology, distance=reconstruct_tree.paralinear_distance, **kwargs):
-        self.core = core
-        self.distance = distance
-        if self.core == reconstruct_tree.estimate_tree_topology:
-            kwargs["scorer"] = kwargs.get("scorer", reconstruct_tree.sv2)
-            kwargs["scaler"] = kwargs.get("scaler", 1.0)
-        self.kwargs = kwargs
-
-    @property
-    def scorer(self):
-        return self.kwargs.get('scorer', None)
-
-    @property
-    def scaler(self):
-        return self.kwargs.get('scaler', None)
-
-    def __call__(self, observations, namespace=None):
-        distance_matrix = self.distance(observations)
-        tree = self.core(distance_matrix, namespace=namespace, **self.kwargs)
-        return tree
-
-    def from_charmatrix(self, char_matrix, namespace=None):
-        """
-        takes dendropy.datamodel.charmatrixmodel.CharacterMatrix
-        """
-        observations, alphabet = utils.charmatrix2array(char_matrix)
-        return self(observations)
-
-    def __str__(self):
-        if self.core == reconstruct_tree.estimate_tree_topology:
-            s = self.scorer.__name__
-            if self.scaler != 1.0:
-                s += " x{:.2}".format(self.scaler)
-        elif self.core == reconstruct_tree.neighbor_joining:
-            s = "NJ"
-        else:
-            s = self.core.__name__
-        return s
+import spectraltree
 
 class Experiment_Datum:
-    def __init__(self, sequence_model, n, method, inferred_tree, reference_tree):
+    def __init__(self, sequence_model, n, method, mutation_rate, inferred_tree, reference_tree):
         self.sequence_model = sequence_model
         self.n = n
         self.method = method
+        self.mutation_rate = mutation_rate
         inferred_tree.update_bipartitions()
         reference_tree.update_bipartitions()
         self.ref_tree = reference_tree
@@ -103,23 +61,64 @@ class Experiment_Datum:
             "method": str(self.method),
         }
 
-def experiment(tree_list, sequence_model, Ns, methods, reps_per_tree=1):
+def save_results(results, filename=None, folder="data"):
+    if filename is None:
+        filename = datetime.datetime.now().strftime("results_%b%d_%-I:%-M%p.pkl")
+    if folder:
+        filename = os.path.join(folder, filename)
+    with open(filename, "wb") as f:
+        pickle.dump(results, f)
+
+def load_results(*files, folder="data", throw_error=True):
+    total_results = []
+    successful = 0
+    for filename in files:
+        successful += 1
+        fullpath = filename if folder is None else os.path.join(folder, filename)
+        try:
+            with open(fullpath, "rb") as f:
+                res = pickle.load(f)
+                total_results += res
+        except Exception as error:
+            successful -= 1
+            if throw_error:
+                raise error
+    if not throw_error:
+        print("Successfully read {} files.".format(successful))
+    return total_results
+
+def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data"):
+
+    print("==== Beginning Experiment =====")
+    print("\t Transition: ", sequence_model)
+    print("\t {} trees".format(len(tree_list)))
+    print("\t {} samples".format(Ns))
+    print("\t {} methods".format(len(methods)), methods)
+    print("\t {} mutation rates:".format(len(mutation_rates)), mutation_rates)
+    print("\t {} reps".format(reps_per_tree))
+
     results = []
-    total_trials = len(tree_list)*len(Ns)*len(methods)*reps_per_tree
+    total_trials = len(tree_list) * reps_per_tree * len(mutation_rates) * len(Ns) * len(methods)
     i = 0
-    print("\t===== Experiment =====")
     for reference_tree in tree_list:
         for _ in range(reps_per_tree):
-            sequences = sequence_model(seq_len=max(Ns), tree_model=reference_tree)
-            observations, alphabet = utils.charmatrix2array(sequences)
-            for n in Ns:
-                for method in methods:
-                    inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
-                    results.append(Experiment_Datum(sequence_model, n, method, inferred_tree, reference_tree))
-                    i += 1
-                    print("{0} / {1}".format(i, total_trials))
+            for mutation_rate in mutation_rates:
+                observations = spectraltree.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
+                for n in Ns:
+                    for method in methods:
+                        inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
+                        results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree))
+                        i += 1
+                        print("{0} / {1}".format(i, total_trials))
+
+    if savepath:
+        previous_results = load_results(savepath, folder=folder, throw_error=False)
+        save_results(previous_results+results, filename=savepath, folder=folder)
+        print("Saved to", os.path.join(folder, savepath) if folder else savepath)
+
     return results
 
+# Plotting functions
 def results2frame(results):
     return pd.DataFrame(result.to_row() for result in results)
 
