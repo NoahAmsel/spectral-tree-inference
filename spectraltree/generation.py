@@ -132,6 +132,9 @@ class ContinuousTimeDiscreteTransition(DiscreteTransition):
     def __eq__(self, other):
         return np.all(self.Q == other.Q)
 
+    def __str__(self):
+        return "Continuous-Time transition with rate matrix\n" + str(self.Q)
+
 class GTR(ContinuousTimeDiscreteTransition):
     def __init__(self, stationary_freqs, transition_rates):
         assert len(transition_rates) == nchoose2(len(stationary_freqs))
