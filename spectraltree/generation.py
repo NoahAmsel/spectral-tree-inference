@@ -86,6 +86,9 @@ class FixedDiscreteTransition(DiscreteTransition):
     def pmatrix(self, t=None, mutation_rate=1.):
         return self._pmatrix
 
+    def __eq__(self, other):
+        return np.all(self._pmatrix == other._pmatrix)
+
 class ContinuousTimeDiscreteTransition(DiscreteTransition):
     def __init__(self, stationary_freqs, Q):
         assert Q.shape[0] == Q.shape[1] == len(stationary_freqs)
@@ -126,6 +129,9 @@ class ContinuousTimeDiscreteTransition(DiscreteTransition):
         """
         return self.paralinear2t(-np.log(similarity), mutation_rate=1.)
 
+    def __eq__(self, other):
+        return np.all(self.Q == other.Q)
+
 class GTR(ContinuousTimeDiscreteTransition):
     def __init__(self, stationary_freqs, transition_rates):
         assert len(transition_rates) == nchoose2(len(stationary_freqs))
@@ -164,6 +170,9 @@ class Jukes_Cantor(GTR):
 
     def p2pmatrix(self, p, mutation_rate=1.):
         return self.pmatrix(self.p2t(p, mutation_rate))
+
+    def __str__(self):
+        return "Jukes Cantor (k={})".format(self.k)
 
 def numpy_matrix_with_characters_on_tree(seq_attr, tree):
     """

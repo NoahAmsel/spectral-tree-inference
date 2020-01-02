@@ -92,9 +92,9 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
     print("==== Beginning Experiment =====")
     print("\t Transition: ", sequence_model)
     print("\t {} trees".format(len(tree_list)))
-    print("\t {} samples".format(Ns))
-    print("\t {} methods".format(len(methods)), methods)
-    print("\t {} mutation rates:".format(len(mutation_rates)), mutation_rates)
+    print("\t {} sample sizes:".format(len(Ns)), *Ns)
+    print("\t {} methods".format(len(methods)), *methods)
+    print("\t {} mutation rates:".format(len(mutation_rates)), *("{0:.4f}".format(rate) for rate in mutation_rates))
     print("\t {} reps".format(reps_per_tree))
 
     results = []
