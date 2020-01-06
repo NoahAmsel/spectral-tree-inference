@@ -65,9 +65,9 @@ class Experiment_Datum:
         }
 
     def __str__(self):
-        first_part = "Method: {}\tn={}\ttransition= {}".format(self.method, self.n, self.sequence_model)
-        rate_part = ("" if self.mutation_rate==1. else "rate= {:.2f}".format(self.mutation_rate))
-        last_part = "m = {}\tF1={:.2f}".format(self.m, self.F1)
+        first_part = "Method={}\tn={}\ttransition={}".format(self.method, self.n, self.sequence_model)
+        rate_part = ("" if self.mutation_rate==1. else "mut_rate={:.2f}".format(self.mutation_rate))
+        last_part = "m={}\tF1={:.1f}%".format(self.m, 100*self.F1)
         return "\t".join([first_part, rate_part, last_part])
 
 def save_results(results, filename=None, folder="data"):
@@ -96,15 +96,16 @@ def load_results(*files, folder="data", throw_error=True):
         print("Successfully read {} files.".format(successful))
     return total_results
 
-def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data", overwrite=False):
+def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data", overwrite=False, verbose=True):
 
-    print("==== Beginning Experiment =====")
-    print("\t Transition: ", sequence_model)
-    print("\t {} trees".format(len(tree_list)))
-    print("\t {} sample sizes:".format(len(Ns)), *Ns)
-    print("\t {} methods".format(len(methods)), *methods)
-    print("\t {} mutation rates:".format(len(mutation_rates)), *("{0:.4f}".format(rate) for rate in mutation_rates))
-    print("\t {} reps".format(reps_per_tree))
+    if verbose:
+        print("==== Beginning Experiment =====")
+        print("\t Transition: ", sequence_model)
+        print("\t {} trees".format(len(tree_list)))
+        print("\t {} sample sizes:".format(len(Ns)), *Ns)
+        print("\t {} methods".format(len(methods)), *methods)
+        print("\t {} mutation rates:".format(len(mutation_rates)), *("{0:.4f}".format(rate) for rate in mutation_rates))
+        print("\t {} reps".format(reps_per_tree))
 
     results = []
     total_trials = len(tree_list) * reps_per_tree * len(mutation_rates) * len(Ns) * len(methods)
@@ -118,14 +119,22 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
                         inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
                         results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree))
                         i += 1
-                        print("{0} / {1}".format(i, total_trials))
+                        if verbose:
+                            print("{0} / {1}".format(i, total_trials))
 
     if savepath:
         previous_results = [] if overwrite else load_results(savepath, folder=folder, throw_error=False)
         save_results(previous_results+results, filename=savepath, folder=folder)
-        print("Saved to", os.path.join(folder, savepath) if folder else savepath)
+        if verbose:
+            print("Saved to", os.path.join(folder, savepath) if folder else savepath)
 
     return results
+
+def reproduce_datum(datum):
+    observations = spectraltree.simulate_sequences(seq_len=datum.n, tree_model=datum.ref_tree, seq_model=datum.sequence_model, mutation_rate=datum.mutation_rate)
+    inferred_tree = datum.method(observations[:,:datum.n], namespace=datum.ref_tree.taxon_namespace)
+    return Experiment_Datum(datum.sequence_model, datum.n, datum.method, datum.mutation_rate, inferred_tree, datum.ref_tree), inferred_tree
+    #return experiment(tree_list=[datum.ref_tree], sequence_model=datum.sequence_model, Ns=[datum.n], methods=[datum.method], mutation_rates=[datum.mutation_rate], verbose=False)[0]
 
 # Plotting functions
 def results2frame(results):
@@ -134,10 +143,9 @@ def results2frame(results):
 def violin(result_frame, x="n", y="F1%", hue="method"):
     sns.catplot(data=result_frame, x=hue, y=y, inner="stick", col=x, bw=.8, scale="count", kind="violin", col_wrap=3)
 
-def box(result_frame, x="n", y="F1%", hue="method"):
-    return accuracy(result_frame, x=x, y=y, hue=hue, col=col, kind="box")
-
 def accuracy(result_frame, x="n", y="F1%", hue="method", col=None, kind="point"):
+    grouping_cols = x if col is None else [col, x]
+    print(result_frame.groupby(grouping_cols)[y].count()) # .describe()
     dodge = 0.1*(result_frame['method'].nunique() - 1)
     return sns.catplot(data=result_frame, x=x, y=y, kind="point", hue=hue, col=col, dodge=dodge, col_wrap=(None if col is None else 3))
 
@@ -145,6 +153,9 @@ def correct(result_frame, x="n", y="correct", hue="method", col=None):
     return accuracy(result_frame, x=x, y=y, hue=hue, col=col)
     #dodge = 0.1*(result_frame['method'].nunique() - 1)
     #sns.pointplot(data=result_frame, x=x, y=y, hue=hue, dodge=dodge)
+
+def box(result_frame, x="n", y="F1%", hue="method"):
+    return accuracy(result_frame, x=x, y=y, hue=hue, col=col, kind="box")
 
 # %%
 def weird1(A1, A2, M):

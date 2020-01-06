@@ -52,5 +52,28 @@ This is actually slower than the simulation code I made, even when you batch the
 distance_matrix = paralinear_distance(observations)
 recovered_tree = estimate_tree_topology(distance_matrix, namespace=tree.taxon_namespace)
 print(recovered_tree.as_ascii_plot())
-dendropy.calculate.treecompare.false_positives_and_negatives(recovered_tree, tree, is_bipartitions_updated=False) 
+dendropy.calculate.treecompare.false_positives_and_negatives(recovered_tree, tree, is_bipartitions_updated=False)
+```
+
+
+## Basic Dendropy functionality
+```
+```
+
+```
+s1 = "(A,(B,C));"
+tree1 = dendropy.Tree.get(
+        data=s1,
+        schema="newick")
+```
+
+Printing
+```
+tree1.print_plot(width=80)
+```
+
+```
+tree1.as_ascii_plot()
+tree1.as_string("newick")
+tree1.as_python_source()
 ```
