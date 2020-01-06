@@ -50,6 +50,18 @@ def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
 
     return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
 
+def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
+    for e in tree.edges():
+        if value is not None:
+            assert fun is None and uniform_range is None
+            e.length = value
+        elif fun is not None:
+            assert uniform_range is None
+            e.length = fun(e.length)
+        else:
+            assert uniform_range is not None
+            e.length = np.random.uniform(*uniform_range)
+
 def charmatrix2array(charmatrix):
     #charmatrix[taxon].values()
     alphabet = charmatrix.state_alphabets[0]
