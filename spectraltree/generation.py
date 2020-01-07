@@ -146,6 +146,29 @@ class GTR(ContinuousTimeDiscreteTransition):
         super().__init__(stationary_freqs, Q)
         self._transition_rates = transition_rates
 
+class TN93(GTR):
+    def __init__(self, stationary_freqs, kappa1, kappa2):
+        #  we could allow for more than for classes
+        # assume the first half are of one type ("pyramidines") and the second half is of the other type ("purines")
+        # but right now we don't
+        assert len(stationary_freqs) == 4
+        transition_rates = np.array([kappa1, 1, 1, 1, 1, kappa2]).astype(float)
+        super().__init__(stationary_freqs, transition_rates)
+
+class T92(TN93):
+    def __init__(self, theta, kappa1, kappa2):
+        #  we could allow for more than for classes
+        # assume the first half are of one type ("pyramidines") and the second half is of the other type ("purines")
+        # but right now we don't
+        assert 0. <= theta <= 1.
+        GC = theta / 2.
+        AT = (1. - theta) / 2.
+        super().__init__(np.array([AT, GC, GC, AT]), kappa1, kappa2)
+
+class HKY(TN93):
+    def __init__(self, stationary_freqs, kappa):
+        super().__init__(stationary_freqs, kappa, kappa)
+
 class Jukes_Cantor(GTR):
     def __init__(self, num_classes=4):
         base_frequencies = np.ones(num_classes)
@@ -183,10 +206,12 @@ def numpy_matrix_with_characters_on_tree(seq_attr, tree):
     Extracts sequences from all leaves and packs them into a numpy matrix.
     Repalces `extend_char_matrix_with_characters_on_tree` method of `DiscreteCharacterEvolver`, which doesn't use numpy.
     """
-    sequences = []
-    for leaf_ix, leaf in enumerate(tree.leaf_node_iter()):
-        sequences.append(getattr(leaf, seq_attr)[-1])
-        #sequences.append(np.concatenate(getattr(leaf, seq_attr)))
+    index_map = {taxon: ix for ix, taxon in enumerate(tree.taxon_namespace)}
+    sequences = [None]*len(tree.leaf_nodes())
+    assert len(sequences) == len(index_map)  # exactly one entry in taxon_namespace for each leaf
+    for leaf in tree.leaf_node_iter():
+        sequences[index_map[leaf.taxon]] = getattr(leaf, seq_attr)[-1]
+        #sequences[index_map(leaf.taxon)] = np.concatenate(getattr(leaf, seq_attr))
     return np.array(sequences)
 
 def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_states=None, retain_sequences_on_tree=False, rng=None):

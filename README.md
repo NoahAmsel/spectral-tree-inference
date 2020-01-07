@@ -24,14 +24,16 @@ mean_kingman_tree(taxon_namespace=taxa)
 
 Birth death.
 ```
-birth_death_tree(birth_rate=1., death_rate=0., num_total_tips=len(taxa), taxon_namespace=taxa)
+t = birth_death_tree(birth_rate=1., death_rate=0., num_total_tips=len(taxa), taxon_namespace=taxa)
+t.collapse_basal_bifurcation()
 ```
 
 ### Building a non-ultrametric tree
 
 
 ```
-birth_death_tree(birth_rate=1., death_rate=2., is_retain_extinct_tips=True, num_total_tips=len(taxa), taxon_namespace=taxa)
+t = birth_death_tree(birth_rate=1., death_rate=2., is_retain_extinct_tips=True, num_total_tips=len(taxa), taxon_namespace=taxa)
+t.collapse_basal_bifurcation()
 ```
 
 tree.minmax_leaf_distance_from_root()
@@ -69,11 +71,16 @@ tree1 = dendropy.Tree.get(
 
 Printing
 ```
-tree1.print_plot(width=80)
+tree1.print_plot(width=80, plot_metric="length")
 ```
 
 ```
 tree1.as_ascii_plot()
 tree1.as_string("newick")
 tree1.as_python_source()
+```
+
+Checking if a clan is in a tree
+```
+taxon_namespace.taxa_bipartition()
 ```

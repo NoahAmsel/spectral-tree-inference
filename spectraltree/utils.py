@@ -2,6 +2,23 @@ from collections import defaultdict
 import numpy as np
 import dendropy
 
+from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree # for convenience
+
+def unrooted_birth_death_tree(birth_rate, death_rate, birth_rate_sd=0.0, death_rate_sd=0.0, **kwargs):
+    tree = birth_death_tree(birth_rate, death_rate, birth_rate_sd=birth_rate_sd, death_rate_sd=death_rate_sd, **kwargs)
+    tree.is_rooted = False
+    return tree
+
+def unrooted_pure_kingman_tree(taxon_namespace, pop_size=1, rng=None):
+    tree = pure_kingman_tree(taxon_namespace, pop_size=pop_size, rng=rng)
+    tree.is_rooted = False
+    return tree
+
+def unrooted_mean_kingman_tree(taxon_namespace, pop_size=1, rng=None):
+    tree = mean_kingman_tree(taxon_namespace, pop_size=pop_size, rng=rng)
+    tree.is_rooted = False
+    return tree
+
 def default_namespace(num_taxa):
     return dendropy.TaxonNamespace([str(i) for i in range(num_taxa)])
 
