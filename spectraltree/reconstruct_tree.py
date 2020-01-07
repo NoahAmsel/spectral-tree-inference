@@ -104,7 +104,7 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
     # for a bifurcating tree we're combining the last two available clades
     # for an unrooted one it's the last three because
     # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)))
+    return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
 
 def estimate_edge_lengths(tree, distance_matrix):
     # check the PAUP* documentation

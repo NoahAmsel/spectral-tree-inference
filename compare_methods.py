@@ -12,6 +12,7 @@ import spectraltree
 
 class Experiment_Datum:
     def __init__(self, sequence_model, n, method, mutation_rate, inferred_tree, reference_tree):
+        assert inferred_tree.is_rooted == reference_tree.is_rooted, "Cannot compare rooted to unrooted tree"
         self.sequence_model = sequence_model
         self.n = n
         self.method = method

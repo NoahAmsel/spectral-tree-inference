@@ -50,7 +50,7 @@ def balanced_binary(num_taxa, namespace=None, edge_length=1.):
     while len(nodes) > 1:
         nodes = [merge_children(nodes[2*i : 2*i+2], edge_length=edge_length) for i in range(len(nodes)//2)]
 
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
+    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0], is_rooted=False)
 
 def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
     # one node splits off at each step
@@ -65,7 +65,7 @@ def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
         b = nodes.pop()
         nodes.append(merge_children((a,b), edge_length=edge_length))
 
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
+    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0], is_rooted=False)
 
 def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
     for e in tree.edges():
