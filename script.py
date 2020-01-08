@@ -1,4 +1,13 @@
-#! /usr/bin/env python
+#! /bin/bash
+#SBATCH --mail-type ALL --mail-user noah.amsel@yale.edu
+#SBATCH --mem=6g
+#SBATCH -c 10
+
+module load Python
+
+# run me from inside spectral-tree-inference
+
+python <<END
 
 from spectraltree import *
 from compare_methods import *
@@ -19,3 +28,4 @@ results = experiment(tree_list=binary_trees,
                         reps_per_tree=10,
                         savepath="grid1.pkl")
 # %%
+END
