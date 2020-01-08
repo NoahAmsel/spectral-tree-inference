@@ -4,3 +4,4 @@ figures
 matlab_tests
 *.DS_Store
 data/*
+scripts/slurm-*.out
