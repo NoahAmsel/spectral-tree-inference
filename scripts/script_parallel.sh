@@ -7,9 +7,11 @@
 module load Python
 
 # run me from inside spectral-tree-inference
-# sbatch --output=scripts/slurm-%A_%a.out scripts/script.sh
+# sbatch --output=scripts/slurm-%A_%a.out scripts/script_parallel.sh
 
 python <<END
+import sys
+sys.path.insert(0, '..')
 
 from spectraltree import *
 from compare_methods import *

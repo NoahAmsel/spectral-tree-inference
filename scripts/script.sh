@@ -10,6 +10,8 @@ module load Python
 # sbatch --output=scripts/slurm-%A_%a.out scripts/script.sh
 
 python <<END
+import sys
+sys.path.insert(0, '..')
 
 from spectraltree import *
 from compare_methods import *
