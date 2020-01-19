@@ -1,6 +1,7 @@
 import datetime
 import pickle
 import os.path
+from itertools import product
 
 import numpy as np
 import pandas as pd
@@ -112,8 +113,9 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
     total_trials = len(tree_list) * reps_per_tree * len(mutation_rates) * len(Ns) * len(methods)
     i = 0
     for reference_tree in tree_list:
-        for _ in range(reps_per_tree):
-            for mutation_rate in mutation_rates:
+        for mutation_rate in mutation_rates:
+            # we can parallelize this loop too, but then we need to set different random seeds
+            for _ in range(reps_per_tree):
                 observations = spectraltree.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
                 for n in Ns:
                     for method in methods:
@@ -136,6 +138,43 @@ def reproduce_datum(datum):
     inferred_tree = datum.method(observations[:,:datum.n], namespace=datum.ref_tree.taxon_namespace)
     return Experiment_Datum(datum.sequence_model, datum.n, datum.method, datum.mutation_rate, inferred_tree, datum.ref_tree), inferred_tree
     #return experiment(tree_list=[datum.ref_tree], sequence_model=datum.sequence_model, Ns=[datum.n], methods=[datum.method], mutation_rates=[datum.mutation_rate], verbose=False)[0]
+
+# %%
+
+def parallel_experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data", overwrite=False, verbose=True):
+    def inner(reference_tree, mutation_rate):
+        partial_results = []
+        for _ in range(reps_per_tree):
+            observations = spectraltree.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
+            for n in Ns:
+                for method in methods:
+                    inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
+                    partial_results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree))
+
+        return partial_results
+
+    if verbose:
+        print("==== Beginning Experiment =====")
+        print("\t Transition: ", sequence_model)
+        print("\t {} trees".format(len(tree_list)))
+        print("\t {} sample sizes:".format(len(Ns)), *Ns)
+        print("\t {} methods".format(len(methods)), *methods)
+        print("\t {} mutation rates:".format(len(mutation_rates)), *("{0:.4f}".format(rate) for rate in mutation_rates))
+        print("\t {} reps".format(reps_per_tree))
+
+    total_trials = len(tree_list) * reps_per_tree * len(mutation_rates) * len(Ns) * len(methods)
+    with multiprocessing.Pool() as pool:
+        result_lists_future = pool.starmap(inner, list(product(tree_list, mutation_rates)))
+
+    results = sum(result_lists_future, [])
+
+    if savepath:
+        previous_results = [] if overwrite else load_results(savepath, folder=folder, throw_error=False)
+        save_results(previous_results+results, filename=savepath, folder=folder)
+        if verbose:
+            print("Saved to", os.path.join(folder, savepath) if folder else savepath)
+
+    return results
 
 # Plotting functions
 def results2frame(results):

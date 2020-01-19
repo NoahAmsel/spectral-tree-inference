@@ -22,12 +22,12 @@ methods = [Reconstruction_Method(neighbor_joining), Reconstruction_Method()] #, 
 delta_vec = np.linspace(0.65,0.95,7)
 mutation_rates = [jc.similarity2t(delta) for delta in delta_vec]
 
-results = experiment(tree_list=binary_trees,
-                        sequence_model=jc,
-                        Ns=Ns,
-                        methods=methods,
-                        mutation_rates=mutation_rates,
-                        reps_per_tree=10,
-                        savepath="grid1.pkl")
+results = parallel_experiment(tree_list=binary_trees,
+                                sequence_model=jc,
+                                Ns=Ns,
+                                methods=methods,
+                                mutation_rates=mutation_rates,
+                                reps_per_tree=10,
+                                savepath="grid1_parallel.pkl")
 # %%
 END
