@@ -1,6 +1,7 @@
 import datetime
 import pickle
 import os.path
+import multiprocessing
 from itertools import product
 
 import numpy as np
