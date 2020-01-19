@@ -1,4 +1,6 @@
 from collections import defaultdict
+from itertools import combinations
+import scipy.spatial.distance
 import numpy as np
 import dendropy
 
@@ -110,6 +112,17 @@ def array2distance_matrix(matrix, namespace=None):
     dm = dendropy.calculate.phylogeneticdistance.PhylogeneticDistanceMatrix()
     dm.compile_from_dict(dict_form, namespace)
     return dm
+
+def distance_matrix2array(dm):
+    """
+    This is patristic distance: adding the branch lengths. If we set branches to
+    have different transitions, this won't be the paralinear distance
+    """
+    taxa = list(dm.taxon_namespace)
+    return scipy.spatial.distance.squareform([dm.distance(taxon1, taxon2) for taxon1, taxon2 in combinations(taxa,2)])
+
+def tree2distance_matrix(tree):
+    return distance_matrix2array(tree.phylogenetic_distance_matrix())
 
 # %%
 if __name__ == "__main__":
