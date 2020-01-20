@@ -142,18 +142,18 @@ def reproduce_datum(datum):
 
 # %%
 
+def parallel_helper(reference_tree, mutation_rate, sequence_model, Ns, methods, reps_per_tree):
+    partial_results = []
+    for _ in range(reps_per_tree):
+        observations = spectraltree.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
+        for n in Ns:
+            for method in methods:
+                inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
+                partial_results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree))
+
+    return partial_results
+
 def parallel_experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data", overwrite=False, verbose=True):
-    def inner(reference_tree, mutation_rate):
-        partial_results = []
-        for _ in range(reps_per_tree):
-            observations = spectraltree.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
-            for n in Ns:
-                for method in methods:
-                    inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
-                    partial_results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree))
-
-        return partial_results
-
     if verbose:
         print("==== Beginning Experiment =====")
         print("\t Transition: ", sequence_model)
@@ -165,9 +165,12 @@ def parallel_experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[
 
     total_trials = len(tree_list) * reps_per_tree * len(mutation_rates) * len(Ns) * len(methods)
     with multiprocessing.Pool() as pool:
-        result_lists_future = pool.starmap(inner, list(product(tree_list, mutation_rates)))
+        params = [(reference_tree, mutation_rate, sequence_model, Ns, methods, reps_per_tree) for reference_tree, mutation_rate in product(tree_list, mutation_rates)]
+        result_lists = pool.starmap(parallel_helper, params)
 
-    results = sum(result_lists_future, [])
+    results = sum(result_lists, [])
+    for r in results:
+        print(r)
 
     if savepath:
         previous_results = [] if overwrite else load_results(savepath, folder=folder, throw_error=False)

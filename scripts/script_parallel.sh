@@ -1,7 +1,7 @@
 #! /bin/bash
 #SBATCH --mail-type ALL --mail-user noah.amsel@yale.edu
 #SBATCH --mem=10g
-#SBATCH -c 10
+#SBATCH -c 20
 #SBATCH -t 24:00:00
 
 module load Python
