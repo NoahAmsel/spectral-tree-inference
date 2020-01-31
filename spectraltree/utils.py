@@ -124,6 +124,45 @@ def distance_matrix2array(dm):
 def tree2distance_matrix(tree):
     return distance_matrix2array(tree.phylogenetic_distance_matrix())
 
+##########################################################
+##               Tree Generation
+##########################################################
+
+def balanced_binary(num_taxa, namespace=None, edge_length=1.):
+    assert num_taxa == 2**int(np.log2(num_taxa)), "The number of leaves in a balanced binary tree must be a power of 2."
+    if namespace is None:
+        namespace = default_namespace(num_taxa)
+    else:
+        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
+
+    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
+    while len(nodes) > 1:
+        nodes = [merge_children(nodes[2*i : 2*i+2], edge_length=edge_length) for i in range(len(nodes)//2)]
+
+    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
+
+def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
+    # one node splits off at each step
+    if namespace is None:
+        namespace = default_namespace(num_taxa)
+    else:
+        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
+
+    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
+    while len(nodes) > 1:
+        a = nodes.pop()
+        b = nodes.pop()
+        nodes.append(merge_children((a,b), edge_length=edge_length))
+
+    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0])
+
+def unrooted_birth_death_tree(num_taxa, namespace=None, birth_rate=0.5, death_rate = 0, **kwargs):
+    if namespace == None:
+        namespace = default_namespace(num_taxa)
+    tree = dendropy.model.birthdeath.birth_death_tree(birth_rate, death_rate, birth_rate_sd=0.0, death_rate_sd=0.0, taxon_namespace = namespace,  num_total_tips=num_taxa, **kwargs)
+    tree.is_rooted = False
+    return tree
+
 # %%
 if __name__ == "__main__":
 

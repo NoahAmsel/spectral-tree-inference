@@ -4,7 +4,8 @@ from itertools import combinations
 import numpy as np
 import scipy.spatial.distance
 import dendropy     #should this library be independent of dendropy? is that even possible?
-from . import utils
+#from . import utils
+import utils
 
 def sv2(A1, A2, M):
     """Second Singular Value"""
@@ -24,7 +25,7 @@ def sum_squared_quartets(A1, A2, M):
     num = norm_sq**2 - np.linalg.norm(M_A.T.dot(M_A))**2
     return num / norm_sq
 
-def paralinear_distance(observations, classes=None):
+def paralinear_similarity(observations, classes=None):
     # build the similarity matrix M -- this is pretty optimized, at least assuming k << n
     # setting classes allows you to ignore missing data. e.g. set class to 1,2,3,4 and it will
     # treat np.nan, -1, and 5 as missing data
@@ -42,19 +43,36 @@ def paralinear_distance(observations, classes=None):
     diag = M.diagonal()
     # assert np.count_nonzero(diag) > 0, "Sequence was so short that some characters never appeared"
     similarity = M / np.sqrt(np.outer(diag,diag))
+    return similarity
+
+def paralinear_distance(observations, classes=None):
+    similarity = paralinear_similarity(observations, classes)
     similarity = np.clip(similarity, a_min=1e-20, a_max=None)
     return -np.log(similarity)
 
-def JC_distance_matrix(observations, classes=None):
-    """Jukes-Cantor Corrected Distance"""
+def JC_similarity_matrix(observations, classes=None):
+    """Jukes-Cantor Corrected Similarity"""
     assert classes is None
     if classes is None:
         classes = np.unique(observations)
     k = len(classes)
     hamming_matrix = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(observations, metric='hamming'))
     inside_log = 1 - hamming_matrix*k/(k-1)
+    return inside_log**(k-1)
+
+def JC_distance_matrix(observations, classes=None):
+    """Jukes-Cantor Corrected Distance"""
+    inside_log = JC_similarity_matrix(observations,classes)
     inside_log = np.clip(inside_log, a_min=1e-16, a_max=None)
-    return - (k-1) * np.log(inside_log)
+    return - np.log(inside_log)
+
+def estimate_edge_lengths(tree, distance_matrix):
+    # check the PAUP* documentation
+    pass
+
+##########################################################
+##               Reconstruction methods
+##########################################################
 
 def correlation_distance_matrix(observations):
     """Correlation Distance"""
@@ -62,16 +80,15 @@ def correlation_distance_matrix(observations):
     corr = np.clip(corr, a_min=1e-16, a_max=None)
     return -np.log(corr)
 
-def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
-    m, m2 = distance_matrix.shape
+#change to spectral_neighbor_joining
+def estimate_tree_topology(similarity_matrix, namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
+    m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
     if namespace is None:
         namespace = utils.default_namespace(m)
     else:
         assert len(namespace) >= m, "Namespace too small for distance matrix"
-
-    M = np.exp(-distance_matrix*scaler)
-
+    
     # initialize leaf nodes
     G = [utils.leaf(i, namespace) for i in range(m)]
 
@@ -80,7 +97,7 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
     Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
     sv1 = np.full((2*m,2*m), np.nan)
     for i,j in combinations(available_clades, 2):
-        Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, M)
+        Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, similarity_matrix)
         Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
 
     # merge
@@ -91,7 +108,7 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
         available_clades.remove(left)
         available_clades.remove(right)
         for other_ix in available_clades:
-            Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, M)
+            Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, similarity_matrix)
             Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
         available_clades.add(new_ix)
 
@@ -106,18 +123,513 @@ def estimate_tree_topology(distance_matrix, namespace=None, scorer=sv2, scaler=1
     # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
     return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
 
-def estimate_edge_lengths(tree, distance_matrix):
-    # check the PAUP* documentation
-    pass
+def neighbor_joining(similarity_matrix, namespace=None):
+    similarity_matrix = np.clip(similarity_matrix, a_min=1e-20, a_max=None)
+    distance_matrix = -np.log(similarity_matrix)
+    T = utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
+    return T
 
-def neighbor_joining(distance_matrix, namespace=None):
-    return utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
 
+def partition_taxa(v):
+    m = len(v)
+    v_sort = np.sort(v)
+    gaps = v_sort[1:m]-v_sort[0:m-1]
+    max_idx = np.argmax(gaps)
+    threshold = (v_sort[max_idx]+v_sort[max_idx+1])/2
+    bool_bipartition = v<threshold
+    return bool_bipartition
+
+def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=None):
+    m, m2 = similarity_matrix.shape
+    assert m == m2, "Distance matrix must be square"
+    if namespace is None:
+        namespace = utils.default_namespace(m)
+    else:
+        assert len(namespace) >= m, "Namespace too small for distance matrix"
+    
+    T = dendropy.Tree(taxon_namespace=namespace)
+
+    # Extracting inecies from namespace    
+    T1_labels = [x.taxon.label for x in T1.leaf_nodes()]
+    T2_labels = [x.taxon.label for x in T2.leaf_nodes()]
+
+    half1_idx_bool = [x.label in T1_labels for x in namespace]
+    half1_idx = [i for i, x in enumerate(half1_idx_bool) if x]
+    half1_idx_array = np.array(half1_idx)
+    T1.is_rooted = True
+    
+    half2_idx_bool = [x.label in T2_labels for x in namespace]
+    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]
+    half2_idx_array = np.array(half2_idx)
+    T2.is_rooted = True
+    
+    # finding roots
+    
+    # find root of half 1
+    bipartitions1 = T1.bipartition_edge_map
+    min_ev2 = float("inf")
+    for bp in bipartitions1.keys():
+        if bp.leafset_as_bitstring().find('0') == -1:
+            continue
+        # Slice similarity matrix of half2 + part of half1 VS the other part of half 1
+        bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+        h1_idx_A = half1_idx_array[bool_array]
+        h1_idx_B = half1_idx_array[~bool_array]
+        other_idx = np.array([], dtype = np.int32) #np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])), sub_idx)
+    
+        A_h2_other_idx = list(np.concatenate([h1_idx_A, half2_idx_array, other_idx]))
+        B_h2_other_idx = list(np.concatenate([h1_idx_B, half2_idx_array, other_idx]))
+
+        A_other_idx = list(np.concatenate([h1_idx_A, other_idx]))
+        B_other_idx = list(np.concatenate([h1_idx_B, other_idx]))
+        
+        A_h2_idx = list(np.concatenate([h1_idx_A, half2_idx_array]))
+        B_h2_idx = list(np.concatenate([h1_idx_B, half2_idx_array]))
+
+        #all_minus_h1_idx_cur = list(np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])),h1_idx_cur))
+        #all_minus_h1_idx_cur_complement = list(np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])),h1_idx_cur_complement))
+        
+        ####################### example of indexes ##################
+        # FFFF FFFF TTTT TTTT - idx            - these are the element we are "solving for" at theis step
+        # FFFF FFFF 1111 FFFF - half1_idx      - these are the elements assignd to half 1 (and described by T1)
+        # FFFF FFFF FFFF 1111 - half2_idx      - these are the elements assignd to half 1 (and described by T1)
+        # FFFF FFFF 0110 FFFF - h1_idx_A       - these are the elements chosen at the current partition (bp)
+        # FFFF FFFF 1001 FFFF - h1_idx_B       - these are the elements chosen at the current partition (bp)
+        # 1111 1111 FFFF FFFF - other_idx      - 
+        
+        # 1111 1111 1001 1111 - B_h2_other_idx - 
+        # 1111 1111 0110 1111 - A_h2_other_idx - 
+        # 1111 1111 0110 0000 - A_other_idx    - 
+        # 1111 1111 1001 0000 - B_other_idx    - 
+        # 0000 0000 0110 1111 - A_h2_idx       - 
+        # 0000 0000 1001 1111 - B_h2_idx       - 
+        
+        ## Case 1: Other is connected to A
+        sliced_sim_mat_try1_1 = similarity_matrix[A_other_idx, ...]
+        sliced_sim_mat_try1_1 = sliced_sim_mat_try1_1[...,B_h2_idx]
+        score_try1_1 = 0 if (sliced_sim_mat_try1_1.shape[0] == 1) | (sliced_sim_mat_try1_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_1, compute_uv = False)[1]
+
+        sliced_sim_mat_try1_2 = similarity_matrix[A_h2_other_idx, ...]
+        sliced_sim_mat_try1_2 = sliced_sim_mat_try1_2[...,h1_idx_B]
+        score_try1_2 = 0 if (sliced_sim_mat_try1_2.shape[0] == 1) | (sliced_sim_mat_try1_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_2, compute_uv = False)[1]
+
+        score_try1 = np.max([score_try1_1,score_try1_2])
+        ## Case 2: Other is connected to B
+        sliced_sim_mat_try2_1 = similarity_matrix[h1_idx_A, ...]
+        sliced_sim_mat_try2_1 = sliced_sim_mat_try2_1[...,B_h2_other_idx]
+        score_try2_1 = 0 if (sliced_sim_mat_try2_1.shape[0] == 1) | (sliced_sim_mat_try2_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_1, compute_uv = False)[1]
+        
+        sliced_sim_mat_try2_2 = similarity_matrix[A_h2_idx, ...]
+        sliced_sim_mat_try2_2 = sliced_sim_mat_try2_2[...,B_other_idx]
+        score_try2_2 = 0 if (sliced_sim_mat_try2_2.shape[0] == 1) | (sliced_sim_mat_try2_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_2, compute_uv = False)[1]
+        
+        score_try2 = np.max([score_try2_1,score_try2_2])
+        
+        ## Case 3: Other is connected to h2
+        sliced_sim_mat_try3_1 = similarity_matrix[h1_idx_A, ...]
+        sliced_sim_mat_try3_1 = sliced_sim_mat_try3_1[...,B_h2_other_idx]
+        score_try3_1 = 0 if (sliced_sim_mat_try3_1.shape[0] == 1) | (sliced_sim_mat_try3_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_1, compute_uv = False)[1]
+        
+        sliced_sim_mat_try3_2 = similarity_matrix[A_h2_other_idx, ...]
+        sliced_sim_mat_try3_2 = sliced_sim_mat_try3_2[...,h1_idx_B]
+        score_try3_2 = 0 if (sliced_sim_mat_try3_2.shape[0] == 1) | (sliced_sim_mat_try3_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_2, compute_uv = False)[1]
+        
+        score_try3 = np.max([score_try3_1,score_try3_2])
+        
+        if np.min([score_try1, score_try2, score_try3]) <min_ev2:
+            min_ev2 = np.min([score_try1, score_try2, score_try3])
+            bp_min = bp
+    # if sum([int(i) for i in bp_min.leafset_as_bitstring()]) != len([int(i) for i in bp_min.leafset_as_bitstring()])/2:
+    #     print("ERROR: ")
+    #     print("size of data:", m)
+    #     print("Half sizes:", sum([int(i) for i in bp_min.leafset_as_bitstring()]), sum([-1*int(i)+1 for i in bp_min.leafset_as_bitstring()]))
+
+    T1.reroot_at_edge(bipartitions1[bp_min])
+
+    # find root of half 2
+    bipartitions2 = T2.bipartition_edge_map
+    min_ev2 = float("inf")
+    for bp in bipartitions2.keys():
+        if bp.leafset_as_bitstring().find('0') == -1:
+            continue
+        # Slice similarity matrix of half2 + part of half1 VS the other part of half 1
+        
+        bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+        h2_idx_A = half2_idx_array[bool_array]
+        h2_idx_B = half2_idx_array[~bool_array]
+        other_idx = np.array([], dtype = np.int32)#np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])), sub_idx)
+
+        A_h1_other_idx = list(np.concatenate([h2_idx_A, half1_idx_array, other_idx]))
+        B_h1_other_idx = list(np.concatenate([h2_idx_B, half1_idx_array, other_idx]))
+
+        A_other_idx = list(np.concatenate([h2_idx_A, other_idx]))
+        B_other_idx = list(np.concatenate([h2_idx_B, other_idx]))
+
+        A_h1_idx = list(np.concatenate([h2_idx_A, half1_idx_array]))
+        B_h1_idx = list(np.concatenate([h2_idx_B, half1_idx_array]))
+
+        ####################### example of indexes ##################
+        # FFFF FFFF TTTT TTTT - idx            - these are the element we are "solving for" at theis step
+        # FFFF FFFF 1111 FFFF - half1_idx      - these are the elements assignd to half 1 (and described by T1)
+        # FFFF FFFF FFFF 1111 - half2_idx      - these are the elements assignd to half 1 (and described by T1)
+        # FFFF FFFF FFFF 1100 - h1_idx_A       - these are the elements chosen at the current partition (bp)
+        # FFFF FFFF FFFF 0011 - h1_idx_B       - these are the elements chosen at the current partition (bp)
+        # 1111 1111 FFFF FFFF - other_idx      - 
+        
+        # 1111 1111 1111 0011 - B_h1_other_idx - 
+        # 1111 1111 1111 1100 - A_h1_other_idx - 
+        # 1111 1111 0000 1100 - A_other_idx    - 
+        # 1111 1111 0000 0011 - B_other_idx    - 
+        # 0000 0000 1111 1100 - A_h1_idx       - 
+        # 0000 0000 1111 0011 - B_h1_idx       - 
+        
+        ## Case 1: Other is connected to A
+        sliced_sim_mat_try1_1 = similarity_matrix[A_other_idx, ...]
+        sliced_sim_mat_try1_1 = sliced_sim_mat_try1_1[...,B_h1_idx]
+        score_try1_1 = 0 if (sliced_sim_mat_try1_1.shape[0] == 1) | (sliced_sim_mat_try1_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_1, compute_uv = False)[1]
+
+        sliced_sim_mat_try1_2 = similarity_matrix[A_h1_other_idx, ...]
+        sliced_sim_mat_try1_2 = sliced_sim_mat_try1_2[...,h2_idx_B]
+        score_try1_2 = 0 if (sliced_sim_mat_try1_2.shape[0] == 1) | (sliced_sim_mat_try1_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_2, compute_uv = False)[1]
+
+        score_try1 = np.max([score_try1_1,score_try1_2])
+        ## Case 2: Other is connected to B
+        sliced_sim_mat_try2_1 = similarity_matrix[h2_idx_A, ...]
+        sliced_sim_mat_try2_1 = sliced_sim_mat_try2_1[...,B_h1_other_idx]
+        score_try2_1 = 0 if (sliced_sim_mat_try2_1.shape[0] == 1) | (sliced_sim_mat_try2_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_1, compute_uv = False)[1]
+        
+        sliced_sim_mat_try2_2 = similarity_matrix[A_h1_idx, ...]
+        sliced_sim_mat_try2_2 = sliced_sim_mat_try2_2[...,B_other_idx]
+        score_try2_2 = 0 if (sliced_sim_mat_try2_2.shape[0] == 1) | (sliced_sim_mat_try2_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_2, compute_uv = False)[1]
+        
+        score_try2 = np.max([score_try2_1,score_try2_2])
+        
+        ## Case 3: Other is connected to h2
+        sliced_sim_mat_try3_1 = similarity_matrix[h2_idx_A, ...]
+        sliced_sim_mat_try3_1 = sliced_sim_mat_try3_1[...,B_h1_other_idx]
+        score_try3_1 = 0 if (sliced_sim_mat_try3_1.shape[0] == 1) | (sliced_sim_mat_try3_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_1, compute_uv = False)[1]
+        
+        sliced_sim_mat_try3_2 = similarity_matrix[A_h1_other_idx, ...]
+        sliced_sim_mat_try3_2 = sliced_sim_mat_try3_2[...,h2_idx_B]
+        score_try3_2 = 0 if (sliced_sim_mat_try3_2.shape[0] == 1) | (sliced_sim_mat_try3_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_2, compute_uv = False)[1]
+        
+        score_try3 = np.max([score_try3_1,score_try3_2])
+        
+        if np.min([score_try1, score_try2, score_try3]) <min_ev2:
+            min_ev2 = np.min([score_try1, score_try2, score_try3])
+            bp_min = bp
+    # if sum([int(i) for i in bp_min.leafset_as_bitstring()]) != len([int(i) for i in bp_min.leafset_as_bitstring()])/2:
+    #     print("ERROR: ")
+    #     print("size of data:", m)
+    #     print("Half sizes:", sum([int(i) for i in bp_min.leafset_as_bitstring()]), sum([-1*int(i)+1 for i in bp_min.leafset_as_bitstring()]))
+    T2.reroot_at_edge(bipartitions2[bp_min])
+        
+    T.seed_node.set_child_nodes([T1.seed_node,T2.seed_node])
+    #T.seed_node.add_child(T1.seed_node)
+    #T.seed_node.add_child(T2.seed_node)
+    # if len(sub_idx) != similarity_matrix.shape[0]:
+    #     T.is_rooted = True
+    return T
+
+
+def spectral_tree_reonstruction(similarity_matrix, namespace=None):
+    m, m2 = similarity_matrix.shape
+    assert m == m2, "Distance matrix must be square"
+    if namespace is None:
+        namespace = utils.default_namespace(m)
+    else:
+        assert len(namespace) >= m, "Namespace too small for distance matrix"
+    
+    # Partitioning
+    [D,V] = np.linalg.eigh(similarity_matrix)            
+    bool_bipartition = partition_taxa(V[:,-2])
+    
+    similarity_matrix1 = similarity_matrix[bool_bipartition,:]
+    similarity_matrix1 = similarity_matrix1[:, bool_bipartition]
+
+    not_bool_bipartition = [~i for i in bool_bipartition]
+    similarity_matrix2 = similarity_matrix[not_bool_bipartition,:]
+    similarity_matrix2 = similarity_matrix2[:, not_bool_bipartition]
+    
+    #reconstructing each part
+    T1 = estimate_tree_topology(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
+    T2 = estimate_tree_topology(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
+
+    # Finding roots and merging trees
+    T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=namespace)
+    return T
+
+
+def spectral_tree_reonstruction_old(similarity_matrix, namespace=None, sub_idx = None):
+    # sub_idx  - internal variable. Do not change when calling the function
+    m, m2 = similarity_matrix.shape
+    if sub_idx == None:
+        sub_idx = list(range(m))
+    #print("size of data:", m, )
+    assert m == m2, "Distance matrix must be square"
+    if namespace is None:
+        namespace = utils.default_namespace(m)
+    else:
+        assert len(namespace) >= m, "Namespace too small for distance matrix"
+    
+    similarity_matrix_small = similarity_matrix[sub_idx,...]
+    similarity_matrix_small = similarity_matrix_small[...,sub_idx]
+    if len(sub_idx) != similarity_matrix.shape[0]:
+        T = dendropy.Tree(taxon_namespace= dendropy.TaxonNamespace([namespace[i] for i in sub_idx]))
+    else:
+        T = dendropy.Tree(taxon_namespace=namespace)
+    
+    #Reconstract tree with NJ for small tree. SHOULD BE CHANGED TO MAXIMUM LIKLHOOD
+    if len(sub_idx)<=64:
+        #distance_matrix = np.clip(similarity_matrix_small, a_min=1e-16, a_max=None)
+        T = estimate_tree_topology(similarity_matrix_small, dendropy.TaxonNamespace([namespace[i] for i in sub_idx]))
+        #T = neighbor_joining(distance_matrix, dendropy.TaxonNamespace([namespace[i] for i in sub_idx]))
+        T.reroot_at_node(T.seed_node)
+        return T
+        
+
+    w,v = scipy.linalg.eigh(similarity_matrix_small)
+    eigv2 =v[:,-2]
+    
+    cut_val = np.median(eigv2)
+    #cut_val = 0
+    half1_idx = [sub_idx[i] for i, val in enumerate(eigv2<cut_val) if val] 
+    half1_idx_array = np.array(half1_idx)
+    #half1 = eigv2[half1_idx]
+    # similarity_matrix1 = similarity_matrix[half1_idx,...]
+    # similarity_matrix1 = similarity_matrix1[...,half1_idx]
+    # namespace1 = dendropy.TaxonNamespace([namespace[i] for i in half1_idx])
+    T1 = spectral_tree_reonstruction_old(similarity_matrix, namespace,sub_idx=half1_idx)
+    T1.is_rooted = True
+
+    half2_idx = [sub_idx[i] for i, val in enumerate(eigv2>cut_val) if val] 
+    half2_idx_array = np.array(half2_idx)
+    #half2 = eigv2[half2_idx]
+    # similarity_matrix2 = similarity_matrix[half2_idx,...]
+    # similarity_matrix2 = similarity_matrix2[...,half2_idx]
+    # namespace2 = dendropy.TaxonNamespace([namespace[i] for i in half2_idx])
+    T2 = spectral_tree_reonstruction_old(similarity_matrix, namespace, sub_idx=half2_idx)
+    T2.is_rooted = True
+    # finding roots
+    
+    # find root of half 1
+    if len(half1_idx)>2:
+        bipartitions1 = T1.bipartition_edge_map
+        min_ev2 = float("inf")
+        for bp in bipartitions1.keys():
+            if bp.leafset_as_bitstring().find('0') == -1:
+                continue
+            # Slice similarity matrix of half2 + part of half1 VS the other part of half 1
+            bool_array =np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+            h1_idx_A = half1_idx_array[bool_array]
+            h1_idx_B = half1_idx_array[~bool_array]
+            other_idx = np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])), sub_idx)
+        
+            A_h2_other_idx = list(np.concatenate([h1_idx_A, half2_idx_array, other_idx]))
+            B_h2_other_idx = list(np.concatenate([h1_idx_B, half2_idx_array, other_idx]))
+
+            A_other_idx = list(np.concatenate([h1_idx_A, other_idx]))
+            B_other_idx = list(np.concatenate([h1_idx_B, other_idx]))
+            
+            A_h2_idx = list(np.concatenate([h1_idx_A, half2_idx_array]))
+            B_h2_idx = list(np.concatenate([h1_idx_B, half2_idx_array]))
+
+            #all_minus_h1_idx_cur = list(np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])),h1_idx_cur))
+            #all_minus_h1_idx_cur_complement = list(np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])),h1_idx_cur_complement))
+            
+            ####################### example of indexes ##################
+            # FFFF FFFF TTTT TTTT - idx            - these are the element we are "solving for" at theis step
+            # FFFF FFFF 1111 FFFF - half1_idx      - these are the elements assignd to half 1 (and described by T1)
+            # FFFF FFFF FFFF 1111 - half2_idx      - these are the elements assignd to half 1 (and described by T1)
+            # FFFF FFFF 0110 FFFF - h1_idx_A       - these are the elements chosen at the current partition (bp)
+            # FFFF FFFF 1001 FFFF - h1_idx_B       - these are the elements chosen at the current partition (bp)
+            # 1111 1111 FFFF FFFF - other_idx      - 
+            
+            # 1111 1111 1001 1111 - B_h2_other_idx - 
+            # 1111 1111 0110 1111 - A_h2_other_idx - 
+            # 1111 1111 0110 0000 - A_other_idx    - 
+            # 1111 1111 1001 0000 - B_other_idx    - 
+            # 0000 0000 0110 1111 - A_h2_idx       - 
+            # 0000 0000 1001 1111 - B_h2_idx       - 
+            
+            ## Case 1: Other is connected to A
+            sliced_sim_mat_try1_1 = similarity_matrix[A_other_idx, ...]
+            sliced_sim_mat_try1_1 = sliced_sim_mat_try1_1[...,B_h2_idx]
+            score_try1_1 = 0 if (sliced_sim_mat_try1_1.shape[0] == 1) | (sliced_sim_mat_try1_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_1, compute_uv = False)[1]
+
+            sliced_sim_mat_try1_2 = similarity_matrix[A_h2_other_idx, ...]
+            sliced_sim_mat_try1_2 = sliced_sim_mat_try1_2[...,h1_idx_B]
+            score_try1_2 = 0 if (sliced_sim_mat_try1_2.shape[0] == 1) | (sliced_sim_mat_try1_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_2, compute_uv = False)[1]
+
+            score_try1 = np.max([score_try1_1,score_try1_2])
+            ## Case 2: Other is connected to B
+            sliced_sim_mat_try2_1 = similarity_matrix[h1_idx_A, ...]
+            sliced_sim_mat_try2_1 = sliced_sim_mat_try2_1[...,B_h2_other_idx]
+            score_try2_1 = 0 if (sliced_sim_mat_try2_1.shape[0] == 1) | (sliced_sim_mat_try2_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_1, compute_uv = False)[1]
+            
+            sliced_sim_mat_try2_2 = similarity_matrix[A_h2_idx, ...]
+            sliced_sim_mat_try2_2 = sliced_sim_mat_try2_2[...,B_other_idx]
+            score_try2_2 = 0 if (sliced_sim_mat_try2_2.shape[0] == 1) | (sliced_sim_mat_try2_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_2, compute_uv = False)[1]
+            
+            score_try2 = np.max([score_try2_1,score_try2_2])
+            
+            ## Case 3: Other is connected to h2
+            sliced_sim_mat_try3_1 = similarity_matrix[h1_idx_A, ...]
+            sliced_sim_mat_try3_1 = sliced_sim_mat_try3_1[...,B_h2_other_idx]
+            score_try3_1 = 0 if (sliced_sim_mat_try3_1.shape[0] == 1) | (sliced_sim_mat_try3_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_1, compute_uv = False)[1]
+            
+            sliced_sim_mat_try3_2 = similarity_matrix[A_h2_other_idx, ...]
+            sliced_sim_mat_try3_2 = sliced_sim_mat_try3_2[...,h1_idx_B]
+            score_try3_2 = 0 if (sliced_sim_mat_try3_2.shape[0] == 1) | (sliced_sim_mat_try3_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_2, compute_uv = False)[1]
+            
+            score_try3 = np.max([score_try3_1,score_try3_2])
+            
+            if np.min([score_try1, score_try2, score_try3]) <min_ev2:
+                min_ev2 = np.min([score_try1, score_try2, score_try3])
+                bp_min = bp
+        # if sum([int(i) for i in bp_min.leafset_as_bitstring()]) != len([int(i) for i in bp_min.leafset_as_bitstring()])/2:
+        #     print("ERROR: ")
+        #     print("size of data:", m)
+        #     print("Half sizes:", sum([int(i) for i in bp_min.leafset_as_bitstring()]), sum([-1*int(i)+1 for i in bp_min.leafset_as_bitstring()]))
+
+        T1.reroot_at_edge(bipartitions1[bp_min])
+    
+    # find root of half 2
+    if len(half2_idx)>2:
+        bipartitions2 = T2.bipartition_edge_map
+        min_ev2 = float("inf")
+        for bp in bipartitions2.keys():
+            if bp.leafset_as_bitstring().find('0') == -1:
+                continue
+            # Slice similarity matrix of half2 + part of half1 VS the other part of half 1
+            
+            bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+            h2_idx_A = half2_idx_array[bool_array]
+            h2_idx_B = half2_idx_array[~bool_array]
+            other_idx = np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])), sub_idx)
+
+            A_h1_other_idx = list(np.concatenate([h2_idx_A, half1_idx_array, other_idx]))
+            B_h1_other_idx = list(np.concatenate([h2_idx_B, half1_idx_array, other_idx]))
+
+            A_other_idx = list(np.concatenate([h2_idx_A, other_idx]))
+            B_other_idx = list(np.concatenate([h2_idx_B, other_idx]))
+
+            A_h1_idx = list(np.concatenate([h2_idx_A, half1_idx_array]))
+            B_h1_idx = list(np.concatenate([h2_idx_B, half1_idx_array]))
+
+            ####################### example of indexes ##################
+            # FFFF FFFF TTTT TTTT - idx            - these are the element we are "solving for" at theis step
+            # FFFF FFFF 1111 FFFF - half1_idx      - these are the elements assignd to half 1 (and described by T1)
+            # FFFF FFFF FFFF 1111 - half2_idx      - these are the elements assignd to half 1 (and described by T1)
+            # FFFF FFFF FFFF 1100 - h1_idx_A       - these are the elements chosen at the current partition (bp)
+            # FFFF FFFF FFFF 0011 - h1_idx_B       - these are the elements chosen at the current partition (bp)
+            # 1111 1111 FFFF FFFF - other_idx      - 
+            
+            # 1111 1111 1111 0011 - B_h1_other_idx - 
+            # 1111 1111 1111 1100 - A_h1_other_idx - 
+            # 1111 1111 0000 1100 - A_other_idx    - 
+            # 1111 1111 0000 0011 - B_other_idx    - 
+            # 0000 0000 1111 1100 - A_h1_idx       - 
+            # 0000 0000 1111 0011 - B_h1_idx       - 
+            
+            ## Case 1: Other is connected to A
+            sliced_sim_mat_try1_1 = similarity_matrix[A_other_idx, ...]
+            sliced_sim_mat_try1_1 = sliced_sim_mat_try1_1[...,B_h1_idx]
+            score_try1_1 = 0 if (sliced_sim_mat_try1_1.shape[0] == 1) | (sliced_sim_mat_try1_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_1, compute_uv = False)[1]
+
+            sliced_sim_mat_try1_2 = similarity_matrix[A_h1_other_idx, ...]
+            sliced_sim_mat_try1_2 = sliced_sim_mat_try1_2[...,h2_idx_B]
+            score_try1_2 = 0 if (sliced_sim_mat_try1_2.shape[0] == 1) | (sliced_sim_mat_try1_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_2, compute_uv = False)[1]
+
+            score_try1 = np.max([score_try1_1,score_try1_2])
+            ## Case 2: Other is connected to B
+            sliced_sim_mat_try2_1 = similarity_matrix[h2_idx_A, ...]
+            sliced_sim_mat_try2_1 = sliced_sim_mat_try2_1[...,B_h1_other_idx]
+            score_try2_1 = 0 if (sliced_sim_mat_try2_1.shape[0] == 1) | (sliced_sim_mat_try2_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_1, compute_uv = False)[1]
+            
+            sliced_sim_mat_try2_2 = similarity_matrix[A_h1_idx, ...]
+            sliced_sim_mat_try2_2 = sliced_sim_mat_try2_2[...,B_other_idx]
+            score_try2_2 = 0 if (sliced_sim_mat_try2_2.shape[0] == 1) | (sliced_sim_mat_try2_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_2, compute_uv = False)[1]
+            
+            score_try2 = np.max([score_try2_1,score_try2_2])
+            
+            ## Case 3: Other is connected to h2
+            sliced_sim_mat_try3_1 = similarity_matrix[h2_idx_A, ...]
+            sliced_sim_mat_try3_1 = sliced_sim_mat_try3_1[...,B_h1_other_idx]
+            score_try3_1 = 0 if (sliced_sim_mat_try3_1.shape[0] == 1) | (sliced_sim_mat_try3_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_1, compute_uv = False)[1]
+            
+            sliced_sim_mat_try3_2 = similarity_matrix[A_h1_other_idx, ...]
+            sliced_sim_mat_try3_2 = sliced_sim_mat_try3_2[...,h2_idx_B]
+            score_try3_2 = 0 if (sliced_sim_mat_try3_2.shape[0] == 1) | (sliced_sim_mat_try3_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_2, compute_uv = False)[1]
+            
+            score_try3 = np.max([score_try3_1,score_try3_2])
+            
+            if np.min([score_try1, score_try2, score_try3]) <min_ev2:
+                min_ev2 = np.min([score_try1, score_try2, score_try3])
+                bp_min = bp
+        # if sum([int(i) for i in bp_min.leafset_as_bitstring()]) != len([int(i) for i in bp_min.leafset_as_bitstring()])/2:
+        #     print("ERROR: ")
+        #     print("size of data:", m)
+        #     print("Half sizes:", sum([int(i) for i in bp_min.leafset_as_bitstring()]), sum([-1*int(i)+1 for i in bp_min.leafset_as_bitstring()]))
+        T2.reroot_at_edge(bipartitions2[bp_min])
+        
+    T.seed_node.set_child_nodes([T1.seed_node,T2.seed_node])
+    #T.seed_node.add_child(T1.seed_node)
+    #T.seed_node.add_child(T2.seed_node)
+    if len(sub_idx) != similarity_matrix.shape[0]:
+        T.is_rooted = True
+    return T
+
+##########################################################
+##               Testing
+##########################################################
+
+
+def compare_trees(reference_tree, inferred_tree):
+    inferred_tree.update_bipartitions()
+    reference_tree.update_bipartitions()
+    false_positives, false_negatives = dendropy.calculate.treecompare.false_positives_and_negatives(reference_tree, inferred_tree, is_bipartitions_updated=True)
+    total_reference = len(reference_tree.bipartition_encoding)
+    total_inferred = len(inferred_tree.bipartition_encoding)
+    
+    true_positives = total_inferred - false_positives
+    precision = true_positives / total_inferred
+    true_positives = total_inferred - false_positives
+    recall = true_positives / total_reference
+
+
+    F1 = 100* 2*(precision * recall)/(precision + recall)
+    RF = false_positives + false_negatives
+    return RF, F1
+
+def check_partition_in_tree(tree,partition):
+    
+    # UGLY!! The bipartitions in 'tree' is given by order of taxonomy (T1,T2 etc)
+    # The input 'partition' is via order of the appearnace in the matrix 
+    # The first step is to switch partition such that it is of the same order of tree
+    ns = []
+    for leaf_ix, leaf in enumerate(tree.leaf_node_iter()):    
+        ns.append(int(leaf.taxon.label))
+    ns_idx = np.argsort(np.array(ns))
+    partition = partition[ns_idx]
+    partition_inv = [not i for i in partition]
+    
+
+    #print("*********************")
+    tree_bipartitions = tree.bipartition_edge_map
+    flag = False
+    for bp in tree_bipartitions.keys():
+        bool_array =np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+        #bool_array = bool_array[ns_idx]
+        #print(bool_array)
+        if np.array_equal(bool_array,partition) or np.array_equal(bool_array,partition_inv):
+            flag = True
+    return flag  
 
 class Reconstruction_Method:
-    def __init__(self, core=estimate_tree_topology, distance=paralinear_distance, **kwargs):
+    def __init__(self, core=estimate_tree_topology, similarity=paralinear_similarity, **kwargs):
         self.core = core
-        self.distance = distance
+        self.similarity = similarity
         if self.core == estimate_tree_topology:
             kwargs["scorer"] = kwargs.get("scorer", sv2)
             kwargs["scaler"] = kwargs.get("scaler", 1.0)
@@ -132,11 +644,13 @@ class Reconstruction_Method:
         return self.kwargs.get('scaler', None)
 
     def __call__(self, observations, namespace=None):
-        return self.reconstruct_from_array(observations, namespace)
+        T = self.reconstruct_from_array(observations, namespace)
+        #T.print_plot()
+        return T
 
     def reconstruct_from_array(self, observations, namespace=None):
-        distance_matrix = self.distance(observations)
-        tree = self.core(distance_matrix, namespace=namespace, **self.kwargs)
+        similarity_matrix = self.similarity(observations)
+        tree = self.core(similarity_matrix, namespace=namespace, **self.kwargs)
         return tree
 
     def reconstruct_from_charmatrix(self, char_matrix, namespace=None):
