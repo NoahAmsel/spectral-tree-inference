@@ -1,7 +1,7 @@
-.git/*
 __pycache__
 figures
 matlab_tests
 *.DS_Store
 data/*
 scripts/slurm-*.out
+.ipynb_checkpoints
