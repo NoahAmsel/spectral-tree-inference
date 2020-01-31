@@ -169,8 +169,6 @@ def parallel_experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[
         result_lists = pool.starmap(parallel_helper, params)
 
     results = sum(result_lists, [])
-    for r in results:
-        print(r)
 
     if savepath:
         previous_results = [] if overwrite else load_results(savepath, folder=folder, throw_error=False)

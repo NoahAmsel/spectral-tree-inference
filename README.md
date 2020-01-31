@@ -8,6 +8,13 @@ This repo is in the process of being refactored! Check back soon for updates and
 
 Joint work with Ariel Jaffe and Boaz Nadler.
 
+### Dependencies
+numpy
+pandas
+dendropy
+seaborn
+
+
 ### Building an ultrametric tree (molecular clock)
 
 ```

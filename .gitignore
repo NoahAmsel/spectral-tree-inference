@@ -4,4 +4,6 @@ matlab_tests
 *.DS_Store
 data/*
 scripts/slurm-*.out
+scripts/data
 .ipynb_checkpoints
+.ipynb_checkpoints/*
