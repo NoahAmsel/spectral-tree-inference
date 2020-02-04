@@ -34,7 +34,7 @@ for x in tree.preorder_edge_iter():
 
 observations = generation.simulate_sequences_ordered(N, tree_model=tree, seq_model=jc, mutation_rate=mutation_rate)
 S = reconstruct_tree.JC_similarity_matrix(observations)
-TT = reconstruct_tree.spectral_tree_reonstruction(S, namespace = tree.taxon_namespace)
+TT = reconstruct_tree.spectral_tree_reonstruction(S, namespace = tree.taxon_namespace, reconstruction_alg=reconstruct_tree.estimate_tree_topology)
 
 RF,F1 = reconstruct_tree.compare_trees(tree, TT)
 print("Spectral: ")

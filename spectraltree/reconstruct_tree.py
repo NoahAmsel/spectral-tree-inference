@@ -332,7 +332,7 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=N
     return T
 
 
-def spectral_tree_reonstruction(similarity_matrix, namespace=None):
+def spectral_tree_reonstruction(similarity_matrix, namespace=None, reconstruction_alg = estimate_tree_topology):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
     if namespace is None:
@@ -352,8 +352,8 @@ def spectral_tree_reonstruction(similarity_matrix, namespace=None):
     similarity_matrix2 = similarity_matrix2[:, not_bool_bipartition]
     
     #reconstructing each part
-    T1 = estimate_tree_topology(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
-    T2 = estimate_tree_topology(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
+    T1 = reconstruction_alg(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
+    T2 = reconstruction_alg(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
 
     # Finding roots and merging trees
     T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=namespace)
