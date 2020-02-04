@@ -26,20 +26,6 @@ def merge_children(children, **kwargs):
         node.taxa_set = np.logical_or.reduce(tuple(child.taxa_set for child in children))
     return node
 
-def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
-    # one node splits off at each step
-    if namespace is None:
-        namespace = default_namespace(num_taxa)
-    else:
-        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
-
-    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
-    while len(nodes) > 1:
-        a = nodes.pop()
-        b = nodes.pop()
-        nodes.append(merge_children((a,b), edge_length=edge_length))
-
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0], is_rooted=False)
 
 def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
     for e in tree.edges():
