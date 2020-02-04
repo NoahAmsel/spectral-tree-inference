@@ -9,15 +9,22 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pylab as plt
 import dendropy
+import time
 
-import spectraltree
+#import spectraltree
+import sys, os, platform
+sys.path.append(os.path.join(sys.path[0],'spectraltree'))
+import utils
+import generation
+import reconstruct_tree
 
 class Experiment_Datum:
-    def __init__(self, sequence_model, n, method, mutation_rate, inferred_tree, reference_tree):
+    def __init__(self, sequence_model, n, method, mutation_rate, inferred_tree, reference_tree, run_time):
         assert inferred_tree.is_rooted == reference_tree.is_rooted, "Cannot compare rooted to unrooted tree"
         self.sequence_model = sequence_model
         self.n = n
         self.method = method
+        self.run_time = run_time
         self.mutation_rate = mutation_rate
         inferred_tree.update_bipartitions()
         reference_tree.update_bipartitions()
@@ -65,6 +72,7 @@ class Experiment_Datum:
             "correct": self.correct,
             "F1%": 100*self.F1,
             "RF": self.RF,
+            "runTime": self.run_time,
         }
 
     def __str__(self):
@@ -117,11 +125,13 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
         for mutation_rate in mutation_rates:
             # we can parallelize this loop too, but then we need to set different random seeds
             for _ in range(reps_per_tree):
-                observations = spectraltree.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
+                observations = generation.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
                 for n in Ns:
                     for method in methods:
+                        t1 = time.time()
                         inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
-                        results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree))
+                        run_time = time.time() - t1
+                        results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree,run_time))
                         i += 1
                         if verbose:
                             print("{0} / {1}".format(i, total_trials))
@@ -135,7 +145,7 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
     return results
 
 def reproduce_datum(datum):
-    observations = spectraltree.simulate_sequences(seq_len=datum.n, tree_model=datum.ref_tree, seq_model=datum.sequence_model, mutation_rate=datum.mutation_rate)
+    observations = utils.simulate_sequences(seq_len=datum.n, tree_model=datum.ref_tree, seq_model=datum.sequence_model, mutation_rate=datum.mutation_rate)
     inferred_tree = datum.method(observations[:,:datum.n], namespace=datum.ref_tree.taxon_namespace)
     return Experiment_Datum(datum.sequence_model, datum.n, datum.method, datum.mutation_rate, inferred_tree, datum.ref_tree), inferred_tree
     #return experiment(tree_list=[datum.ref_tree], sequence_model=datum.sequence_model, Ns=[datum.n], methods=[datum.method], mutation_rates=[datum.mutation_rate], verbose=False)[0]
@@ -145,7 +155,7 @@ def reproduce_datum(datum):
 def parallel_helper(reference_tree, mutation_rate, sequence_model, Ns, methods, reps_per_tree):
     partial_results = []
     for _ in range(reps_per_tree):
-        observations = spectraltree.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
+        observations = utils.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
         for n in Ns:
             for method in methods:
                 inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
@@ -221,18 +231,18 @@ def weird2(A1, A2, M):
 
 # %%
 if __name__ == "__main__":
-    from spectraltree import *
 
-    binary_trees = [balanced_binary(m) for m in [64, 128, 256]]
-    lopsided = [lopsided_tree(m) for m in [64, 128]]
-    jc = Jukes_Cantor()
+    binary_trees = [utils.balanced_binary(m) for m in [64, 128]]
+    lopsided = [utils.lopsided_tree(m) for m in [64, 128]]
+    jc = generation.Jukes_Cantor()
     Ns = [100, 400, 1600]
-    methods = [Reconstruction_Method(neighbor_joining), Reconstruction_Method()] #, Reconstruction_Method(scorer=reconstruct_tree.sum_squared_quartets), Reconstruction_Method(scorer=weird2)]
+    Ns = [100]
+    methods = [reconstruct_tree.Reconstruction_Method(reconstruct_tree.neighbor_joining), reconstruct_tree.Reconstruction_Method()] #, Reconstruction_Method(scorer=reconstruct_tree.sum_squared_quartets), Reconstruction_Method(scorer=weird2)]
     # first one: delta^2 = 1/2
     # second one: probability of transitioning to some other state is 15 %
     mutation_rates = [jc.similarity2t(np.sqrt(1/2)), jc.p2t(0.85)]
 
-    results = experiment(tree_list=binary_trees+lopsided,
+    results = experiment(tree_list=binary_trees,
                             sequence_model=jc,
                             Ns=Ns,
                             methods=methods,
@@ -240,12 +250,13 @@ if __name__ == "__main__":
                             savepath="example_run.pkl",
                             overwrite=True)
 # %%
-
-    df = results2frame(loaded)
-    df["delta^2"] = pd.Series([Jukes_Cantor().similarity(t)**2 for t in df['mutation_rate']]).round(3)
-
-    accuracy(df)
-    accuracy(df, col="delta^2")
+    #results = pickle.load(open("./data/example_run.pkl", 'rb'))
+    df = results2frame(results)
+    df["delta^2"] = pd.Series([generation.Jukes_Cantor().similarity(t)**2 for t in df['rate']]).round(3)
+    
+    print(df)
+#    accuracy(df)
+#    accuracy(df, col="delta^2")
 # %%
 
 # if __name__ == "__main__":
