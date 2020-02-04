@@ -10,7 +10,10 @@ import seaborn as sns
 import matplotlib.pylab as plt
 import dendropy
 import copy
-import spectraltree
+
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
+
 import utils
 import generation
 import reconstruct_tree

@@ -21,7 +21,7 @@ import reconstruct_tree
 
 
 N = 400
-num_taxa = 128
+num_taxa = 32
 jc = generation.Jukes_Cantor()
 mutation_rate = [jc.p2t(0.95)]
 
