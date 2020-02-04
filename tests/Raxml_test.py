@@ -10,8 +10,10 @@ Make sure to include `raxml_args=["-T 2"]`
 On other operating systems you may need to compile yourself using the directions here
 https://cme.h-its.org/exelixis/web/software/raxml/hands_on.html
 """
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
 
-from spectraltree import balanced_binary, Jukes_Cantor
+from utils import balanced_binary, Jukes_Cantor
 from dendropy.interop import raxml
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
