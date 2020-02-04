@@ -4,7 +4,6 @@ from itertools import combinations
 import numpy as np
 import scipy.spatial.distance
 import dendropy     #should this library be independent of dendropy? is that even possible?
-#from . import utils
 import utils
 
 def sv2(A1, A2, M):
@@ -129,6 +128,9 @@ def neighbor_joining(similarity_matrix, namespace=None):
     T = utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
     return T
 
+
+def raxml_reconstruct():
+    pass
 
 def partition_taxa(v):
     m = len(v)
