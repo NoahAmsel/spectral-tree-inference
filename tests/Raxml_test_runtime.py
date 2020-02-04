@@ -10,6 +10,8 @@ Make sure to include `raxml_args=["-T 2"]`
 On other operating systems you may need to compile yourself using the directions here
 https://cme.h-its.org/exelixis/web/software/raxml/hands_on.html
 """
+
+# %%
 import sys, os, platform
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
 import reconstruct_tree
@@ -32,8 +34,9 @@ elif platform.system() == 'Linux':
     #Linux version
     rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),'spectraltree/raxmlHPC-SSE3-linux'))
 
-m_vec = [256,512]
-reference_trees = [utils.balanced_binary(m) for m in m_vec]
+m_vec = np.arange(100,500,100)
+#reference_trees = [utils.balanced_binary(m) for m in m_vec]
+reference_trees = [utils.unrooted_pure_kingman_tree(utils.default_namespace(m), pop_size=m, rng=None) for m in m_vec]
 n_vec = [200,400,600]
 RF = np.zeros((len(n_vec),len(m_vec)))
 runtime = np.zeros((len(n_vec),len(m_vec)))
@@ -49,7 +52,4 @@ for tree_idx,tree in enumerate(reference_trees):
         RF[n_idx,tree_idx],F1 = reconstruct_tree.compare_trees(tree_raxml, tree)
 
 
-
-print(RF)
-print(runtime)
 
