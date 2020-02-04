@@ -30,6 +30,9 @@ if platform.system() == 'Windows':
 elif platform.system() == 'Darwin':
     #MacOS version:
     rx = raxml.RaxmlRunner()
+elif platform.system() == 'Linux':
+    #Linux version
+    rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),'spectraltree/raxmlHPC-SSE3-linux'))
 
 tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
 
