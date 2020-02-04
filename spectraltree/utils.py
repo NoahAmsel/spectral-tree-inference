@@ -114,8 +114,10 @@ def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
 
     return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0], is_rooted=False)
 
-def unrooted_birth_death_tree(birth_rate, death_rate, birth_rate_sd=0.0, death_rate_sd=0.0, **kwargs):
-    tree = birth_death_tree(birth_rate, death_rate, birth_rate_sd=birth_rate_sd, death_rate_sd=death_rate_sd, **kwargs)
+def unrooted_birth_death_tree(num_taxa, namespace=None, birth_rate=0.5, death_rate = 0, **kwargs):
+    if namespace == None:
+        namespace = default_namespace(num_taxa)
+    tree = dendropy.model.birthdeath.birth_death_tree(birth_rate, death_rate, birth_rate_sd=0.0, death_rate_sd=0.0, taxon_namespace = namespace,  num_total_tips=num_taxa, **kwargs)
     tree.is_rooted = False
     return tree
 
