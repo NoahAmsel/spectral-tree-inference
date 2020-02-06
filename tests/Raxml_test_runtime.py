@@ -14,9 +14,10 @@ https://cme.h-its.org/exelixis/web/software/raxml/hands_on.html
 # %%
 import sys, os, platform
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
+sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 import reconstruct_tree
 import utils
-import numpy as np 
+import numpy as np
 import time
 import generation
 from dendropy.interop import raxml
@@ -42,7 +43,7 @@ RF = np.zeros((len(n_vec),len(m_vec)))
 runtime = np.zeros((len(n_vec),len(m_vec)))
 for tree_idx,tree in enumerate(reference_trees):
     print(tree_idx)
-    for n_idx,n in enumerate(n_vec):        
+    for n_idx,n in enumerate(n_vec):
         data = simulate_discrete_chars(n, tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95))
         t_start = time.time()
         tree_raxml = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
@@ -50,6 +51,3 @@ for tree_idx,tree in enumerate(reference_trees):
         runtime[n_idx,tree_idx] = t_stop-t_start
         print(runtime[n_idx,tree_idx])
         RF[n_idx,tree_idx],F1 = reconstruct_tree.compare_trees(tree_raxml, tree)
-
-
-

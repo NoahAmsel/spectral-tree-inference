@@ -12,8 +12,9 @@ https://cme.h-its.org/exelixis/web/software/raxml/hands_on.html
 """
 import sys, os, platform
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
+sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 import reconstruct_tree
-import utils 
+import utils
 import generation
 from dendropy.interop import raxml
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
@@ -36,7 +37,7 @@ elif platform.system() == 'Linux':
 
 tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
 
-
+type(data)
 
 tree.print_plot()
 
