@@ -47,9 +47,11 @@ for tree_idx,tree in enumerate(reference_trees):
         t_start = time.time()
         tree_raxml = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
         t_stop = time.time()
-        runtime[n_idx,tree_idx] = t_stop-t_start
-        print(runtime[n_idx,tree_idx])
+        runtime[n_idx,tree_idx] = t_stop-t_start        
         RF[n_idx,tree_idx],F1 = reconstruct_tree.compare_trees(tree_raxml, tree)
+        print('untime is ', runtime[n_idx,tree_idx], ' RF is ', RF[n_idx,tree_idx])
+print(RF)
+print(runtime)
 
 
 
