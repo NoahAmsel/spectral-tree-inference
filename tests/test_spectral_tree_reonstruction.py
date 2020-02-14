@@ -13,6 +13,7 @@ import copy
 
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
+sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 
 #import spectraltree
 import utils
@@ -28,7 +29,7 @@ mutation_rate = [jc.p2t(0.95)]
 tree = utils.unrooted_birth_death_tree(num_taxa, birth_rate=1)
 for x in tree.preorder_edge_iter():
     x.length = 1
-# tree = utils.lopsided_tree(num_taxa=num_taxa) 
+# tree = utils.lopsided_tree(num_taxa=num_taxa)
 #tree = utils.balanced_binary(num_taxa)
 
 

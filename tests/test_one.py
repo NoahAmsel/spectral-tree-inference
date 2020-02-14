@@ -11,6 +11,7 @@ import dendropy
 
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
+sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 
 import utils
 import generation
@@ -22,7 +23,7 @@ def checkSol(reference_tree, inferred_tree):
     false_positives, false_negatives = dendropy.calculate.treecompare.false_positives_and_negatives(reference_tree, inferred_tree, is_bipartitions_updated=True)
     total_reference = len(reference_tree.bipartition_encoding)
     total_inferred = len(inferred_tree.bipartition_encoding)
-    
+
     true_positives = total_inferred - false_positives
     precision = true_positives / total_inferred
     true_positives = total_inferred - false_positives
@@ -38,8 +39,8 @@ N = 400
 jc = generation.Jukes_Cantor()
 mutation_rate = [jc.p2t(0.95)]
 # Construct data of type 'tree' from class dendropy
-tree = utils.balanced_binary(num_taxa=128) 
-tree = utils.lopsided_tree(128) 
+tree = utils.balanced_binary(num_taxa=128)
+tree = utils.lopsided_tree(128)
 #tree.is_rooted = True
 
 # create sequences for each node, not sure what is th
@@ -78,4 +79,3 @@ print("Spectral: ")
 print("RF = ",RF)
 print("F1% = ",F1)
 print("")
-
