@@ -1,3 +1,5 @@
+import platform
+from abc import ABC, abstractmethod
 from functools import partial
 from itertools import combinations
 
@@ -5,6 +7,7 @@ import numpy as np
 import scipy.spatial.distance
 import dendropy     #should this library be independent of dendropy? is that even possible?
 import utils
+from character_matrix import FastCharacterMatrix
 
 def sv2(A1, A2, M):
     """Second Singular Value"""
@@ -334,7 +337,8 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=N
     return T
 
 
-def spectral_tree_reonstruction(similarity_matrix, namespace=None, reconstruction_alg = estimate_tree_topology):
+def spectral_tree_reonstruction(sequences, distance_metric, namespace=None, reconstruction_alg = SpectralNeighborJoining(None)):
+    similarity_matrix = distance_metric(sequences)
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
     if namespace is None:
@@ -354,8 +358,8 @@ def spectral_tree_reonstruction(similarity_matrix, namespace=None, reconstructio
     similarity_matrix2 = similarity_matrix2[:, not_bool_bipartition]
     
     #reconstructing each part
-    T1 = reconstruction_alg(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
-    T2 = reconstruction_alg(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
+    T1 = reconstruction_alg.reconstruct_from_similarity(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
+    T2 = reconstruction_alg.reconstruct_from_similarity(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
 
     # Finding roots and merging trees
     T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=namespace)
@@ -627,6 +631,60 @@ def check_partition_in_tree(tree,partition):
         if np.array_equal(bool_array,partition) or np.array_equal(bool_array,partition_inv):
             flag = True
     return flag  
+
+
+
+class ReconstructionMethod(ABC):
+    @abstractmethod
+    def __call__(self, sequences, namespace=None):
+        pass
+
+class RAxML(ReconstructionMethod):
+    def __call__(self, sequences, namespace=None):
+        data = FastCharacterMatrix(sequences).to_dendropy()
+
+        if platform.system() == 'Windows':
+            # Windows version:
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),r'spectraltree\raxmlHPC-SSE3.exe'))
+        elif platform.system() == 'Darwin':
+            #MacOS version:
+            rx = raxml.RaxmlRunner()
+        elif platform.system() == 'Linux':
+            #Linux version
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),'spectraltree/raxmlHPC-SSE3-linux'))
+
+        tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
+        return tree
+
+class DistanceReconstructionMethod(ReconstructionMethod):
+    def __init__(self, similarity_metric):
+        self.similarity_metric = similarity_metric
+
+    def __call__(self, sequences, namespace=None):
+        similarity_matrix = self.similarity_metric(sequences)
+        return self.reconstruct_from_similarity(similarity_matrix, namespace)
+
+    @abstractmethod
+    def reconstruct_from_similarity(self, similarity_matrix, namespace=None):
+        pass
+
+class NeighborJoining(DistanceReconstructionMethod):
+    def reconstruct_from_similarity(self, similarity_matrix, namespace=None):
+        return neighbor_joining(similarity_matrix, namespace)
+        
+class SpectralNeighborJoining(DistanceReconstructionMethod):
+    def reconstruct_from_similarity(self, similarity_matrix, namespace=None):
+        return estimate_tree_topology(similarity_matrix, namespace)
+
+class SpectralTreeReconstruction(ReconstructionMethod):
+    def __init__(self, inner_method, similarity_metric):
+        self.inner_method = inner_method
+        self.similarity_metric = similarity_metric
+    
+    def __call__(self, sequences, namespace=None):
+        # def spectral_tree_reonstruction(similarity_matrix, namespace=None, reconstruction_alg = estimate_tree_topology):
+        similarity_matrix = self.similarity_metric(sequences)
+        return spectral_tree_reonstruction(sequences, self.distance_metric, namespace)
 
 class Reconstruction_Method:
     def __init__(self, core=estimate_tree_topology, similarity=paralinear_similarity, **kwargs):
