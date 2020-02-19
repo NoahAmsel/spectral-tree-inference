@@ -95,12 +95,12 @@ if False:
 
     data = dendropy.model.discrete.simulate_discrete_chars(1000, my_tree, dendropy.model.discrete.Jc69())
 
-print(data.taxon_namespace)
+    print(data.taxon_namespace)
 
-for n, seq in data.items():
-    print(n, seq)
+    for n, seq in data.items():
+        print(n, seq)
 
-zz = np.zeros((5,3))
-zz
-np.append(zz, np.ones(3).reshape(1,-1), axis=0)
-len(zz)
+    zz = np.zeros((5,3))
+    zz
+    np.append(zz, np.ones(3).reshape(1,-1), axis=0)
+    len(zz)
