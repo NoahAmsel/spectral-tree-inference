@@ -82,54 +82,6 @@ def correlation_distance_matrix(observations):
     corr = np.clip(corr, a_min=1e-16, a_max=None)
     return -np.log(corr)
 
-#change to spectral_neighbor_joining
-def estimate_tree_topology(similarity_matrix, namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
-    m, m2 = similarity_matrix.shape
-    assert m == m2, "Distance matrix must be square"
-    if namespace is None:
-        namespace = utils.default_namespace(m)
-    else:
-        assert len(namespace) >= m, "Namespace too small for distance matrix"
-    
-    # initialize leaf nodes
-    G = [utils.leaf(i, namespace) for i in range(m)]
-
-    available_clades = set(range(len(G)))   # len(G) == m
-    # initialize Sigma
-    Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
-    sv1 = np.full((2*m,2*m), np.nan)
-    for i,j in combinations(available_clades, 2):
-        Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, similarity_matrix)
-        Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
-
-    # merge
-    while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
-        left, right = min(combinations(available_clades, 2), key=lambda pair: Sigma[pair])
-        G.append(utils.merge_children((G[left], G[right])))
-        new_ix = len(G) - 1
-        available_clades.remove(left)
-        available_clades.remove(right)
-        for other_ix in available_clades:
-            Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, similarity_matrix)
-            Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
-        available_clades.add(new_ix)
-
-    # HEYYYY why does ariel do something special for the last THREE groups? (rather than last two)
-    # think about what would happen if at the end we have three groups: 1 leaf, 1 leaf, n-2 leaves
-    # how would we know which leaf to attach, since score would be 0 for both??
-
-    # return Phylo.BaseTree.Tree(G[-1])
-
-    # for a bifurcating tree we're combining the last two available clades
-    # for an unrooted one it's the last three because
-    # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
-
-def neighbor_joining(similarity_matrix, namespace=None):
-    similarity_matrix = np.clip(similarity_matrix, a_min=1e-20, a_max=None)
-    distance_matrix = -np.log(similarity_matrix)
-    T = utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
-    return T
 
 
 def raxml_reconstruct():
@@ -337,33 +289,6 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=N
     return T
 
 
-def spectral_tree_reonstruction(sequences, distance_metric, namespace=None, reconstruction_alg = SpectralNeighborJoining(None)):
-    similarity_matrix = distance_metric(sequences)
-    m, m2 = similarity_matrix.shape
-    assert m == m2, "Distance matrix must be square"
-    if namespace is None:
-        namespace = utils.default_namespace(m)
-    else:
-        assert len(namespace) >= m, "Namespace too small for distance matrix"
-    
-    # Partitioning
-    [D,V] = np.linalg.eigh(similarity_matrix)            
-    bool_bipartition = partition_taxa(V[:,-2])
-    
-    similarity_matrix1 = similarity_matrix[bool_bipartition,:]
-    similarity_matrix1 = similarity_matrix1[:, bool_bipartition]
-
-    not_bool_bipartition = [~i for i in bool_bipartition]
-    similarity_matrix2 = similarity_matrix[not_bool_bipartition,:]
-    similarity_matrix2 = similarity_matrix2[:, not_bool_bipartition]
-    
-    #reconstructing each part
-    T1 = reconstruction_alg.reconstruct_from_similarity(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
-    T2 = reconstruction_alg.reconstruct_from_similarity(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
-
-    # Finding roots and merging trees
-    T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=namespace)
-    return T
 
 
 def spectral_tree_reonstruction_old(similarity_matrix, namespace=None, sub_idx = None):
@@ -670,11 +595,61 @@ class DistanceReconstructionMethod(ReconstructionMethod):
 
 class NeighborJoining(DistanceReconstructionMethod):
     def reconstruct_from_similarity(self, similarity_matrix, namespace=None):
-        return neighbor_joining(similarity_matrix, namespace)
+        return self.neighbor_joining(similarity_matrix, namespace)
+    
+    def neighbor_joining(self, similarity_matrix, namespace=None):
+        similarity_matrix = np.clip(similarity_matrix, a_min=1e-20, a_max=None)
+        distance_matrix = -np.log(similarity_matrix)
+        T = utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
+        return T
         
 class SpectralNeighborJoining(DistanceReconstructionMethod):
     def reconstruct_from_similarity(self, similarity_matrix, namespace=None):
-        return estimate_tree_topology(similarity_matrix, namespace)
+        return self.estimate_tree_topology(similarity_matrix, namespace)
+    #change to spectral_neighbor_joining
+
+    def estimate_tree_topology(self, similarity_matrix, namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
+        m, m2 = similarity_matrix.shape
+        assert m == m2, "Distance matrix must be square"
+        if namespace is None:
+            namespace = utils.default_namespace(m)
+        else:
+            assert len(namespace) >= m, "Namespace too small for distance matrix"
+        
+        # initialize leaf nodes
+        G = [utils.leaf(i, namespace) for i in range(m)]
+
+        available_clades = set(range(len(G)))   # len(G) == m
+        # initialize Sigma
+        Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
+        sv1 = np.full((2*m,2*m), np.nan)
+        for i,j in combinations(available_clades, 2):
+            Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, similarity_matrix)
+            Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
+
+        # merge
+        while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
+            left, right = min(combinations(available_clades, 2), key=lambda pair: Sigma[pair])
+            G.append(utils.merge_children((G[left], G[right])))
+            new_ix = len(G) - 1
+            available_clades.remove(left)
+            available_clades.remove(right)
+            for other_ix in available_clades:
+                Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, similarity_matrix)
+                Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
+            available_clades.add(new_ix)
+
+        # HEYYYY why does ariel do something special for the last THREE groups? (rather than last two)
+        # think about what would happen if at the end we have three groups: 1 leaf, 1 leaf, n-2 leaves
+        # how would we know which leaf to attach, since score would be 0 for both??
+
+        # return Phylo.BaseTree.Tree(G[-1])
+
+        # for a bifurcating tree we're combining the last two available clades
+        # for an unrooted one it's the last three because
+        # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
+        return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
+
 
 class SpectralTreeReconstruction(ReconstructionMethod):
     def __init__(self, inner_method, similarity_metric):
@@ -682,9 +657,42 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         self.similarity_metric = similarity_metric
     
     def __call__(self, sequences, namespace=None):
-        # def spectral_tree_reonstruction(similarity_matrix, namespace=None, reconstruction_alg = estimate_tree_topology):
-        similarity_matrix = self.similarity_metric(sequences)
-        return spectral_tree_reonstruction(sequences, self.distance_metric, namespace)
+        return self.spectral_tree_reonstruction(sequences, self.similarity_metric, namespace)
+
+    def spectral_tree_reonstruction(self, sequences, similarity_metric, namespace=None, reconstruction_alg = SpectralNeighborJoining(None)):
+        similarity_matrix = similarity_metric(sequences)
+        m, m2 = similarity_matrix.shape
+        assert m == m2, "Distance matrix must be square"
+        if namespace is None:
+            namespace = utils.default_namespace(m)
+        else:
+            assert len(namespace) >= m, "Namespace too small for distance matrix"
+        
+        # Partitioning
+        [D,V] = np.linalg.eigh(similarity_matrix)            
+        bool_bipartition = partition_taxa(V[:,-2])
+        
+        similarity_matrix1 = similarity_matrix[bool_bipartition,:]
+        similarity_matrix1 = similarity_matrix1[:, bool_bipartition]
+
+        not_bool_bipartition = [~i for i in bool_bipartition]
+        similarity_matrix2 = similarity_matrix[not_bool_bipartition,:]
+        similarity_matrix2 = similarity_matrix2[:, not_bool_bipartition]
+        
+        #reconstructing each part
+        if issubclass(reconstruction_alg, DistanceReconstructionMethod):
+            T1 = reconstruction_alg.reconstruct_from_similarity(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
+            T2 = reconstruction_alg.reconstruct_from_similarity(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
+        else:
+            sequences1 = sequences[bool_bipartition,:]
+            sequences2 = sequences[not_bool_bipartition,:]
+            T1 = reconstruction_alg(sequences1)
+            T2 = reconstruction_alg(sequences2)
+
+        # Finding roots and merging trees
+        T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=namespace)
+        return T
+
 
 class Reconstruction_Method:
     def __init__(self, core=estimate_tree_topology, similarity=paralinear_similarity, **kwargs):
