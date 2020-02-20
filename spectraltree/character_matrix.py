@@ -7,10 +7,10 @@ class FastCharacterMatrix(Mapping):
     def __getitem__(self, taxon):
         return self.matrix[self.taxon2index[taxon], :]
     
-    #TODO: define taxon2index
-    # def __iter__(self):
-    #     for taxon in taxon2index:
-    #         yield taxon
+    
+    def __iter__(self):
+        for taxon in self.taxon2index:
+            yield taxon
 
     def __len__(self):
         return len(self.matrix)
