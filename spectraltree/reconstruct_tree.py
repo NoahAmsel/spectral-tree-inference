@@ -334,7 +334,6 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=N
     return T
 
 
-
 def spectral_tree_reonstruction_old(similarity_matrix, namespace=None, sub_idx = None):
     # sub_idx  - internal variable. Do not change when calling the function
     m, m2 = similarity_matrix.shape
@@ -625,7 +624,7 @@ class RAxML(ReconstructionMethod):
             #Linux version
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),'spectraltree/raxmlHPC-SSE3-linux'))
 
-        tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
+        tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2 --JC69 -c 1"])
         return tree
 
 class DistanceReconstructionMethod(ReconstructionMethod):
