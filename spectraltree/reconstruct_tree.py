@@ -2,10 +2,12 @@ import platform
 from abc import ABC, abstractmethod
 from functools import partial
 from itertools import combinations
+import os, sys
 
 import numpy as np
 import scipy.spatial.distance
 import dendropy     #should this library be independent of dendropy? is that even possible?
+from dendropy.interop import raxml
 import utils
 from character_matrix import FastCharacterMatrix
 
@@ -81,6 +83,49 @@ def correlation_distance_matrix(observations):
     corr = np.abs(np.corrcoef(observations))
     corr = np.clip(corr, a_min=1e-16, a_max=None)
     return -np.log(corr)
+
+def estimate_tree_topology(similarity_matrix, namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
+    m, m2 = similarity_matrix.shape
+    assert m == m2, "Distance matrix must be square"
+    if namespace is None:
+        namespace = utils.default_namespace(m)
+    else:
+        assert len(namespace) >= m, "Namespace too small for distance matrix"
+    
+    # initialize leaf nodes
+    G = [utils.leaf(i, namespace) for i in range(m)]
+
+    available_clades = set(range(len(G)))   # len(G) == m
+    # initialize Sigma
+    Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
+    sv1 = np.full((2*m,2*m), np.nan)
+    for i,j in combinations(available_clades, 2):
+        Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, similarity_matrix)
+        Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
+
+    # merge
+    while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
+        left, right = min(combinations(available_clades, 2), key=lambda pair: Sigma[pair])
+        G.append(utils.merge_children((G[left], G[right])))
+        new_ix = len(G) - 1
+        available_clades.remove(left)
+        available_clades.remove(right)
+        for other_ix in available_clades:
+            Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, similarity_matrix)
+            Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
+        available_clades.add(new_ix)
+
+    # HEYYYY why does ariel do something special for the last THREE groups? (rather than last two)
+    # think about what would happen if at the end we have three groups: 1 leaf, 1 leaf, n-2 leaves
+    # how would we know which leaf to attach, since score would be 0 for both??
+
+    # return Phylo.BaseTree.Tree(G[-1])
+
+    # for a bifurcating tree we're combining the last two available clades
+    # for an unrooted one it's the last three because
+    # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
+    return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
+
 
 
 
@@ -287,7 +332,6 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=N
     # if len(sub_idx) != similarity_matrix.shape[0]:
     #     T.is_rooted = True
     return T
-
 
 
 
@@ -566,7 +610,10 @@ class ReconstructionMethod(ABC):
 
 class RAxML(ReconstructionMethod):
     def __call__(self, sequences, namespace=None):
-        data = FastCharacterMatrix(sequences).to_dendropy()
+        if not isinstance(sequences, dendropy.DnaCharacterMatrix):
+            data = FastCharacterMatrix(sequences).to_dendropy()
+        else:
+            data = sequences
 
         if platform.system() == 'Windows':
             # Windows version:

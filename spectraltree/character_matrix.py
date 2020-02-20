@@ -1,14 +1,16 @@
 from collections.abc import Mapping
 import dendropy
+import utils
 
 class FastCharacterMatrix(Mapping):
 
     def __getitem__(self, taxon):
         return self.matrix[self.taxon2index[taxon], :]
-
-    def __iter__(self):
-        for taxon in taxon2index:
-            yield taxon
+    
+    #TODO: define taxon2index
+    # def __iter__(self):
+    #     for taxon in taxon2index:
+    #         yield taxon
 
     def __len__(self):
         return len(self.matrix)
@@ -30,8 +32,8 @@ class FastCharacterMatrix(Mapping):
         self.matrix = matrix
         if not taxon_namespace:
             assert taxon2index is None
-            taxon_namespace = default_namespace(len(self.matrix))
-        self.taxon_namespace = namespace
+            taxon_namespace = utils.default_namespace(len(self.matrix))
+        self.taxon_namespace = taxon_namespace
         if taxon2index:
             for taxon in taxon2index:
                 assert taxon in self.taxon_namespace
@@ -65,7 +67,7 @@ class FastCharacterMatrix(Mapping):
         return cls.from_dictionary(taxon2array, tree.taxon_namespace)
 
 
-    def to_dendropy(alphabet=None):
+    def to_dendropy(self, alphabet=None):
         if alphabet is None:
             if self.alphabet:
                 alphabet = self.alphabet

@@ -24,8 +24,8 @@ reference_tree = utils.balanced_binary(16)
 reference_tree.print_plot()
 
 data = simulate_discrete_chars(1000, reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
-
-tree = reconstruct_tree.RAxML(data)
+raxml = reconstruct_tree.RAxML()
+tree = raxml(data)
 
 tree.print_plot()
 
