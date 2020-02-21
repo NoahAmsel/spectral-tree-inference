@@ -19,26 +19,24 @@ sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 import utils
 import generation
 import reconstruct_tree
-
+from dendropy.model.discrete import simulate_discrete_chars, Jc69
+from dendropy.calculate.treecompare import symmetric_difference
 
 N = 400
 num_taxa = 32
 jc = generation.Jukes_Cantor()
 mutation_rate = [jc.p2t(0.95)]
 
-tree = utils.unrooted_birth_death_tree(num_taxa, birth_rate=1)
-for x in tree.preorder_edge_iter():
+reference_tree = utils.unrooted_birth_death_tree(num_taxa, birth_rate=1)
+for x in reference_tree.preorder_edge_iter():
     x.length = 1
-# tree = utils.lopsided_tree(num_taxa=num_taxa)
-#tree = utils.balanced_binary(num_taxa)
-
-
-observations = generation.simulate_sequences_ordered(N, tree_model=tree, seq_model=jc, mutation_rate=mutation_rate)
-S = reconstruct_tree.JC_similarity_matrix(observations)
-TT = reconstruct_tree.spectral_tree_reonstruction(S, namespace = tree.taxon_namespace, reconstruction_alg=reconstruct_tree.estimate_tree_topology)
-
-RF,F1 = reconstruct_tree.compare_trees(tree, TT)
+observations = generation.simulate_sequences_ordered(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate)
+spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
+tree_rec = spectral_method(observations,reference_tree.taxon_namespace)
+RF,F1 = reconstruct_tree.compare_trees(tree_rec, reference_tree)
 print("Spectral: ")
 print("RF = ",RF)
 print("F1% = ",F1)
 print("")
+
+

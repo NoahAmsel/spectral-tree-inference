@@ -74,7 +74,7 @@ class FastCharacterMatrix(Mapping):
 
         char_matrix = dendropy.StandardCharacterMatrix()
         for taxon, sequence in self.items():
-            char_matrix.new_sequence(taxon, [alphabet[v] for v in values] if alphabet else values)
+            char_matrix.new_sequence(taxon, [alphabet[v] for v in self.values] if alphabet else self.values)
 
         return char_matrix
 

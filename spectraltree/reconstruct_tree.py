@@ -703,7 +703,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         self.similarity_metric = similarity_metric
     
     def __call__(self, sequences, namespace=None):
-        return self.spectral_tree_reonstruction(sequences, self.similarity_metric, namespace)
+        return self.spectral_tree_reonstruction(sequences, self.similarity_metric, namespace,reconstruction_alg = self.inner_method)
 
     def spectral_tree_reonstruction(self, sequences, similarity_metric, namespace=None, reconstruction_alg = SpectralNeighborJoining(None)):
         similarity_matrix = similarity_metric(sequences)
@@ -727,8 +727,9 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         
         #reconstructing each part
         if issubclass(reconstruction_alg, DistanceReconstructionMethod):
-            T1 = reconstruction_alg.reconstruct_from_similarity(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
-            T2 = reconstruction_alg.reconstruct_from_similarity(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
+            method = reconstruction_alg(similarity_metric)
+            T1 = method.reconstruct_from_similarity(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
+            T2 = method.reconstruct_from_similarity(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
         else:
             sequences1 = sequences[bool_bipartition,:]
             sequences2 = sequences[not_bool_bipartition,:]
