@@ -610,7 +610,7 @@ class ReconstructionMethod(ABC):
 class RAxML(ReconstructionMethod):
     def __call__(self, sequences, namespace=None):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
-            data = FastCharacterMatrix(sequences).to_dendropy()
+            data = FastCharacterMatrix(sequences, taxon_namespace=namespace).to_dendropy()
         else:
             data = sequences
 
@@ -725,16 +725,20 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         similarity_matrix2 = similarity_matrix[not_bool_bipartition,:]
         similarity_matrix2 = similarity_matrix2[:, not_bool_bipartition]
         
+        namespace1 = dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]])
+        namespace2 = dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]])
+
         #reconstructing each part
         if issubclass(reconstruction_alg, DistanceReconstructionMethod):
             method = reconstruction_alg(similarity_metric)
-            T1 = method.reconstruct_from_similarity(similarity_matrix1, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]]))
-            T2 = method.reconstruct_from_similarity(similarity_matrix2, dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]]))
+            T1 = method.reconstruct_from_similarity(similarity_matrix1, taxon_namespace = namespace1)
+            T2 = method.reconstruct_from_similarity(similarity_matrix2, taxon_namespace = namespace2)
         else:
             sequences1 = sequences[bool_bipartition,:]
             sequences2 = sequences[not_bool_bipartition,:]
-            T1 = reconstruction_alg(sequences1)
-            T2 = reconstruction_alg(sequences2)
+            method = reconstruction_alg()
+            T1 = method(sequences1,  namespace = namespace1)
+            T2 = method(sequences2,  namespace = namespace2)
 
         # Finding roots and merging trees
         T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=namespace)
