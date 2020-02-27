@@ -31,7 +31,7 @@ reference_tree = utils.unrooted_birth_death_tree(num_taxa, birth_rate=1)
 for x in reference_tree.preorder_edge_iter():
     x.length = 1
 observations = generation.simulate_sequences_ordered(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate)
-spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
+spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML,reconstruct_tree.JC_similarity_matrix)   
 tree_rec = spectral_method(observations,reference_tree.taxon_namespace)
 RF,F1 = reconstruct_tree.compare_trees(tree_rec, reference_tree)
 print("Spectral: ")
