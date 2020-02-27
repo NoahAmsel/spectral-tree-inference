@@ -41,7 +41,11 @@ class FastCharacterMatrix(Mapping):
             # default is just to use the iterated order of the taxon_namespace object
             taxon2index = {taxon: ix for ix, taxon in enumerate(self.taxon_namespace)}
         self.taxon2index = taxon2index
-        self.alphabet = alphabet
+        if alphabet:
+            self.alphabet = alphabet
+        else:
+            self.alphabet = ['A','C','T','G']
+
 
     @classmethod
     def from_dictionary(cls, taxon2array, taxon_namespace, alphabet=None):
@@ -73,8 +77,9 @@ class FastCharacterMatrix(Mapping):
                 alphabet = self.alphabet
 
         char_matrix = dendropy.StandardCharacterMatrix()
+        char_matrix.taxon_namespace = self.taxon_namespace
         for taxon, sequence in self.items():
-            char_matrix.new_sequence(taxon, [alphabet[v] for v in self.values] if alphabet else self.values)
+            char_matrix.new_sequence(taxon, [alphabet[v] for v in sequence] if alphabet else [str(x) for x in sequence])
 
         return char_matrix
 
