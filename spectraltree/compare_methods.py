@@ -139,7 +139,8 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
                         i += 1
                         if verbose:
                             print("{0} / {1}".format(i, total_trials))
-                    save_results(previous_results+results, filename=savepath, folder=folder)
+                    if savepath:
+                        save_results(previous_results+results, filename=savepath, folder=folder)
 
     if savepath:
         save_results(previous_results+results, filename=savepath, folder=folder)
