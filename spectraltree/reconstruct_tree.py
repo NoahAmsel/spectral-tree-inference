@@ -84,16 +84,16 @@ def correlation_distance_matrix(observations):
     corr = np.clip(corr, a_min=1e-16, a_max=None)
     return -np.log(corr)
 
-def estimate_tree_topology(similarity_matrix, namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
+def estimate_tree_topology(similarity_matrix, taxon_namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
-    if namespace is None:
-        namespace = utils.default_namespace(m)
+    if taxon_namespace is None:
+        taxon_namespace = utils.default_namespace(m)
     else:
-        assert len(namespace) >= m, "Namespace too small for distance matrix"
+        assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
     
     # initialize leaf nodes
-    G = [utils.leaf(i, namespace) for i in range(m)]
+    G = [utils.leaf(i, taxon_namespace) for i in range(m)]
 
     available_clades = set(range(len(G)))   # len(G) == m
     # initialize Sigma
@@ -141,26 +141,26 @@ def partition_taxa(v):
     bool_bipartition = v<threshold
     return bool_bipartition
 
-def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=None):
+def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_namespace=None):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
-    if namespace is None:
-        namespace = utils.default_namespace(m)
+    if taxon_namespace is None:
+        taxon_namespace = utils.default_namespace(m)
     else:
-        assert len(namespace) >= m, "Namespace too small for distance matrix"
+        assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
     
-    T = dendropy.Tree(taxon_namespace=namespace)
+    T = dendropy.Tree(taxon_namespace=taxon_namespace)
 
     # Extracting inecies from namespace    
     T1_labels = [x.taxon.label for x in T1.leaf_nodes()]
     T2_labels = [x.taxon.label for x in T2.leaf_nodes()]
 
-    half1_idx_bool = [x.label in T1_labels for x in namespace]
+    half1_idx_bool = [x.label in T1_labels for x in taxon_namespace]
     half1_idx = [i for i, x in enumerate(half1_idx_bool) if x]
     half1_idx_array = np.array(half1_idx)
     T1.is_rooted = True
     
-    half2_idx_bool = [x.label in T2_labels for x in namespace]
+    half2_idx_bool = [x.label in T2_labels for x in taxon_namespace]
     half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]
     half2_idx_array = np.array(half2_idx)
     T2.is_rooted = True
@@ -604,13 +604,13 @@ def check_partition_in_tree(tree,partition):
 
 class ReconstructionMethod(ABC):
     @abstractmethod
-    def __call__(self, sequences, namespace=None):
+    def __call__(self, sequences, taxon_namespace=None):
         pass
 
 class RAxML(ReconstructionMethod):
-    def __call__(self, sequences, namespace=None):
+    def __call__(self, sequences, taxon_namespace=None):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
-            data = FastCharacterMatrix(sequences, taxon_namespace=namespace).to_dendropy()
+            data = FastCharacterMatrix(sequences, taxon_namespace=taxon_namespace).to_dendropy()
         else:
             data = sequences
 
@@ -625,45 +625,46 @@ class RAxML(ReconstructionMethod):
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),'spectraltree/raxmlHPC-SSE3-linux'))
 
         tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2 --JC69 -c 1"])
+        tree.is_rooted = False
         return tree
 
 class DistanceReconstructionMethod(ReconstructionMethod):
     def __init__(self, similarity_metric):
         self.similarity_metric = similarity_metric
 
-    def __call__(self, sequences, namespace=None):
+    def __call__(self, sequences, taxon_namespace=None):
         similarity_matrix = self.similarity_metric(sequences)
-        return self.reconstruct_from_similarity(similarity_matrix, namespace)
+        return self.reconstruct_from_similarity(similarity_matrix, taxon_namespace)
 
     @abstractmethod
-    def reconstruct_from_similarity(self, similarity_matrix, namespace=None):
+    def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
         pass
 
 class NeighborJoining(DistanceReconstructionMethod):
-    def reconstruct_from_similarity(self, similarity_matrix, namespace=None):
-        return self.neighbor_joining(similarity_matrix, namespace)
+    def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
+        return self.neighbor_joining(similarity_matrix, taxon_namespace)
     
-    def neighbor_joining(self, similarity_matrix, namespace=None):
+    def neighbor_joining(self, similarity_matrix, taxon_namespace=None):
         similarity_matrix = np.clip(similarity_matrix, a_min=1e-20, a_max=None)
         distance_matrix = -np.log(similarity_matrix)
-        T = utils.array2distance_matrix(distance_matrix, namespace).nj_tree()
+        T = utils.array2distance_matrix(distance_matrix, taxon_namespace).nj_tree()
         return T
         
 class SpectralNeighborJoining(DistanceReconstructionMethod):
-    def reconstruct_from_similarity(self, similarity_matrix, namespace=None):
-        return self.estimate_tree_topology(similarity_matrix, namespace)
+    def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
+        return self.estimate_tree_topology(similarity_matrix, taxon_namespace)
     #change to spectral_neighbor_joining
 
-    def estimate_tree_topology(self, similarity_matrix, namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
+    def estimate_tree_topology(self, similarity_matrix, taxon_namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
         m, m2 = similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
-        if namespace is None:
-            namespace = utils.default_namespace(m)
+        if taxon_namespace is None:
+            taxon_namespace = utils.default_namespace(m)
         else:
-            assert len(namespace) >= m, "Namespace too small for distance matrix"
+            assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
         
         # initialize leaf nodes
-        G = [utils.leaf(i, namespace) for i in range(m)]
+        G = [utils.leaf(i, taxon_namespace) for i in range(m)]
 
         available_clades = set(range(len(G)))   # len(G) == m
         # initialize Sigma
@@ -694,7 +695,7 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
         # for a bifurcating tree we're combining the last two available clades
         # for an unrooted one it's the last three because
         # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
-        return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
+        return dendropy.Tree(taxon_namespace=taxon_namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
 
 
 class SpectralTreeReconstruction(ReconstructionMethod):
@@ -702,17 +703,17 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         self.inner_method = inner_method
         self.similarity_metric = similarity_metric
     
-    def __call__(self, sequences, namespace=None):
-        return self.spectral_tree_reonstruction(sequences, self.similarity_metric, namespace,reconstruction_alg = self.inner_method)
+    def __call__(self, sequences, taxon_namespace=None):
+        return self.spectral_tree_reonstruction(sequences, self.similarity_metric, taxon_namespace,reconstruction_alg = self.inner_method)
 
-    def spectral_tree_reonstruction(self, sequences, similarity_metric, namespace=None, reconstruction_alg = SpectralNeighborJoining(None)):
+    def spectral_tree_reonstruction(self, sequences, similarity_metric, taxon_namespace=None, reconstruction_alg = SpectralNeighborJoining(None)):
         similarity_matrix = similarity_metric(sequences)
         m, m2 = similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
-        if namespace is None:
-            namespace = utils.default_namespace(m)
+        if taxon_namespace is None:
+            taxon_namespace = utils.default_namespace(m)
         else:
-            assert len(namespace) >= m, "Namespace too small for distance matrix"
+            assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
         
         # Partitioning
         [D,V] = np.linalg.eigh(similarity_matrix)            
@@ -725,8 +726,8 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         similarity_matrix2 = similarity_matrix[not_bool_bipartition,:]
         similarity_matrix2 = similarity_matrix2[:, not_bool_bipartition]
         
-        namespace1 = dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]])
-        namespace2 = dendropy.TaxonNamespace([namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]])
+        namespace1 = dendropy.TaxonNamespace([taxon_namespace[i] for i in [i for i, x in enumerate(bool_bipartition) if x]])
+        namespace2 = dendropy.TaxonNamespace([taxon_namespace[i] for i in [i for i, x in enumerate(not_bool_bipartition) if x]])
 
         #reconstructing each part
         if issubclass(reconstruction_alg, DistanceReconstructionMethod):
@@ -737,11 +738,11 @@ class SpectralTreeReconstruction(ReconstructionMethod):
             sequences1 = sequences[bool_bipartition,:]
             sequences2 = sequences[not_bool_bipartition,:]
             method = reconstruction_alg()
-            T1 = method(sequences1,  namespace = namespace1)
-            T2 = method(sequences2,  namespace = namespace2)
+            T1 = method(sequences1,  taxon_namespace = namespace1)
+            T2 = method(sequences2,  taxon_namespace = namespace2)
 
         # Finding roots and merging trees
-        T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, namespace=namespace)
+        T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_namespace=taxon_namespace)
         return T
 
 
