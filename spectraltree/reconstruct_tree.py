@@ -11,6 +11,9 @@ from dendropy.interop import raxml
 import utils
 from character_matrix import FastCharacterMatrix
 
+RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
+RECONSTRUCT_TREE__DIR_PATH = os.path.dirname(RECONSTRUCT_TREE_PATH)
+
 def sv2(A1, A2, M):
     """Second Singular Value"""
     A = A1 | A2
@@ -612,17 +615,16 @@ class RAxML(ReconstructionMethod):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
             data = FastCharacterMatrix(sequences, taxon_namespace=taxon_namespace).to_dendropy()
         else:
-            data = sequences
-
+            data = sequences     
         if platform.system() == 'Windows':
             # Windows version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),r'spectraltree\raxmlHPC-SSE3.exe'))
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH, 'raxmlHPC-SSE3.exe'))
         elif platform.system() == 'Darwin':
             #MacOS version:
             rx = raxml.RaxmlRunner()
         elif platform.system() == 'Linux':
             #Linux version
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),'spectraltree/raxmlHPC-SSE3-linux'))
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-SSE3-linux'))
 
         tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2 --JC69 -c 1"])
         tree.is_rooted = False
