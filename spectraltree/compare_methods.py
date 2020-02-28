@@ -122,6 +122,9 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
     results = []
     total_trials = len(tree_list) * reps_per_tree * len(mutation_rates) * len(Ns) * len(methods)
     i = 0
+    if savepath:
+        previous_results = [] if overwrite else load_results(savepath, folder=folder, throw_error=False)
+
     for reference_tree in tree_list:
         for mutation_rate in mutation_rates:
             # we can parallelize this loop too, but then we need to set different random seeds
@@ -136,9 +139,9 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
                         i += 1
                         if verbose:
                             print("{0} / {1}".format(i, total_trials))
+                    save_results(previous_results+results, filename=savepath, folder=folder)
 
     if savepath:
-        previous_results = [] if overwrite else load_results(savepath, folder=folder, throw_error=False)
         save_results(previous_results+results, filename=savepath, folder=folder)
         if verbose:
             print("Saved to", os.path.join(folder, savepath) if folder else savepath)
@@ -202,7 +205,7 @@ def accuracy(result_frame, x="n", y="F1%", hue="method", col=None, kind="point")
     dodge = 0.1*(result_frame['method'].nunique() - 1)
     #d = {'color': ['C0', 'k'], "ls" : ["-","--"]}
     return sns.catplot(data=result_frame, x=x, y=y, kind="point", hue=hue, col=col, dodge=dodge, col_wrap=(None if col is None else 3),\
-        markers=['o','s'],legend=False)
+        legend=False)
 
 def correct(result_frame, x="n", y="correct", hue="method", col=None):
     return accuracy(result_frame, x=x, y=y, hue=hue, col=col)
