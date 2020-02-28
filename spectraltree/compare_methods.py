@@ -20,6 +20,7 @@ import reconstruct_tree
 
 class Experiment_Datum:
     def __init__(self, sequence_model, n, method, mutation_rate, inferred_tree, reference_tree, run_time):
+        inferred_tree.update_bipartitions()
         assert inferred_tree.is_rooted == reference_tree.is_rooted, "Cannot compare rooted to unrooted tree"
         self.sequence_model = sequence_model
         self.n = n
@@ -129,7 +130,7 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
                 for n in Ns:
                     for method in methods:
                         t1 = time.time()
-                        inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
+                        inferred_tree = method(observations[:,:n], taxon_namespace=reference_tree.taxon_namespace)
                         run_time = time.time() - t1
                         results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree,run_time))
                         i += 1
@@ -146,7 +147,7 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
 
 def reproduce_datum(datum):
     observations = utils.simulate_sequences(seq_len=datum.n, tree_model=datum.ref_tree, seq_model=datum.sequence_model, mutation_rate=datum.mutation_rate)
-    inferred_tree = datum.method(observations[:,:datum.n], namespace=datum.ref_tree.taxon_namespace)
+    inferred_tree = datum.method(observations[:,:datum.n], taxon_namespace=datum.ref_tree.taxon_namespace)
     return Experiment_Datum(datum.sequence_model, datum.n, datum.method, datum.mutation_rate, inferred_tree, datum.ref_tree), inferred_tree
     #return experiment(tree_list=[datum.ref_tree], sequence_model=datum.sequence_model, Ns=[datum.n], methods=[datum.method], mutation_rates=[datum.mutation_rate], verbose=False)[0]
 
@@ -158,7 +159,7 @@ def parallel_helper(reference_tree, mutation_rate, sequence_model, Ns, methods, 
         observations = utils.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
         for n in Ns:
             for method in methods:
-                inferred_tree = method(observations[:,:n], namespace=reference_tree.taxon_namespace)
+                inferred_tree = method(observations[:,:n], taxon_namespace=reference_tree.taxon_namespace)
                 partial_results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree))
 
     return partial_results
