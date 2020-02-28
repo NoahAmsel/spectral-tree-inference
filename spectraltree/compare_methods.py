@@ -199,7 +199,9 @@ def accuracy(result_frame, x="n", y="F1%", hue="method", col=None, kind="point")
     grouping_cols = x if col is None else [col, x]
     print(result_frame.groupby(grouping_cols)[y].count()) # .describe()
     dodge = 0.1*(result_frame['method'].nunique() - 1)
-    return sns.catplot(data=result_frame, x=x, y=y, kind="point", hue=hue, col=col, dodge=dodge, col_wrap=(None if col is None else 3))
+    #d = {'color': ['C0', 'k'], "ls" : ["-","--"]}
+    return sns.catplot(data=result_frame, x=x, y=y, kind="point", hue=hue, col=col, dodge=dodge, col_wrap=(None if col is None else 3),\
+        markers=['o','s'],legend=False)
 
 def correct(result_frame, x="n", y="correct", hue="method", col=None):
     return accuracy(result_frame, x=x, y=y, hue=hue, col=col)
