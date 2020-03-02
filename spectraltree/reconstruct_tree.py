@@ -6,6 +6,7 @@ import os, sys
 
 import numpy as np
 import scipy.spatial.distance
+from sklearn.decomposition import TruncatedSVD
 import dendropy     #should this library be independent of dendropy? is that even possible?
 from dendropy.interop import raxml
 import utils
@@ -144,6 +145,15 @@ def partition_taxa(v):
     bool_bipartition = v<threshold
     return bool_bipartition
 
+SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
+def svd2(mat):
+    if (mat.shape[0] == 1) | (mat.shape[1] == 1):
+        return 0
+    elif (mat.shape[0] == 2) | (mat.shape[1] == 2):
+        return np.linalg.svd(mat,False,False)[1]
+    else:
+        return SVD2_OBJ.fit(mat).singular_values_[1]
+
 def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_namespace=None):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
@@ -191,6 +201,7 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_names
         A_h2_idx = list(np.concatenate([h1_idx_A, half2_idx_array]))
         B_h2_idx = list(np.concatenate([h1_idx_B, half2_idx_array]))
 
+        
         #all_minus_h1_idx_cur = list(np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])),h1_idx_cur))
         #all_minus_h1_idx_cur_complement = list(np.setdiff1d(np.array(range(np.shape(similarity_matrix)[0])),h1_idx_cur_complement))
         
@@ -212,32 +223,32 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_names
         ## Case 1: Other is connected to A
         sliced_sim_mat_try1_1 = similarity_matrix[A_other_idx, ...]
         sliced_sim_mat_try1_1 = sliced_sim_mat_try1_1[...,B_h2_idx]
-        score_try1_1 = 0 if (sliced_sim_mat_try1_1.shape[0] == 1) | (sliced_sim_mat_try1_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_1, compute_uv = False)[1]
+        score_try1_1 = svd2(sliced_sim_mat_try1_1)
 
         sliced_sim_mat_try1_2 = similarity_matrix[A_h2_other_idx, ...]
         sliced_sim_mat_try1_2 = sliced_sim_mat_try1_2[...,h1_idx_B]
-        score_try1_2 = 0 if (sliced_sim_mat_try1_2.shape[0] == 1) | (sliced_sim_mat_try1_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_2, compute_uv = False)[1]
+        score_try1_2 = svd2(sliced_sim_mat_try1_2)
 
         score_try1 = np.max([score_try1_1,score_try1_2])
         ## Case 2: Other is connected to B
         sliced_sim_mat_try2_1 = similarity_matrix[h1_idx_A, ...]
         sliced_sim_mat_try2_1 = sliced_sim_mat_try2_1[...,B_h2_other_idx]
-        score_try2_1 = 0 if (sliced_sim_mat_try2_1.shape[0] == 1) | (sliced_sim_mat_try2_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_1, compute_uv = False)[1]
+        score_try2_1 = svd2(sliced_sim_mat_try2_1)
         
         sliced_sim_mat_try2_2 = similarity_matrix[A_h2_idx, ...]
         sliced_sim_mat_try2_2 = sliced_sim_mat_try2_2[...,B_other_idx]
-        score_try2_2 = 0 if (sliced_sim_mat_try2_2.shape[0] == 1) | (sliced_sim_mat_try2_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_2, compute_uv = False)[1]
+        score_try2_2 = svd2(sliced_sim_mat_try2_2)
         
         score_try2 = np.max([score_try2_1,score_try2_2])
         
         ## Case 3: Other is connected to h2
         sliced_sim_mat_try3_1 = similarity_matrix[h1_idx_A, ...]
         sliced_sim_mat_try3_1 = sliced_sim_mat_try3_1[...,B_h2_other_idx]
-        score_try3_1 = 0 if (sliced_sim_mat_try3_1.shape[0] == 1) | (sliced_sim_mat_try3_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_1, compute_uv = False)[1]
+        score_try3_1 = svd2(sliced_sim_mat_try3_1)
         
         sliced_sim_mat_try3_2 = similarity_matrix[A_h2_other_idx, ...]
         sliced_sim_mat_try3_2 = sliced_sim_mat_try3_2[...,h1_idx_B]
-        score_try3_2 = 0 if (sliced_sim_mat_try3_2.shape[0] == 1) | (sliced_sim_mat_try3_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_2, compute_uv = False)[1]
+        score_try3_2 = svd2(sliced_sim_mat_try3_2)
         
         score_try3 = np.max([score_try3_1,score_try3_2])
         
@@ -291,32 +302,32 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_names
         ## Case 1: Other is connected to A
         sliced_sim_mat_try1_1 = similarity_matrix[A_other_idx, ...]
         sliced_sim_mat_try1_1 = sliced_sim_mat_try1_1[...,B_h1_idx]
-        score_try1_1 = 0 if (sliced_sim_mat_try1_1.shape[0] == 1) | (sliced_sim_mat_try1_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_1, compute_uv = False)[1]
+        score_try1_1 = svd2(sliced_sim_mat_try1_1)
 
         sliced_sim_mat_try1_2 = similarity_matrix[A_h1_other_idx, ...]
         sliced_sim_mat_try1_2 = sliced_sim_mat_try1_2[...,h2_idx_B]
-        score_try1_2 = 0 if (sliced_sim_mat_try1_2.shape[0] == 1) | (sliced_sim_mat_try1_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try1_2, compute_uv = False)[1]
+        score_try1_2 =svd2(sliced_sim_mat_try1_2)
 
         score_try1 = np.max([score_try1_1,score_try1_2])
         ## Case 2: Other is connected to B
         sliced_sim_mat_try2_1 = similarity_matrix[h2_idx_A, ...]
         sliced_sim_mat_try2_1 = sliced_sim_mat_try2_1[...,B_h1_other_idx]
-        score_try2_1 = 0 if (sliced_sim_mat_try2_1.shape[0] == 1) | (sliced_sim_mat_try2_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_1, compute_uv = False)[1]
+        score_try2_1 = svd2(sliced_sim_mat_try2_1)
         
         sliced_sim_mat_try2_2 = similarity_matrix[A_h1_idx, ...]
         sliced_sim_mat_try2_2 = sliced_sim_mat_try2_2[...,B_other_idx]
-        score_try2_2 = 0 if (sliced_sim_mat_try2_2.shape[0] == 1) | (sliced_sim_mat_try2_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try2_2, compute_uv = False)[1]
+        score_try2_2 = svd2(sliced_sim_mat_try2_2)
         
         score_try2 = np.max([score_try2_1,score_try2_2])
         
         ## Case 3: Other is connected to h2
         sliced_sim_mat_try3_1 = similarity_matrix[h2_idx_A, ...]
         sliced_sim_mat_try3_1 = sliced_sim_mat_try3_1[...,B_h1_other_idx]
-        score_try3_1 = 0 if (sliced_sim_mat_try3_1.shape[0] == 1) | (sliced_sim_mat_try3_1.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_1, compute_uv = False)[1]
+        score_try3_1 = svd2(sliced_sim_mat_try3_1)
         
         sliced_sim_mat_try3_2 = similarity_matrix[A_h1_other_idx, ...]
         sliced_sim_mat_try3_2 = sliced_sim_mat_try3_2[...,h2_idx_B]
-        score_try3_2 = 0 if (sliced_sim_mat_try3_2.shape[0] == 1) | (sliced_sim_mat_try3_2.shape[1] == 1) else scipy.linalg.svd(sliced_sim_mat_try3_2, compute_uv = False)[1]
+        score_try3_2 = svd2(sliced_sim_mat_try3_2)
         
         score_try3 = np.max([score_try3_1,score_try3_2])
         
