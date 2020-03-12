@@ -640,6 +640,8 @@ class RAxML(ReconstructionMethod):
         tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2 --JC69 -c 1"])
         tree.is_rooted = False
         return tree
+    def __repr__():
+        return "RAxML"
 
 class DistanceReconstructionMethod(ReconstructionMethod):
     def __init__(self, similarity_metric):
@@ -662,6 +664,8 @@ class NeighborJoining(DistanceReconstructionMethod):
         distance_matrix = -np.log(similarity_matrix)
         T = utils.array2distance_matrix(distance_matrix, taxon_namespace).nj_tree()
         return T
+    def __repr__():
+        return "NJ"
         
 class SpectralNeighborJoining(DistanceReconstructionMethod):
     def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
@@ -709,7 +713,8 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
         # for an unrooted one it's the last three because
         # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
         return dendropy.Tree(taxon_namespace=taxon_namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
-
+def __repr__():
+        return "SNJ"
 
 class SpectralTreeReconstruction(ReconstructionMethod):
     def __init__(self, inner_method, similarity_metric):
@@ -722,7 +727,8 @@ class SpectralTreeReconstruction(ReconstructionMethod):
             
     def __call__(self, sequences, taxon_namespace=None):
         return self.spectral_tree_reonstruction(sequences, self.similarity_metric, taxon_namespace=taxon_namespace, reconstruction_alg = self.inner_method)
-
+    def __repr__():
+        return "spectralTree"
 
     def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, threshhold = 100):
         self.sequences = sequences
@@ -761,6 +767,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                     cur_node = cur_node.parent
         partitioning_tree.root.tree.taxon_namespace = self.taxon_namespace
         return partitioning_tree.root.tree
+        
     def splitTaxa(self,node):
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
@@ -781,6 +788,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
         return join_trees_with_spectral_root_finding(cur_similarity, node.left.tree, node.right.tree, taxon_namespace=cur_namespace)
+    
     def reconstruct_alg_wrapper(self, node):
         namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
         if issubclass(self.inner_method, DistanceReconstructionMethod):
