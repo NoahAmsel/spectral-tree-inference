@@ -622,7 +622,7 @@ class ReconstructionMethod(ABC):
         pass
 
 class RAxML(ReconstructionMethod):
-    def __call__(self, sequences, taxon_namespace=None):
+    def __call__(self, sequences, taxon_namespace=None, raxml_args = "-T 2 --JC69 -c 1"):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
             data = FastCharacterMatrix(sequences, taxon_namespace=taxon_namespace).to_dendropy()
         else:
@@ -637,7 +637,7 @@ class RAxML(ReconstructionMethod):
             #Linux version
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-SSE3-linux'))
 
-        tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2 --JC69 -c 1"])
+        tree = rx.estimate_tree(char_matrix=data, raxml_args=[raxml_args])
         tree.is_rooted = False
         return tree
     def __repr__():
