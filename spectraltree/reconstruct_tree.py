@@ -136,14 +136,28 @@ def estimate_tree_topology(similarity_matrix, taxon_namespace=None, scorer=sv2, 
 def raxml_reconstruct():
     pass
 
-def partition_taxa(v):
+def partition_taxa(v,similarity,num_gaps):
     m = len(v)
+    #idx_vec = 
     v_sort = np.sort(v)
     gaps = v_sort[1:m]-v_sort[0:m-1]
-    max_idx = np.argmax(gaps)
-    threshold = (v_sort[max_idx]+v_sort[max_idx+1])/2
-    bool_bipartition = v<threshold
-    return bool_bipartition
+    ind_partition = np.argpartition(gaps, -num_gaps)[-num_gaps:]
+    smin = 1000
+    for p_idx in ind_partition:        
+        threshold = (v_sort[p_idx]+v_sort[p_idx+1])/2
+        if (p_idx>0) & (p_idx<m-2):
+            bool_bipartition = v<threshold
+            s_sliced = similarity[bool_bipartition,:]
+            s_sliced = s_sliced[:,~bool_bipartition]
+            s2 = svd2(s_sliced)
+            if s2<smin:
+                partition_min = bool_bipartition
+                smin = s2
+    return partition_min   
+    #max_idx = np.argmax(gaps)
+    #threshold = (v_sort[max_idx]+v_sort[max_idx+1])/2
+    #bool_bipartition = v<threshold
+    #return bool_bipartition
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
 def svd2(mat):
@@ -730,7 +744,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def __repr__():
         return "spectralTree"
 
-    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, threshhold = 100):
+    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100):
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
@@ -753,7 +767,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                 else:
                     cur_node = cur_node.parent
             elif sum(cur_node.bitmap) > threshhold:
-                L1,L2 = self.splitTaxa(cur_node)
+                L1,L2 = self.splitTaxa(cur_node,num_gaps)
                 cur_node.setLeft(MyNode(L1))
                 cur_node.setRight(MyNode(L2))
                 cur_node = cur_node.right
@@ -768,11 +782,11 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         partitioning_tree.root.tree.taxon_namespace = self.taxon_namespace
         return partitioning_tree.root.tree
         
-    def splitTaxa(self,node):
+    def splitTaxa(self,node,num_gaps):
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
         [D,V] = np.linalg.eigh(cur_similarity)
-        bool_bipartition = partition_taxa(V[:,-2])
+        bool_bipartition = partition_taxa(V[:,-2],cur_similarity,num_gaps)
         
         #Building partitioning bitmaps from partial bitmaps
         ll = np.array([i for i, x in enumerate(node.bitmap) if x])
@@ -810,7 +824,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         
         # Partitioning
         [D,V] = np.linalg.eigh(similarity_matrix)            
-        bool_bipartition = partition_taxa(V[:,-2])
+        bool_bipartition = partition_taxa(V[:,-2],similarity_matrix,1)
         
         similarity_matrix1 = similarity_matrix[bool_bipartition,:]
         similarity_matrix1 = similarity_matrix1[:, bool_bipartition]
