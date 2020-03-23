@@ -744,7 +744,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def __repr__():
         return "spectralTree"
 
-    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100):
+    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, **kargs):
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
@@ -772,7 +772,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                 cur_node.setRight(MyNode(L2))
                 cur_node = cur_node.right
             else:
-                cur_node.tree = self.reconstruct_alg_wrapper(cur_node)
+                cur_node.tree = self.reconstruct_alg_wrapper(cur_node, **kargs)
                 if cur_node.parent == None:
                     break
                 if cur_node.parent.right == cur_node:
@@ -803,15 +803,16 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         cur_similarity = cur_similarity[:,node.bitmap]
         return join_trees_with_spectral_root_finding(cur_similarity, node.left.tree, node.right.tree, taxon_namespace=cur_namespace)
     
-    def reconstruct_alg_wrapper(self, node):
+    def reconstruct_alg_wrapper(self, node, **kargs):
         namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
         if issubclass(self.inner_method, DistanceReconstructionMethod):
             similarity_matrix1 = self.similarity_matrix[node.bitmap,:]
             similarity_matrix1 = similarity_matrix1[:,node.bitmap]
             return self.reconstruction_alg.reconstruct_from_similarity(similarity_matrix1, taxon_namespace = namespace1)
         else:
+            # print(type(self.sequences))
             sequences1 = self.sequences[node.bitmap,:]
-            return self.reconstruction_alg(sequences1, taxon_namespace = namespace1)
+            return self.reconstruction_alg(sequences1, taxon_namespace = namespace1, **kargs)
 
     def spectral_tree_reonstruction(self, sequences, similarity_metric, taxon_namespace=None, reconstruction_alg = SpectralNeighborJoining(None)):
         similarity_matrix = similarity_metric(sequences)
@@ -851,6 +852,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         # Finding roots and merging trees
         T = join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_namespace=taxon_namespace)
         return T
+    
 class MyNode(object):
     def __init__(self, data):
         self.bitmap = data
