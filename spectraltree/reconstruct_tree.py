@@ -869,10 +869,10 @@ class MyNode(object):
 class MyTree(object):
     def __init__(self, data = None):
         self.root = MyNode(data)
-    def setLeft(node):
+    def setLeft(self,node):
         self.left = node
         node.parent = self
-    def setRight(node):
+    def setRight(self,node):
         self.right = node
         node.parent = self
 
