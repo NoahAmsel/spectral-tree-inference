@@ -214,7 +214,7 @@ def numpy_matrix_with_characters_on_tree_ordered(seq_attr, tree):
     return np.array(sequences)
 
 
-def numpy_matrix_with_characters_on_tree(seq_attr, tree):
+def OLD_numpy_matrix_with_characters_on_tree(seq_attr, tree):
     """
     Extracts sequences from all leaves and packs them into a numpy matrix.
     Repalces `extend_char_matrix_with_characters_on_tree` method of `DiscreteCharacterEvolver`, which doesn't use numpy.
@@ -227,6 +227,19 @@ def numpy_matrix_with_characters_on_tree(seq_attr, tree):
         #sequences[index_map(leaf.taxon)] = np.concatenate(getattr(leaf, seq_attr))
     return np.array(sequences)
 
+def numpy_matrix_with_characters_on_tree(seq_attr, tree):
+    """
+    Extracts sequences from all leaves and packs them into a numpy matrix.
+    Repalces `extend_char_matrix_with_characters_on_tree` method of `DiscreteCharacterEvolver`, which doesn't use numpy.
+    """
+    taxa = []
+    sequences = []
+    for leaf in tree.leaf_node_iter():
+        taxa.append(leaf.taxon)
+        sequences.append(getattr(leaf, seq_attr)[-1])
+        # sequences.append(np.concatenate(getattr(leaf, seq_attr)))  # TODO
+    
+    return np.array(sequences), TaxaIndexMapping(tree.taxon_namespace, taxa)
 
 def simulate_sequences_ordered(seq_len, tree_model, seq_model, mutation_rate=1.0, root_states=None, retain_sequences_on_tree=False, rng=None):
     """

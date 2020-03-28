@@ -2,6 +2,40 @@ from collections.abc import Mapping
 import dendropy
 import utils
 
+class TaxaIndexMapping(Mapping):
+    def __init__(self, taxon_namespace, taxa_list):
+        self._taxon_namespace = taxon_namespace
+        self._taxa_list = np.array(taxa_list)
+        self._taxon2index = {}
+        for ix, taxon in enumerate(taxa_list):
+            assert taxon in taxon_namespace, "Each taxon must be included in the given taxon namespace."
+            self._taxon2index[taxon] = ix
+
+    @property
+    def taxon_namespace(self):
+        return self._taxon_namespace
+
+    def __getitem__(self, taxa_or_indexer):
+        if taxa_or_indexer in self.taxon_namespace:
+            return self._taxon2index[taxa_or_indexer]
+        else:
+            return self._taxa_list[taxa_or_indexer]
+
+    def __iter__(self):
+        for taxon in self._taxa_list:
+            yield taxon
+
+    def __len__(self):
+        return len(self._taxa_list)
+
+    def taxaset2mask(self, taxa_set):
+        mask = np.zeros(len(self), dtype=bool)
+        mask[taxa_set] = True
+        return mask
+
+    def mask2bipartition(self, mask):
+        pass
+
 class FastCharacterMatrix(Mapping):
 
     def __getitem__(self, taxon):
