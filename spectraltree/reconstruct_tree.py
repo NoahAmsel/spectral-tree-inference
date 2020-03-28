@@ -15,7 +15,7 @@ from character_matrix import FastCharacterMatrix
 RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
 RECONSTRUCT_TREE__DIR_PATH = os.path.dirname(RECONSTRUCT_TREE_PATH)
 
-def sv2(A1, A2, M):
+def full_sv2(A1, A2, M):
     """Second Singular Value"""
     A = A1 | A2
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
@@ -24,6 +24,15 @@ def sv2(A1, A2, M):
         return 0    # automatically rank 1, so we say "the second eigenvalue" is 0
     else:
         return s[1] # the second eigenvalue
+
+SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
+def svd2(mat):
+    if (mat.shape[0] == 1) | (mat.shape[1] == 1):
+        return 0
+    elif (mat.shape[0] == 2) | (mat.shape[1] == 2):
+        return np.linalg.svd(mat, full_matricesbool=False, compute_uvbool=False)[1]
+    else:
+        return SVD2_OBJ.fit(mat).singular_values_[1]
 
 def sum_squared_quartets(A1, A2, M):
     """Normalized Sum of Squared Quartets"""
@@ -88,54 +97,6 @@ def correlation_distance_matrix(observations):
     corr = np.clip(corr, a_min=1e-16, a_max=None)
     return -np.log(corr)
 
-def estimate_tree_topology(similarity_matrix, taxon_namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
-    m, m2 = similarity_matrix.shape
-    assert m == m2, "Distance matrix must be square"
-    if taxon_namespace is None:
-        taxon_namespace = utils.default_namespace(m)
-    else:
-        assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
-    
-    # initialize leaf nodes
-    G = [utils.leaf(i, taxon_namespace) for i in range(m)]
-
-    available_clades = set(range(len(G)))   # len(G) == m
-    # initialize Sigma
-    Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
-    sv1 = np.full((2*m,2*m), np.nan)
-    for i,j in combinations(available_clades, 2):
-        Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, similarity_matrix)
-        Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
-
-    # merge
-    while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
-        left, right = min(combinations(available_clades, 2), key=lambda pair: Sigma[pair])
-        G.append(utils.merge_children((G[left], G[right])))
-        new_ix = len(G) - 1
-        available_clades.remove(left)
-        available_clades.remove(right)
-        for other_ix in available_clades:
-            Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, similarity_matrix)
-            Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
-        available_clades.add(new_ix)
-
-    # HEYYYY why does ariel do something special for the last THREE groups? (rather than last two)
-    # think about what would happen if at the end we have three groups: 1 leaf, 1 leaf, n-2 leaves
-    # how would we know which leaf to attach, since score would be 0 for both??
-
-    # return Phylo.BaseTree.Tree(G[-1])
-
-    # for a bifurcating tree we're combining the last two available clades
-    # for an unrooted one it's the last three because
-    # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
-
-
-
-
-def raxml_reconstruct():
-    pass
-
 def partition_taxa(v,similarity,num_gaps):
     m = len(v)
     #idx_vec = 
@@ -158,15 +119,6 @@ def partition_taxa(v,similarity,num_gaps):
     #threshold = (v_sort[max_idx]+v_sort[max_idx+1])/2
     #bool_bipartition = v<threshold
     #return bool_bipartition
-
-SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
-def svd2(mat):
-    if (mat.shape[0] == 1) | (mat.shape[1] == 1):
-        return 0
-    elif (mat.shape[0] == 2) | (mat.shape[1] == 2):
-        return np.linalg.svd(mat,False,False)[1]
-    else:
-        return SVD2_OBJ.fit(mat).singular_values_[1]
 
 def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_namespace=None):
     m, m2 = similarity_matrix.shape
@@ -654,7 +606,8 @@ class RAxML(ReconstructionMethod):
         tree = rx.estimate_tree(char_matrix=data, raxml_args=[raxml_args])
         tree.is_rooted = False
         return tree
-    def __repr__():
+
+    def __repr__(self):
         return "RAxML"
 
 class DistanceReconstructionMethod(ReconstructionMethod):
@@ -671,14 +624,11 @@ class DistanceReconstructionMethod(ReconstructionMethod):
 
 class NeighborJoining(DistanceReconstructionMethod):
     def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
-        return self.neighbor_joining(similarity_matrix, taxon_namespace)
-    
-    def neighbor_joining(self, similarity_matrix, taxon_namespace=None):
         similarity_matrix = np.clip(similarity_matrix, a_min=1e-20, a_max=None)
         distance_matrix = -np.log(similarity_matrix)
-        T = utils.array2distance_matrix(distance_matrix, taxon_namespace).nj_tree()
-        return T
-    def __repr__():
+        return utils.array2distance_matrix(distance_matrix, taxon_namespace).nj_tree()
+
+    def __repr__(self):
         return "NJ"
         
 class SpectralNeighborJoining(DistanceReconstructionMethod):
@@ -686,7 +636,7 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
         return self.estimate_tree_topology(similarity_matrix, taxon_namespace)
     #change to spectral_neighbor_joining
 
-    def estimate_tree_topology(self, similarity_matrix, taxon_namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
+    def estimate_tree_topology(self, similarity_matrix, taxon_namespace=None, scorer=svd2, scaler=1.0, bifurcating=False):
         m, m2 = similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         if taxon_namespace is None:
@@ -727,7 +677,8 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
         # for an unrooted one it's the last three because
         # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
         return dendropy.Tree(taxon_namespace=taxon_namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
-def __repr__():
+
+    def __repr__(self):
         return "SNJ"
 
 class SpectralTreeReconstruction(ReconstructionMethod):
@@ -741,7 +692,8 @@ class SpectralTreeReconstruction(ReconstructionMethod):
             
     def __call__(self, sequences, taxon_namespace=None):
         return self.spectral_tree_reonstruction(sequences, self.similarity_metric, taxon_namespace=taxon_namespace, reconstruction_alg = self.inner_method)
-    def __repr__():
+    
+    def __repr__(self):
         return "spectralTree"
 
     def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, **kargs):
@@ -875,52 +827,6 @@ class MyTree(object):
     def setRight(self,node):
         self.right = node
         node.parent = self
-
-
-class Reconstruction_Method:
-    def __init__(self, core=estimate_tree_topology, similarity=paralinear_similarity, **kwargs):
-        self.core = core
-        self.similarity = similarity
-        if self.core == estimate_tree_topology:
-            kwargs["scorer"] = kwargs.get("scorer", sv2)
-            kwargs["scaler"] = kwargs.get("scaler", 1.0)
-        self.kwargs = kwargs
-
-    @property
-    def scorer(self):
-        return self.kwargs.get('scorer', None)
-
-    @property
-    def scaler(self):
-        return self.kwargs.get('scaler', None)
-
-    def __call__(self, observations, namespace=None):
-        T = self.reconstruct_from_array(observations, namespace)
-        #T.print_plot()
-        return T
-
-    def reconstruct_from_array(self, observations, namespace=None):
-        similarity_matrix = self.similarity(observations)
-        tree = self.core(similarity_matrix, namespace=namespace, **self.kwargs)
-        return tree
-
-    def reconstruct_from_charmatrix(self, char_matrix, namespace=None):
-        """
-        takes dendropy.datamodel.charmatrixmodel.CharacterMatrix
-        """
-        observations, alphabet = utils.charmatrix2array(char_matrix)
-        return self(observations)
-
-    def __str__(self):
-        if self.core == estimate_tree_topology:
-            s = self.scorer.__name__
-            if self.scaler != 1.0:
-                s += " x{:.2}".format(self.scaler)
-        elif self.core == neighbor_joining:
-            s = "NJ"
-        else:
-            s = self.core.__name__
-        return s
 
 # %%
 if __name__ == "__main__":
