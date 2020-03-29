@@ -3,6 +3,9 @@ import numpy as np
 import dendropy
 #import utils
 
+def default_namespace(num_taxa, prefix="T"):
+    return dendropy.TaxonNamespace([prefix+str(i) for i in range(1, num_taxa+1)])
+
 class TaxaIndexMapping(Mapping):
     def __init__(self, taxon_namespace, taxa_list):
         # TODO: modify init so that it detects repeated values (even if it's specified as a taxon object one time and as a label the other) and throws an error
@@ -22,7 +25,12 @@ class TaxaIndexMapping(Mapping):
                 assert False, "Each taxon must be included in the given taxon namespace."
 
         self._taxa_list = np.array(self._taxa_list)
-                  
+
+    @classmethod
+    def default(cls, length):
+        namespace = default_namespace(length)
+        return cls(namespace, list(namespace))
+
     @property
     def taxon_namespace(self):
         return self._taxon_namespace
@@ -77,6 +85,10 @@ class TaxaIndexMapping(Mapping):
     def __str__(self):
         return str([taxon.label for taxon in self])
 
+    def __eq__(self, other):
+        isinstance(other, TaxaIndexMapping) and (
+            self.taxon_namespace == other.taxon_namespace) and (
+                self._taxa_list == other._taxa_list)
 
 
 """

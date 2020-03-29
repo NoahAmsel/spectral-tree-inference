@@ -33,5 +33,11 @@ class TestTaxaIndexMapping(unittest.TestCase):
         self.assertEqual(str(self.taxa1.taxa2bipartition(["dog", "cat"])), "11100")
         self.assertEqual(str(self.taxa1.mask2bipartition([False, False, True, True])), "11100")
 
+    def test_str(self):
+        self.assertEqual(str(self.taxa1), str(['fish', 'snake', 'cat', 'dog']))
+
+    def test_default(self):
+        self.assertListEqual([taxon.label for taxon in character_matrix.TaxaIndexMapping.default(4)], ["T1", "T2", "T3", "T4"])
+
 if __name__ == "__main__":
     unittest.main()

@@ -4,19 +4,20 @@ import scipy.spatial.distance
 import numpy as np
 import dendropy
 
-from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree # for convenience
+from char_matrix import TaxaIndexMapping
 
-def default_namespace(num_taxa):
-    return dendropy.TaxonNamespace([str(i) for i in range(num_taxa)])
+# Including these functions here for convenience
+from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
 
-def leaf(i, namespace, **kwargs):
-    # for now, `i` will specify the taxon but in the future can make it more flexible
-    assert 'taxon' not in kwargs
-    kwargs['taxon'] = namespace[i]
-    node = dendropy.Node(**kwargs)
-    node.taxa_set = np.full(len(namespace), False)
-    node.taxa_set[i] = True
-    return node
+# OLD: will be removed TODO
+# def leaf(i, namespace, **kwargs):
+#     # for now, `i` will specify the taxon but in the future can make it more flexible
+#     assert 'taxon' not in kwargs
+#     kwargs['taxon'] = namespace[i]
+#     node = dendropy.Node(**kwargs)
+#     node.taxa_set = np.full(len(namespace), False)
+#     node.taxa_set[i] = True
+#     return node
 
 def merge_children(children, **kwargs):
     node = dendropy.Node(**kwargs)
@@ -25,7 +26,6 @@ def merge_children(children, **kwargs):
     if all(hasattr(child,'taxa_set') for child in children):
         node.taxa_set = np.logical_or.reduce(tuple(child.taxa_set for child in children))
     return node
-
 
 def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
     for e in tree.edges():
@@ -41,34 +41,50 @@ def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
 
 def charmatrix2array(charmatrix):
     #charmatrix[taxon].values()
-    alphabet = charmatrix.state_alphabets[0]
-    return np.array([[state_id.index for state_id in charmatrix[taxon].values()] for taxon in charmatrix]), alphabet
+    alphabet = charmatrix.state_alphabets[0] # TODO: what if there are multiple different state_alphabets?
+    taxa = []
+    sequences = []
+    for taxon in charmatrix:
+        taxa.append(taxon)
+        sequences.append([state_id.index for state_id in charmatrix[taxon].values()])
+    
+    return np.array(sequences), TaxaIndexMapping(charmatrix.taxon_namespace, taxa), alphabet
 
-def array2charmatrix(matrix, alphabet=None, namespace=None):
-    if namespace is None:
-        namespace = default_namespace(matrix.shape[0])
+def array2charmatrix(matrix, alphabet=None, taxa_index_map=None):
+    if taxa_index_map is None:
+        taxa_index_map = TaxaIndexMapping.default(matrix.shape[0])
     else:
-        assert len(namespace) == matrix.shape[0]
+        assert len(taxa_index_map) == matrix.shape[0], "Taxon-Index map does not match size of matrix."
+    
+    # TODO: add support for DNACharacterMatrix and others
     if alphabet is None:
+        # input the values in the matrix directly
         alphabet = dendropy.new_standard_state_alphabet(val for val in np.unique(matrix))
+        char_matrix = dendropy.StandardCharacterMatrix(default_state_alphabet=alphabet, taxon_namespace=taxa_index_map.taxon_namespace)
+        for taxon, ix in taxa_index_map.items():
+            char_matrix.new_sequence(taxon, [str(x) for x in matrix[ix, :]])
+    else:
+        # assume values in the matrix are indices into the alphabet
+        char_matrix = dendropy.StandardCharacterMatrix(default_state_alphabet=alphabet, taxon_namespace=taxa_index_map.taxon_namespace)
+        for taxon, ix in taxa_index_map.items():
+            char_matrix.new_sequence(taxon, [alphabet[v] for v in matrix[ix, :]])
 
-    str_matrix = matrix.astype('str') # there must be a faster way...
-    return dendropy.StandardCharacterMatrix.from_dict({taxon: str_matrix[i,:] for (i, taxon) in enumerate(namespace)}, default_state_alphabet=alphabet)
+    return char_matrix
 
-def array2distance_matrix(matrix, namespace=None):
+def array2distance_matrix(matrix, taxa_index_map=None):
     m, m2 = matrix.shape
     assert m == m2, "Distance matrix must be square"
-    if namespace is None:
-        namespace = default_namespace(m)
+    if taxa_index_map is None:
+        taxa_index_map = TaxaIndexMapping.default(m)
     else:
-        assert len(namespace) >= m, "Namespace too small for distance matrix"
+        assert len(taxa_index_map) == m, "Taxon-Index map does not match size of matrix."
 
     dict_form = defaultdict(dict)
-    for i in range(m):
-        for j in range(m):
-            dict_form[namespace[i]][namespace[j]] = matrix[i,j]
+    for row_taxon in taxa_index_map:
+        for column_taxon in taxa_index_map:
+            dict_form[row_taxon][column_taxon] = matrix[taxa_index_map.index2taxa(row_taxon), taxa_index_map.index2taxa(column_taxon)]
     dm = dendropy.calculate.phylogeneticdistance.PhylogeneticDistanceMatrix()
-    dm.compile_from_dict(dict_form, namespace)
+    dm.compile_from_dict(dict_form, taxa_index_map.taxon_namespace)
     return dm
 
 def distance_matrix2array(dm):
@@ -76,8 +92,8 @@ def distance_matrix2array(dm):
     This is patristic distance: adding the branch lengths. If we set branches to
     have different transitions, this won't be the paralinear distance
     """
-    taxa = list(dm.taxon_namespace)
-    return scipy.spatial.distance.squareform([dm.distance(taxon1, taxon2) for taxon1, taxon2 in combinations(taxa,2)])
+    taxa = list(dm.taxon_iter())
+    return scipy.spatial.distance.squareform([dm.distance(taxon1, taxon2) for taxon1, taxon2 in combinations(taxa,2)]), TaxaIndexMapping(dm.taxon_namespace, taxa)
 
 def tree2distance_matrix(tree):
     return distance_matrix2array(tree.phylogenetic_distance_matrix())
