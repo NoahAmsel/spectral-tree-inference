@@ -1,43 +1,102 @@
 from collections import defaultdict
+from collections.abc import Mapping
 from itertools import combinations
 import scipy.spatial.distance
 import numpy as np
 import dendropy
 
-from char_matrix import TaxaIndexMapping
+def default_namespace(num_taxa, prefix="T"):
+    return dendropy.TaxonNamespace([prefix+str(i) for i in range(1, num_taxa+1)])
 
-# Including these functions here for convenience
-from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
+class TaxaIndexMapping(Mapping):
+    def __init__(self, taxon_namespace, taxa_list):
+        # TODO: modify init so that it detects repeated values (even if it's specified as a taxon object one time and as a label the other) and throws an error
+        self._taxon_namespace = taxon_namespace
+        self._taxa_list = []
+        self._taxon2index = {}
+        for ix, taxon in enumerate(taxa_list):
+            taxon = self._convert_label(taxon)
+            if taxon in taxon_namespace:
+                self._taxon2index[taxon] = ix
+                self._taxon2index[taxon.label] = ix
+                # append one at a time to make sure labels have been converted to taxa first
+                self._taxa_list.append(taxon)
+            else:
+                # not in namespace, or wrong type
+                # TODO: throw a real error
+                assert False, "Each taxon must be included in the given taxon namespace."
 
-# OLD: will be removed TODO
-# def leaf(i, namespace, **kwargs):
-#     # for now, `i` will specify the taxon but in the future can make it more flexible
-#     assert 'taxon' not in kwargs
-#     kwargs['taxon'] = namespace[i]
-#     node = dendropy.Node(**kwargs)
-#     node.taxa_set = np.full(len(namespace), False)
-#     node.taxa_set[i] = True
-#     return node
+        self._taxa_list = np.array(self._taxa_list)
 
-def merge_children(children, **kwargs):
-    node = dendropy.Node(**kwargs)
-    for child in children:
-        node.add_child(child)
-    if all(hasattr(child,'taxa_set') for child in children):
-        node.taxa_set = np.logical_or.reduce(tuple(child.taxa_set for child in children))
-    return node
+    @classmethod
+    def whole_namespace(cls, namespace):
+        return cls(namespace, list(namespace))
 
-def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
-    for e in tree.edges():
-        if value is not None:
-            assert fun is None and uniform_range is None
-            e.length = value
-        elif fun is not None:
-            assert uniform_range is None
-            e.length = fun(e.length)
-        else:
-            assert uniform_range is not None
-            e.length = np.random.uniform(*uniform_range)
+    @classmethod
+    def default(cls, length):
+        return cls.whole_namespace(default_namespace(length))
+
+    @property
+    def taxon_namespace(self):
+        return self._taxon_namespace
+
+    def __getitem__(self, taxon):
+        return self._taxon2index[taxon]
+
+    def __iter__(self):
+        for taxon in self._taxa_list:
+            yield taxon
+
+    def __len__(self):
+        return len(self._taxa_list)
+
+    def _convert_label(self, taxon_or_label):
+        return self.taxon_namespace.get_taxon(taxon_or_label) if self.taxon_namespace.has_taxon_label(taxon_or_label) else taxon_or_label
+
+    def _convert_labels(self, taxa_or_labels):
+        return [self._convert_label(t_or_l) for t_or_l in taxa_or_labels]
+
+    def index2taxa(self, indexer):
+        return self._taxa_list[indexer]
+
+    def taxon2mask(self, taxon):
+        taxon = self._convert_label(taxon)
+        mask = np.zeros(len(self), dtype=bool)
+        mask[self[taxon]] = True
+        return mask
+
+    def taxa2mask(self, taxa):
+        taxa = self._convert_labels(taxa)
+        mask = np.zeros(len(self), dtype=bool)
+        mask[[self[taxon] for taxon in taxa]] = True
+        return mask
+
+    def taxa2bipartition(self, taxa):
+        taxa = self._convert_labels(taxa)
+        return self._taxon_namespace.taxa_bipartition(taxa=taxa)
+
+    def mask2bipartition(self, mask):
+        return self.taxa2bipartition(self.index2taxa(mask))
+
+    def leaf(self, taxon, **kwargs):
+        taxon = self._convert_label(taxon)
+        assert taxon in self, "Must supply taxon in the taxa map to produce a leaf."
+
+        kwargs['taxon'] = taxon
+        node = dendropy.Node(**kwargs)
+        node.mask = self.taxon2mask(taxon)
+        return node
+
+    def all_leaves(self, **kwargs):
+        return [self.leaf(taxon, **kwargs) for taxon in self]
+        
+    def __str__(self):
+        return str([taxon.label for taxon in self])
+
+    def __eq__(self, other):
+        isinstance(other, TaxaIndexMapping) and (
+            self.taxon_namespace == other.taxon_namespace) and (
+                self._taxa_list == other._taxa_list)
 
 def charmatrix2array(charmatrix):
     #charmatrix[taxon].values()
@@ -98,37 +157,73 @@ def distance_matrix2array(dm):
 def tree2distance_matrix(tree):
     return distance_matrix2array(tree.phylogenetic_distance_matrix())
 
+def merge_children(children, **kwargs):
+    node = dendropy.Node(**kwargs)
+    for child in children:
+        node.add_child(child)
+    if all(hasattr(child,'taxa_set') for child in children):
+        node.taxa_set = np.logical_or.reduce(tuple(child.taxa_set for child in children))
+    return node
+
+def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
+    for e in tree.edges():
+        if value is not None:
+            assert fun is None and uniform_range is None
+            e.length = value
+        elif fun is not None:
+            assert uniform_range is None
+            e.length = fun(e.length)
+        else:
+            assert uniform_range is not None
+            e.length = np.random.uniform(*uniform_range)
+
 ##########################################################
 ##               Tree Generation
 ##########################################################
 
-def balanced_binary(num_taxa, namespace=None, edge_length=1.):
-    assert num_taxa == 2**int(np.log2(num_taxa)), "The number of leaves in a balanced binary tree must be a power of 2."
-    if namespace is None:
-        namespace = default_namespace(num_taxa)
-    else:
-        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
+# Including these functions here for convenience
+from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
 
-    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
+def balanced_binary(num_taxa=None, taxa=None, edge_length=1.):
+    if taxa is None:
+        if num_taxa:
+            taxa = TaxaIndexMapping.default(num_taxa)
+        else:
+            assert False, "Must provide either the number of leaves or a TaxaIndexMapping"
+
+    if num_taxa:
+        assert num_taxa == len(taxa), "The number of leaves must match the number of taxa given."
+    else:
+        num_taxa = len(taxa)
+
+    assert num_taxa == 2**int(np.log2(num_taxa)), "The number of leaves in a balanced binary tree must be a power of 2."
+
+    nodes = taxa.all_leaves(edge_length=edge_length)
     while len(nodes) > 1:
         nodes = [merge_children(nodes[2*i : 2*i+2], edge_length=edge_length) for i in range(len(nodes)//2)]
 
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0], is_rooted=False)
+    return dendropy.Tree(taxon_namespace=taxa.taxon_namespace, seed_node=nodes[0], is_rooted=False)
 
-def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
-    # one node splits off at each step
-    if namespace is None:
-        namespace = default_namespace(num_taxa)
+def lopsided_tree(num_taxa, taxa=None, edge_length=1.):
+    """One node splits off at each step"""
+    if taxa is None:
+        if num_taxa:
+            taxa = TaxaIndexMapping.default(num_taxa)
+        else:
+            assert False, "Must provide either the number of leaves or a TaxaIndexMapping"
+
+    if num_taxa:
+        assert num_taxa == len(taxa), "The number of leaves must match the number of taxa given."
     else:
-        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
+        num_taxa = len(taxa)
 
-    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
+    nodes = taxa.all_leaves(edge_length=edge_length)
     while len(nodes) > 1:
         a = nodes.pop()
         b = nodes.pop()
         nodes.append(merge_children((a,b), edge_length=edge_length))
 
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0], is_rooted=False)
+    return dendropy.Tree(taxon_namespace=taxa.namespace, seed_node=nodes[0], is_rooted=False)
 
 def unrooted_birth_death_tree(num_taxa, namespace=None, birth_rate=0.5, death_rate = 0, **kwargs):
     if namespace == None:
