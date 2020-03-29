@@ -1,25 +1,34 @@
 from collections.abc import Mapping
+import numpy as np
 import dendropy
-import utils
+#import utils
 
 class TaxaIndexMapping(Mapping):
     def __init__(self, taxon_namespace, taxa_list):
+        # TODO: modify init so that it detects repeated values (even if it's specified as a taxon object one time and as a label the other) and throws an error
         self._taxon_namespace = taxon_namespace
-        self._taxa_list = np.array(taxa_list)
+        self._taxa_list = []
         self._taxon2index = {}
         for ix, taxon in enumerate(taxa_list):
-            assert taxon in taxon_namespace, "Each taxon must be included in the given taxon namespace."
-            self._taxon2index[taxon] = ix
+            taxon = self._convert_label(taxon)
+            if taxon in taxon_namespace:
+                self._taxon2index[taxon] = ix
+                self._taxon2index[taxon.label] = ix
+                # append one at a time to make sure labels have been converted to taxa first
+                self._taxa_list.append(taxon)
+            else:
+                # not in namespace, or wrong type
+                # TODO: throw a real error
+                assert False, "Each taxon must be included in the given taxon namespace."
 
+        self._taxa_list = np.array(self._taxa_list)
+                  
     @property
     def taxon_namespace(self):
         return self._taxon_namespace
 
-    def __getitem__(self, taxa_or_indexer):
-        if taxa_or_indexer in self.taxon_namespace:
-            return self._taxon2index[taxa_or_indexer]
-        else:
-            return self._taxa_list[taxa_or_indexer]
+    def __getitem__(self, taxon):
+        return self._taxon2index[taxon]
 
     def __iter__(self):
         for taxon in self._taxa_list:
@@ -28,14 +37,49 @@ class TaxaIndexMapping(Mapping):
     def __len__(self):
         return len(self._taxa_list)
 
-    def taxaset2mask(self, taxa_set):
+    def _convert_label(self, taxon_or_label):
+        return self.taxon_namespace.get_taxon(taxon_or_label) if self.taxon_namespace.has_taxon_label(taxon_or_label) else taxon_or_label
+
+    def _convert_labels(self, taxa_or_labels):
+        return [self._convert_label(t_or_l) for t_or_l in taxa_or_labels]
+
+    def index2taxa(self, indexer):
+        return self._taxa_list[indexer]
+
+    def taxon2mask(self, taxon):
+        taxon = self._convert_label(taxon)
         mask = np.zeros(len(self), dtype=bool)
-        mask[taxa_set] = True
+        mask[self[taxon]] = True
         return mask
 
-    def mask2bipartition(self, mask):
-        pass
+    def taxa2mask(self, taxa):
+        taxa = self._convert_labels(taxa)
+        mask = np.zeros(len(self), dtype=bool)
+        mask[[self[taxon] for taxon in taxa]] = True
+        return mask
 
+    def taxa2bipartition(self, taxa):
+        taxa = self._convert_labels(taxa)
+        return self._taxon_namespace.taxa_bipartition(taxa=taxa)
+
+    def mask2bipartition(self, mask):
+        return self.taxa2bipartition(self.index2taxa(mask))
+
+    def leaf(self, taxon, **kwargs):
+        taxon = self._convert_label(taxon)
+        assert taxon in self, "Must supply taxon in the taxa map to produce a leaf."
+
+        kwargs['taxon'] = taxon
+        node = dendropy.Node(**kwargs)
+        node.mask = self.taxon2mask(taxon)
+        return node
+        
+    def __str__(self):
+        return str([taxon.label for taxon in self])
+
+
+
+"""
 class FastCharacterMatrix(Mapping):
 
     def __getitem__(self, taxon):
@@ -49,18 +93,18 @@ class FastCharacterMatrix(Mapping):
     def __len__(self):
         return len(self.matrix)
 
-    """
-    def __setitem__(self, taxon, sequence):
-        assert len(sequence) == self.matrix.shape[1]
-        if taxon in self.taxon2index:
-            self.matrix[self.taxon2index[taxon], :] = sequence
-        else:
-            self.taxon2index[taxon] = len(self.matrix)
-            self.matrix = np.append(self.matrix, sequence.reshape(1,-1), axis=0)
+    #
+    # def __setitem__(self, taxon, sequence):
+    #    assert len(sequence) == self.matrix.shape[1]
+    #    if taxon in self.taxon2index:
+    #        self.matrix[self.taxon2index[taxon], :] = sequence
+    #    else:
+    #        self.taxon2index[taxon] = len(self.matrix)
+    #        self.matrix = np.append(self.matrix, sequence.reshape(1,-1), axis=0)
 
-    def __delitem__(self, taxon):
-        pass # TODO
-    """
+    #def __delitem__(self, taxon):
+    #    pass # TODO
+    # 
 
     def __init__(self, matrix, taxon_namespace=None, taxon2index=None, alphabet=None):
         self.matrix = matrix
@@ -146,3 +190,4 @@ if False:
     zz
     np.append(zz, np.ones(3).reshape(1,-1), axis=0)
     len(zz)
+"""
