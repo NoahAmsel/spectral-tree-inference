@@ -90,13 +90,24 @@ class TaxaIndexMapping(Mapping):
     def all_leaves(self, **kwargs):
         return [self.leaf(taxon, **kwargs) for taxon in self]
         
+    def reindex_matrix(self, matrix, old_taxa, axes=[0]):
+        assert False
+        assert self.equals_unordered(old_taxa), "Old and new taxa maps must have the same set of taxa."
+        new_matrix = np.zeros_like(matrix)
+        # how do we generalize this for different numbers of axes?
+
     def __str__(self):
         return str([taxon.label for taxon in self])
 
     def __eq__(self, other):
-        isinstance(other, TaxaIndexMapping) and (
+        return isinstance(other, TaxaIndexMapping) and (
             self.taxon_namespace == other.taxon_namespace) and (
-                self._taxa_list == other._taxa_list)
+                all(self._taxa_list == other._taxa_list))
+
+    def equals_unordered(self, other):
+        return isinstance(other, TaxaIndexMapping) and (
+            self.taxon_namespace == other.taxon_namespace) and (
+                set(self._taxa_list) == set(other._taxa_list))
 
 def charmatrix2array(charmatrix):
     #charmatrix[taxon].values()
@@ -151,8 +162,8 @@ def distance_matrix2array(dm):
     This is patristic distance: adding the branch lengths. If we set branches to
     have different transitions, this won't be the paralinear distance
     """
-    taxa = list(dm.taxon_iter())
-    return scipy.spatial.distance.squareform([dm.distance(taxon1, taxon2) for taxon1, taxon2 in combinations(taxa,2)]), TaxaIndexMapping(dm.taxon_namespace, taxa)
+    taxa = TaxaIndexMapping(dm.taxon_namespace, list(dm.taxon_iter()))
+    return scipy.spatial.distance.squareform([dm.distance(taxon1, taxon2) for taxon1, taxon2 in combinations(taxa,2)]), taxa
 
 def tree2distance_matrix(tree):
     return distance_matrix2array(tree.phylogenetic_distance_matrix())
@@ -219,8 +230,10 @@ def lopsided_tree(num_taxa, taxa=None, edge_length=1.):
 
     nodes = taxa.all_leaves(edge_length=edge_length)
     while len(nodes) > 1:
-        a = nodes.pop()
+        # maintain this order, because we want the order of the taxa when we
+        # iterate thru the leaves to be the same as specified in taxa argument
         b = nodes.pop()
+        a = nodes.pop()
         nodes.append(merge_children((a,b), edge_length=edge_length))
 
     return dendropy.Tree(taxon_namespace=taxa.taxon_namespace, seed_node=nodes[0], is_rooted=False)

@@ -1,9 +1,8 @@
-
 import unittest
 import numpy as np
 import dendropy
 
-import utils
+from spectraltree import utils
 
 
 class TestTaxaIndexMapping(unittest.TestCase):
@@ -40,8 +39,23 @@ class TestTaxaIndexMapping(unittest.TestCase):
         self.assertListEqual([taxon.label for taxon in utils.TaxaIndexMapping.default(4)], ["T1", "T2", "T3", "T4"])
 
 class TestConversionFunctions(unittest.TestCase):
+    def setUp(self):
+        self.namespace1 = dendropy.TaxonNamespace(["dog", "cat", "snake", "fish", "tree"])
+        self.taxa1 = utils.TaxaIndexMapping(self.namespace1, ["fish", "snake", "cat", "dog"])
+        self.dog = self.namespace1.get_taxon("dog")
+        self.snake = self.namespace1.get_taxon("snake")
+
     def test_charmatrix2array(self):
         pass
+
+    def test_distance_matrix2array(self):        
+        tree = utils.lopsided_tree(4, self.taxa1)
+        dm = tree.phylogenetic_distance_matrix()
+        distance_mat, matrix_taxa = utils.distance_matrix2array(dm)
+        self.assertTrue(matrix_taxa.equals_unordered(self.taxa1))
+        for taxon1 in self.taxa1:
+            for taxon2 in self.taxa1:
+                self.assertEqual(distance_mat[matrix_taxa[taxon1], matrix_taxa[taxon2]], dm.distance(taxon1, taxon2))
 
 if __name__ == "__main__":
     unittest.main()

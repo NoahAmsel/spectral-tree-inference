@@ -9,8 +9,7 @@ import scipy.spatial.distance
 from sklearn.decomposition import TruncatedSVD
 import dendropy     #should this library be independent of dendropy? is that even possible?
 from dendropy.interop import raxml
-import utils
-from character_matrix import FastCharacterMatrix
+from . import utils
 
 RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
 RECONSTRUCT_TREE__DIR_PATH = os.path.dirname(RECONSTRUCT_TREE_PATH)
