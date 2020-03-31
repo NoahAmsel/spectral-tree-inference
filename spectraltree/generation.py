@@ -4,6 +4,8 @@ import scipy.linalg
 import scipy.spatial.distance
 import dendropy
 
+from character_matrix import TaxaIndexMapping
+
 def nchoose2(n):
     return int(n*(n-1)/2)
 
@@ -77,7 +79,7 @@ class DiscreteTransition(Transition):
         return (redundant_samples*mask).sum(axis=0)
 
 class FixedDiscreteTransition(DiscreteTransition):
-    def __init__(self, pmatrix, stationary_freqs):
+    def __init__(self, stationary_freqs, pmatrix):
         assert pmatrix.shape[0] == pmatrix.shape[1] == len(stationary_freqs)
         assert np.all(pmatrix >= 0)
         super().__init__(stationary_freqs)
@@ -331,11 +333,14 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
     return char_matrix
 
 if __name__ == "__main__":
+    from utils import balanced_binary
+
     TT = np.array([[0.9, 0.1], [0.4, 0.6]])
-    my_trans = FixedDiscreteTransition(TT, np.array([0,1]))
+    my_trans = FixedDiscreteTransition(np.array([0,1]), TT)
     my_tree = balanced_binary(4)
-    my_tree.edges()[-1].seq_model = FixedDiscreteTransition(np.array([[1,0],[1,0]]), np.array([0,1]))
-    print(simulate_sequences(1000, my_tree, my_trans).mean(axis=1))
+    my_tree.edges()[-1].seq_model = FixedDiscreteTransition(np.array([0,1]), np.array([[1,0],[1,0]]))
+    matrix, taxa = simulate_sequences(1000, my_tree, my_trans, retain_sequences_on_tree=True)
+    print(matrix.mean(axis=1))
 
 
 if __name__ == "__main__":

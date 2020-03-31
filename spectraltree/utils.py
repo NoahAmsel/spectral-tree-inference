@@ -223,7 +223,7 @@ def lopsided_tree(num_taxa, taxa=None, edge_length=1.):
         b = nodes.pop()
         nodes.append(merge_children((a,b), edge_length=edge_length))
 
-    return dendropy.Tree(taxon_namespace=taxa.namespace, seed_node=nodes[0], is_rooted=False)
+    return dendropy.Tree(taxon_namespace=taxa.taxon_namespace, seed_node=nodes[0], is_rooted=False)
 
 def unrooted_birth_death_tree(num_taxa, namespace=None, birth_rate=0.5, death_rate = 0, **kwargs):
     if namespace == None:

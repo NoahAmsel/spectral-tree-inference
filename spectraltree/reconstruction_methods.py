@@ -139,9 +139,8 @@ class NeighborJoining(DistanceReconstructionMethod):
 class SpectralNeighborJoining(DistanceReconstructionMethod):
     def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
         return self.estimate_tree_topology(similarity_matrix, taxon_namespace)
-    #change to spectral_neighbor_joining
 
-    def estimate_tree_topology(self, similarity_matrix, taxon_namespace=None, scorer=svd2, scaler=1.0, bifurcating=False):
+    def estimate_tree_topology(self, similarity_matrix, taxon_namespace=None, scorer=full_sv2, scaler=1.0, bifurcating=False):
         m, m2 = similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         if taxon_namespace is None:
