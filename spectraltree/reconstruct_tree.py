@@ -153,6 +153,8 @@ def partition_taxa(v,similarity,num_gaps):
             if s2<smin:
                 partition_min = bool_bipartition
                 smin = s2
+        elif p_idx == 0: partition_min = v <= v_sort[0]
+        elif p_idx == m - 2: partition_min = v < v_sort[m-1]
     return partition_min   
     #max_idx = np.argmax(gaps)
     #threshold = (v_sort[max_idx]+v_sort[max_idx+1])/2
@@ -197,6 +199,7 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_names
     # find root of half 1
     bipartitions1 = T1.bipartition_edge_map
     min_ev2 = float("inf")
+    
     for bp in bipartitions1.keys():
         if bp.leafset_as_bitstring().find('0') == -1:
             continue
@@ -273,8 +276,8 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_names
     #     print("ERROR: ")
     #     print("size of data:", m)
     #     print("Half sizes:", sum([int(i) for i in bp_min.leafset_as_bitstring()]), sum([-1*int(i)+1 for i in bp_min.leafset_as_bitstring()]))
-
-    T1.reroot_at_edge(bipartitions1[bp_min])
+    if len(bipartitions1.keys()) > 1: 
+        T1.reroot_at_edge(bipartitions1[bp_min])
 
     # find root of half 2
     bipartitions2 = T2.bipartition_edge_map
@@ -352,7 +355,8 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_names
     #     print("ERROR: ")
     #     print("size of data:", m)
     #     print("Half sizes:", sum([int(i) for i in bp_min.leafset_as_bitstring()]), sum([-1*int(i)+1 for i in bp_min.leafset_as_bitstring()]))
-    T2.reroot_at_edge(bipartitions2[bp_min])
+    if len(bipartitions2.keys()) > 1: 
+        T2.reroot_at_edge(bipartitions2[bp_min])
         
     T.seed_node.set_child_nodes([T1.seed_node,T2.seed_node])
     #T.seed_node.add_child(T1.seed_node)
