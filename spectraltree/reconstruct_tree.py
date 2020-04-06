@@ -162,13 +162,17 @@ def partition_taxa(v,similarity,num_gaps):
     #return bool_bipartition
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
-def svd2(mat):
+def svd2(mat, normalized = True):
     if (mat.shape[0] == 1) | (mat.shape[1] == 1):
         return 0
     elif (mat.shape[0] == 2) | (mat.shape[1] == 2):
         return np.linalg.svd(mat,False,False)[1]
     else:
-        return SVD2_OBJ.fit(mat).singular_values_[1]
+        sigmas = SVD2_OBJ.fit(mat).singular_values_
+        if normalized:
+            return sigmas[1]**2/(sigmas[1]**2 + sigmas[0]**2)
+        else: 
+            return sigmas[1]
 
 def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_namespace=None):
     m, m2 = similarity_matrix.shape
