@@ -174,6 +174,106 @@ def svd2(mat, normalized = True):
         else: 
             return sigmas[1]
 
+
+def join_trees_with_spectral_root_finding_basic(similarity_matrix, T1, T2, taxon_namespace=None):
+    m, m2 = similarity_matrix.shape
+    assert m == m2, "Distance matrix must be square"
+    if taxon_namespace is None:
+        taxon_namespace = utils.default_namespace(m)
+    else:
+        assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
+    
+    T = dendropy.Tree(taxon_namespace=taxon_namespace)
+
+    # Extracting inecies from namespace    
+    T1_labels = [x.taxon.label for x in T1.leaf_nodes()]
+    T2_labels = [x.taxon.label for x in T2.leaf_nodes()]
+
+    half1_idx_bool = [x.label in T1_labels for x in taxon_namespace]
+    half1_idx = [i for i, x in enumerate(half1_idx_bool) if x]
+    half1_idx_array = np.array(half1_idx)
+    T1.is_rooted = True
+    
+    half2_idx_bool = [x.label in T2_labels for x in taxon_namespace]
+    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]
+    half2_idx_array = np.array(half2_idx)
+    T2.is_rooted = True
+    
+    # finding roots
+    
+    # find root of half 1
+    bipartitions1 = T1.bipartition_edge_map
+    min_ev2 = float("inf")
+    
+    for bp in bipartitions1.keys():
+        if bp.leafset_as_bitstring().find('0') == -1:
+            continue
+        # Slice similarity matrix of half2 + part of half1 VS the other part of half 1
+        bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+        h1_idx_A = half1_idx_array[bool_array]
+        h1_idx_B = half1_idx_array[~bool_array]
+    
+        A_h2_idx = list(np.concatenate([h1_idx_A, half2_idx_array]))
+        B_h2_idx = list(np.concatenate([h1_idx_B, half2_idx_array]))
+        
+        ## Case 1: Other is connected to A
+        sliced_sim_mat_try1_1 = similarity_matrix[h1_idx_A, ...]
+        sliced_sim_mat_try1_1 = sliced_sim_mat_try1_1[...,B_h2_idx]
+        score_try1_1 = svd2(sliced_sim_mat_try1_1)
+
+        sliced_sim_mat_try1_2 = similarity_matrix[A_h2_idx, ...]
+        sliced_sim_mat_try1_2 = sliced_sim_mat_try1_2[...,h1_idx_B]
+        score_try1_2 = svd2(sliced_sim_mat_try1_2)
+
+        score_try = np.max([score_try1_1,score_try1_2])
+        
+        if score_try <min_ev2:
+            min_ev2 = score_try
+            bp_min = bp
+
+    bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+    print("one - merging: ",sum(bool_array), " out of: ", len(bool_array))
+    if len(bipartitions1.keys()) > 1: 
+        T1.reroot_at_edge(bipartitions1[bp_min])
+
+    # find root of half 2
+    bipartitions2 = T2.bipartition_edge_map
+    min_ev2 = float("inf")
+    for bp in bipartitions2.keys():
+        if bp.leafset_as_bitstring().find('0') == -1:
+            continue
+        # Slice similarity matrix of half2 + part of half1 VS the other part of half 1
+        
+        bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+        h2_idx_A = half2_idx_array[bool_array]
+        h2_idx_B = half2_idx_array[~bool_array]
+
+        A_h1_idx = list(np.concatenate([h2_idx_A, half1_idx_array]))
+        B_h1_idx = list(np.concatenate([h2_idx_B, half1_idx_array]))
+        
+        sliced_sim_mat_try1_1 = similarity_matrix[h2_idx_A, ...]
+        sliced_sim_mat_try1_1 = sliced_sim_mat_try1_1[...,B_h1_idx]
+        score_try1_1 = svd2(sliced_sim_mat_try1_1)
+
+        sliced_sim_mat_try1_2 = similarity_matrix[A_h1_idx, ...]
+        sliced_sim_mat_try1_2 = sliced_sim_mat_try1_2[...,h2_idx_B]
+        score_try1_2 =svd2(sliced_sim_mat_try1_2)
+
+        score_try = np.max([score_try1_1,score_try1_2])
+
+        if score_try  <min_ev2:
+            min_ev2 = score_try
+            bp_min = bp
+    bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+    print("two -  merging: ",sum(bool_array), " out of: ", len(bool_array))
+    
+    if len(bipartitions2.keys()) > 1: 
+        T2.reroot_at_edge(bipartitions2[bp_min])
+        
+    T.seed_node.set_child_nodes([T1.seed_node,T2.seed_node])
+    return T
+
+
 def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_namespace=None):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
@@ -280,6 +380,8 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_names
     #     print("ERROR: ")
     #     print("size of data:", m)
     #     print("Half sizes:", sum([int(i) for i in bp_min.leafset_as_bitstring()]), sum([-1*int(i)+1 for i in bp_min.leafset_as_bitstring()]))
+    bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+    print("one - merging: ",sum(bool_array), " out of: ", len(bool_array))
     if len(bipartitions1.keys()) > 1: 
         T1.reroot_at_edge(bipartitions1[bp_min])
 
@@ -355,6 +457,9 @@ def join_trees_with_spectral_root_finding(similarity_matrix, T1, T2, taxon_names
         if np.min([score_try1, score_try2, score_try3]) <min_ev2:
             min_ev2 = np.min([score_try1, score_try2, score_try3])
             bp_min = bp
+    bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+    print("two -  merging: ",sum(bool_array), " out of: ", len(bool_array))
+        
     # if sum([int(i) for i in bp_min.leafset_as_bitstring()]) != len([int(i) for i in bp_min.leafset_as_bitstring()])/2:
     #     print("ERROR: ")
     #     print("size of data:", m)
@@ -776,6 +881,9 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                     cur_node = cur_node.parent
             elif sum(cur_node.bitmap) > threshhold:
                 L1,L2 = self.splitTaxa(cur_node,num_gaps)
+                print("partition")
+                print("L1 size: ", sum(L1))
+                print("L2 size: ", sum(L2))
                 cur_node.setLeft(MyNode(L1))
                 cur_node.setRight(MyNode(L2))
                 cur_node = cur_node.right
