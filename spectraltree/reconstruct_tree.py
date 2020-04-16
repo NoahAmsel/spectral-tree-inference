@@ -7,6 +7,7 @@ import os, sys
 import numpy as np
 import scipy.spatial.distance
 from sklearn.decomposition import TruncatedSVD
+from itertools import product
 import dendropy     #should this library be independent of dendropy? is that even possible?
 from dendropy.interop import raxml
 import utils
@@ -251,7 +252,7 @@ def join_trees_with_spectral_root_finding_basic(similarity_matrix, T1, T2, taxon
     # find root of half 1
     bipartitions1 = T1.bipartition_edge_map
     min_ev2 = float("inf")
-    
+    results = []
     for bp in bipartitions1.keys():
         if bp.leafset_as_bitstring().find('0') == -1:
             continue
@@ -273,7 +274,7 @@ def join_trees_with_spectral_root_finding_basic(similarity_matrix, T1, T2, taxon
         score_try1_2 = svd2(sliced_sim_mat_try1_2)
 
         score_try = np.max([score_try1_1,score_try1_2])
-        
+        results.append([sliced_sim_mat_try1_1.shape, score_try1_1,sliced_sim_mat_try1_2.shape,score_try1_2])
         if score_try <min_ev2:
             min_ev2 = score_try
             bp_min = bp
@@ -284,6 +285,7 @@ def join_trees_with_spectral_root_finding_basic(similarity_matrix, T1, T2, taxon
         T1.reroot_at_edge(bipartitions1[bp_min])
 
     # find root of half 2
+    results2 = []
     bipartitions2 = T2.bipartition_edge_map
     min_ev2 = float("inf")
     for bp in bipartitions2.keys():
@@ -307,7 +309,7 @@ def join_trees_with_spectral_root_finding_basic(similarity_matrix, T1, T2, taxon
         score_try1_2 =svd2(sliced_sim_mat_try1_2)
 
         score_try = np.max([score_try1_1,score_try1_2])
-
+        results2.append([sliced_sim_mat_try1_1.shape, score_try1_1,sliced_sim_mat_try1_2.shape,score_try1_2])
         if score_try  <min_ev2:
             min_ev2 = score_try
             bp_min = bp
@@ -964,7 +966,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         cur_namespace = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]])  
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
-        return join_trees_with_spectral_root_finding(cur_similarity, node.left.tree, node.right.tree, taxon_namespace=cur_namespace)
+        return join_trees_with_spectral_root_finding_basic(cur_similarity, node.left.tree, node.right.tree, taxon_namespace=cur_namespace)
     
     def reconstruct_alg_wrapper(self, node, **kargs):
         namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
