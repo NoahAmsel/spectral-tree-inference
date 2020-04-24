@@ -283,7 +283,8 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_na
         alpha = np.linalg.lstsq(O_AB,S_11_AB,rcond=None)
 
         #normalize by number of elements
-        score = alpha[1]/S_11_AB.shape[0]
+        #score = alpha[1]/S_11_AB.shape[0]
+        score = alpha[1]/(np.linalg.norm(S_11_AB)**2)
         results.append([sum(bool_array),sum(~bool_array), score])
         if score <min_score:
             min_score = score
@@ -322,7 +323,8 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_na
         alpha = np.linalg.lstsq(O_AB,S_22_AB,rcond=None)
 
         #normalize by number of elements
-        score = alpha[1]/S_22_AB.shape[0]
+        #score = alpha[1]/S_22_AB.shape[0]
+        score = alpha[1]/(np.linalg.norm(S_22_AB)**2)
         results2.append([sum(bool_array),sum(~bool_array), score])
         if score <min_score:
             min_score = score
