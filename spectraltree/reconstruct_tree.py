@@ -210,7 +210,7 @@ def partition_taxa(v,similarity,num_gaps):
     #return bool_bipartition
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
-def svd2(mat, normalized = True):
+def svd2(mat, normalized = False):
     if (mat.shape[0] == 1) | (mat.shape[1] == 1):
         return 0
     elif (mat.shape[0] == 2) | (mat.shape[1] == 2):
@@ -222,6 +222,122 @@ def svd2(mat, normalized = True):
         else: 
             return sigmas[1]
 
+def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_namespace=None):
+    m, m2 = similarity_matrix.shape
+    assert m == m2, "Distance matrix must be square"
+    if taxon_namespace is None:
+        taxon_namespace = utils.default_namespace(m)
+    else:
+        assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
+    
+    T = dendropy.Tree(taxon_namespace=taxon_namespace)
+
+    # Extracting inecies from namespace    
+    T1_labels = [x.taxon.label for x in T1.leaf_nodes()]
+    T2_labels = [x.taxon.label for x in T2.leaf_nodes()]
+
+    half1_idx_bool = [x.label in T1_labels for x in taxon_namespace]
+    half1_idx = [i for i, x in enumerate(half1_idx_bool) if x]
+    half1_idx_array = np.array(half1_idx)
+    T1.is_rooted = True
+    
+    half2_idx_bool = [x.label in T2_labels for x in taxon_namespace]
+    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]
+    half2_idx_array = np.array(half2_idx)
+    T2.is_rooted = True
+    
+    # Get sbmatrix of siilarities between nodes in subset 1 
+    S_11 = similarity_matrix[half1_idx,:]
+    S_11 = S_11[:,half1_idx]
+    # Get sbmatrix of siilarities between nodes in subset 2
+    S_22 = similarity_matrix[half2_idx,:]
+    S_22 = S_22[:,half2_idx]
+    # Get sbmatrix of cross similarities between nodes in subsets 1 and 2
+    S_12 = similarity_matrix[half1_idx,:]
+    S_12 = S_12[:,half2_idx]
+    [u_12,s,v_12] = np.linalg.svd(S_12)
+    O = np.outer(u_12[:,0],u_12[:,0])
+    
+    # find root of half 1
+    bipartitions1 = T1.bipartition_edge_map
+    min_score = float("inf")
+    results = []
+    for bp in bipartitions1.keys():
+        bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+        h1_idx_A = half1_idx_array[bool_array]
+        h1_idx_B = half1_idx_array[~bool_array]
+        
+        # submatrix of similarities betweeb potential subgroups of 1:
+        S_11_AB = S_11[bool_array,:]
+        S_11_AB = S_11_AB[:,~bool_array]
+
+        #submatrix of outer product
+        O_AB = O[bool_array,:]
+        O_AB = O_AB[:,~bool_array]
+
+        # flattern submatrices
+        S_11_AB = np.reshape(S_11_AB,(-1,1))        
+        O_AB = np.reshape(O_AB,(-1,1))
+
+        #estimate least sqare error               
+        alpha = np.linalg.lstsq(O_AB,S_11_AB,rcond=None)
+
+        #normalize by number of elements
+        score = alpha[1]/S_11_AB.shape[0]
+        results.append([sum(bool_array),sum(~bool_array), score])
+        if score <min_score:
+            min_score = score
+            bp_min = bp
+
+    bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+    print("one - merging: ",sum(bool_array), " out of: ", len(bool_array))
+    if len(bipartitions1.keys()) > 1: 
+        T1.reroot_at_edge(bipartitions1[bp_min])
+
+    # find root of half 2
+    #[u_12,s,v_12] = np.linalg.svd(S_12.T)
+    O = np.outer(v_12[0,:],v_12[0,:])
+    #O = np.outer(v_12[:,0],v_12[:,0])
+    bipartitions2 = T2.bipartition_edge_map
+    min_score = float("inf")
+    results2 = []
+    for bp in bipartitions2.keys():
+        bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+        h2_idx_A = half2_idx_array[bool_array]
+        h2_idx_B = half2_idx_array[~bool_array]
+        
+        # submatrix of similarities betweeb potential subgroups of 1:
+        S_22_AB = S_22[bool_array,:]
+        S_22_AB = S_22_AB[:,~bool_array]
+
+        #submatrix of outer product
+        O_AB = O[bool_array,:]
+        O_AB = O_AB[:,~bool_array]
+
+        # flattern submatrices
+        S_22_AB = np.reshape(S_22_AB,(-1,1))        
+        O_AB = np.reshape(O_AB,(-1,1))
+
+        #estimate least sqare error               
+        alpha = np.linalg.lstsq(O_AB,S_22_AB,rcond=None)
+
+        #normalize by number of elements
+        score = alpha[1]/S_22_AB.shape[0]
+        results2.append([sum(bool_array),sum(~bool_array), score])
+        if score <min_score:
+            min_score = score
+            bp_min = bp
+
+    bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+    print("one - merging: ",sum(bool_array), " out of: ", len(bool_array))
+    if len(bipartitions2.keys()) > 1: 
+        T2.reroot_at_edge(bipartitions2[bp_min])
+
+    T.seed_node.set_child_nodes([T1.seed_node,T2.seed_node])
+    return T
+
+
+    
 
 def join_trees_with_spectral_root_finding_basic(similarity_matrix, T1, T2, taxon_namespace=None):
     m, m2 = similarity_matrix.shape
@@ -966,7 +1082,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         cur_namespace = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]])  
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
-        return join_trees_with_spectral_root_finding_basic(cur_similarity, node.left.tree, node.right.tree, taxon_namespace=cur_namespace)
+        return join_trees_with_spectral_root_finding_ls(cur_similarity, node.left.tree, node.right.tree, taxon_namespace=cur_namespace)
     
     def reconstruct_alg_wrapper(self, node, **kargs):
         namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
