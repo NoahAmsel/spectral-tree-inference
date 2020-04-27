@@ -93,6 +93,7 @@ def HKY_similarity_matrix(observations, classes=None, verbose = False):
 
     if verbose: print("Computing the average base frequency for each pair of sequences...")
     g = {}
+    
     for x in classes:
         obs_x = observations == x
         g[x] = np.array([np.mean(np.hstack([a, b])) for a, b in product(obs_x, repeat = 2)]).reshape((m, m))
@@ -102,18 +103,23 @@ def HKY_similarity_matrix(observations, classes=None, verbose = False):
     
     # compute transition and transversion proportion
     if verbose: print("Computing transition and transversion proportion for each pair of sequences...")
-    P = {}
-    for i, x in enumerate(classes):
-        other_classes = np.delete(classes, i)
-        for y in other_classes:
-            P_x_y = np.array([np.mean(np.logical_and(a == x, b == y)) for a, b in product(observations, repeat = 2)]).reshape((m, m))
-            P[x + y] = P_x_y
-            
-    P_1 = P['AG'] + P["GA"]
-    P_2 = P['CT'] + P['TC']
-    Q = P['AC'] + P['CA'] + P['AT'] + P['TA'] +\
-        P['GC'] + P['CG'] + P['GT'] + P['TG']
-
+        
+    P_1 = np.zeros((m,m))
+    P_2 = np.zeros((m,m))
+    Q = np.zeros((m,m))
+    
+    for i in range(m):
+        for j in range(i + 1, m):
+            a = observations[i,:]
+            b = observations[j,:]
+            A_G = np.mean(np.logical_and(a == "A", b == "G") + np.logical_and(a == "G", b == "A"))
+            P_1[i, j] = P_1[j, i] = A_G
+            C_T = np.mean(np.logical_and(a == "C", b == "T") + np.logical_and(a == "T", b == "C"))
+            P_2[i, j] = P_2[j, i] = C_T
+            a_is_AG = np.isin(a, ["A", "G"])
+            b_is_AG = np.isin(b, ["A", "G"])
+            Q[i, j] = Q[j, i] = np.mean(np.logical_xor(a_is_AG, b_is_AG))
+                        
     # compute the similarity (formula 7)
     if verbose: print("Computing similarity matrix")
     R = (1 - g["R"]/(2 * g["A"] * g["G"]) * P_1 - 1 / (2 * g["R"]) * Q)
