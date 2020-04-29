@@ -178,32 +178,38 @@ def estimate_tree_topology(similarity_matrix, taxon_namespace=None, scorer=sv2, 
     # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
     return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
 
-
-
-
 def raxml_reconstruct():
     pass
 
-def partition_taxa(v,similarity,num_gaps):
+def partition_taxa(v,similarity,num_gaps,min_split):
     m = len(v)
     #idx_vec = 
+
     v_sort = np.sort(v)
-    gaps = v_sort[1:m]-v_sort[0:m-1]
-    ind_partition = np.argpartition(gaps, -num_gaps)[-num_gaps:]
-    smin = 1000
-    for p_idx in ind_partition:        
-        threshold = (v_sort[p_idx]+v_sort[p_idx+1])/2
-        if (p_idx>0) & (p_idx<m-2):
-            bool_bipartition = v<threshold
-            s_sliced = similarity[bool_bipartition,:]
-            s_sliced = s_sliced[:,~bool_bipartition]
-            s2 = svd2(s_sliced)
-            if s2<smin:
-                partition_min = bool_bipartition
-                smin = s2
-        elif p_idx == 0: partition_min = v <= v_sort[0]
-        elif p_idx == m - 2: partition_min = v < v_sort[m-1]
-    return partition_min   
+    gaps = v_sort[1:m]-v_sort[0:m-1]    
+    sort_idx = np.argsort(gaps)
+    flag = 0
+    p_idx = 1
+    while flag==0:        
+        #ind_partition = np.argpartition(gaps, -num_gaps)[-num_gaps:]
+        #smin = 1000
+        #for p_idx in ind_partition:                
+        threshold = (v_sort[sort_idx[-p_idx]]+v_sort[sort_idx[-p_idx]+1])/2
+        bool_bipartition = v<threshold
+        if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))>min_split:
+            flag = 1
+        else:
+            p_idx = p_idx+1
+        #if (p_idx>0) & (p_idx<m-2):            
+        #    s_sliced = similarity[bool_bipartition,:]
+        #    s_sliced = s_sliced[:,~bool_bipartition]
+        #    s2 = svd2(s_sliced)
+        #    if s2<smin:
+        #        partition_min = bool_bipartition
+        #        smin = s2
+        #elif p_idx == 0: partition_min = v <= v_sort[0]
+        #elif p_idx == m - 2: partition_min = v < v_sort[m-1]
+    return bool_bipartition   
     #max_idx = np.argmax(gaps)
     #threshold = (v_sort[max_idx]+v_sort[max_idx+1])/2
     #bool_bipartition = v<threshold
@@ -280,17 +286,21 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_na
         O_AB = np.reshape(O_AB,(-1,1))
 
         #estimate least sqare error               
-        alpha = np.linalg.lstsq(O_AB,S_11_AB,rcond=None)
-
+        O_AB_n = O_AB/np.linalg.norm(O_AB)
+        S_11_AB_n = S_11_AB/np.linalg.norm(S_11_AB)
+        #alpha = np.linalg.lstsq(O_AB,S_11_AB,rcond=None)
+        score = 1-np.matmul(S_11_AB_n.T,O_AB_n)
         #normalize by number of elements
         #score = alpha[1]/S_11_AB.shape[0]
-        score = alpha[1]/(np.linalg.norm(S_11_AB)**2)
+        #score = alpha[1]/(np.linalg.norm(S_11_AB)**2)
         results.append([sum(bool_array),sum(~bool_array), score])
         if score <min_score:
             min_score = score
             bp_min = bp
 
     bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+    if sum(bool_array)==1:
+        print('one')
     print("one - merging: ",sum(bool_array), " out of: ", len(bool_array))
     if len(bipartitions1.keys()) > 1: 
         T1.reroot_at_edge(bipartitions1[bp_min])
@@ -320,26 +330,29 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_na
         O_AB = np.reshape(O_AB,(-1,1))
 
         #estimate least sqare error               
-        alpha = np.linalg.lstsq(O_AB,S_22_AB,rcond=None)
+        O_AB_n = O_AB/np.linalg.norm(O_AB)
+        S_22_AB_n = S_22_AB/np.linalg.norm(S_22_AB)
+
+        #alpha = np.linalg.lstsq(O_AB,S_22_AB,rcond=None)
 
         #normalize by number of elements
         #score = alpha[1]/S_22_AB.shape[0]
-        score = alpha[1]/(np.linalg.norm(S_22_AB)**2)
+        #score = alpha[1]/(np.linalg.norm(S_22_AB)**2)
+        score = 1-np.matmul(S_22_AB_n.T,O_AB_n)
         results2.append([sum(bool_array),sum(~bool_array), score])
         if score <min_score:
             min_score = score
             bp_min = bp
 
     bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+    if sum(bool_array)==1:
+        print('one')
     print("one - merging: ",sum(bool_array), " out of: ", len(bool_array))
     if len(bipartitions2.keys()) > 1: 
         T2.reroot_at_edge(bipartitions2[bp_min])
 
     T.seed_node.set_child_nodes([T1.seed_node,T2.seed_node])
     return T
-
-
-    
 
 def join_trees_with_spectral_root_finding_basic(similarity_matrix, T1, T2, taxon_namespace=None):
     m, m2 = similarity_matrix.shape
@@ -1024,7 +1037,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def __repr__():
         return "spectralTree"
 
-    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, **kargs):
+    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,**kargs):
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
@@ -1047,7 +1060,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                 else:
                     cur_node = cur_node.parent
             elif sum(cur_node.bitmap) > threshhold:
-                L1,L2 = self.splitTaxa(cur_node,num_gaps)
+                L1,L2 = self.splitTaxa(cur_node,num_gaps,min_split)
                 print("partition")
                 print("L1 size: ", sum(L1))
                 print("L2 size: ", sum(L2))
@@ -1065,11 +1078,11 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         partitioning_tree.root.tree.taxon_namespace = self.taxon_namespace
         return partitioning_tree.root.tree
         
-    def splitTaxa(self,node,num_gaps):
+    def splitTaxa(self,node,num_gaps,min_split):
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
         [D,V] = np.linalg.eigh(cur_similarity)
-        bool_bipartition = partition_taxa(V[:,-2],cur_similarity,num_gaps)
+        bool_bipartition = partition_taxa(V[:,-2],cur_similarity,num_gaps,min_split)
         
         #Building partitioning bitmaps from partial bitmaps
         ll = np.array([i for i, x in enumerate(node.bitmap) if x])
