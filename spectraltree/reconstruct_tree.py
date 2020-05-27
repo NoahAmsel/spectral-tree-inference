@@ -307,8 +307,7 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     T1.is_rooted = True
     
     half2_idx_bool = [x.label in T2_labels for x in taxon_namespace]
-    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]
-    half2_idx_array = np.array(half2_idx)
+    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]    
     T2.is_rooted = True
     
     # Get sbmatrix of siilarities between nodes in subset 1 
@@ -327,12 +326,16 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     bipartitions1 = T1.bipartition_edge_map
     min_score = float("inf")
     results = []
+    results = {'sizeA': [], 'sizeB': [], 'score': []}
     for bp in bipartitions1.keys():
         bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
 
         score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O,merge_method)
         
-        results.append([sum(bool_array),sum(~bool_array), score])
+        results['sizeA'].append(sum(bool_array))
+        results['sizeB'].append(sum(~bool_array))
+        results['score'].append(score)
+        #results.append([sum(bool_array),sum(~bool_array), score])
         if score <min_score:
             min_score = score
             bp_min = bp
@@ -974,6 +977,8 @@ class DistanceReconstructionMethod(ReconstructionMethod):
         self.similarity_metric = similarity_metric
 
     def __call__(self, sequences, taxon_namespace=None):
+        if isinstance(sequences, FastCharacterMatrix):
+            sequences = sequences.to_array()
         similarity_matrix = self.similarity_metric(sequences)
         return self.reconstruct_from_similarity(similarity_matrix, taxon_namespace)
 
