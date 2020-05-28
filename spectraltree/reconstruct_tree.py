@@ -64,6 +64,9 @@ def JC_similarity_matrix(observations, classes=None):
     assert classes is None
     if classes is None:
         classes = np.unique(observations)
+    if classes.dtype == np.dtype('<U1'):
+        vord = np.vectorize(ord)
+        observations = vord(observations)
     k = len(classes)
     hamming_matrix = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(observations, metric='hamming'))
     inside_log = 1 - hamming_matrix*k/(k-1)
@@ -125,9 +128,9 @@ def HKY_similarity_matrix(observations, classes=None, verbose = False):
     R = (1 - g["R"]/(2 * g["A"] * g["G"]) * P_1 - 1 / (2 * g["R"]) * Q)
     Y = (1 - g["Y"]/(2 * g["T"] * g["C"]) * P_2 - 1 / (2 * g["Y"]) * Q)
     T = (1 - 1/(2 * g["R"] * g["Y"]) * Q)
-    S = np.sign(R) * (np.abs(R))**(2 * g["A"] * g["G"] / g["R"])
-    S += np.sign(Y) * (np.abs(Y))**(2 * g["T"] * g["C"] / g["Y"])
-    S += np.sign(T) * (np.abs(T))**(2 * (g["R"] * g["Y"] - g["A"] * g["G"] * g["Y"] / g["R"] - g["T"] * g["C"] * g["R"] / g["Y"]))
+    S = np.sign(R) * (np.abs(R))**(8 * g["A"] * g["G"] / g["R"])
+    S *= np.sign(Y) * (np.abs(Y))**(8 * g["T"] * g["C"] / g["Y"])
+    S *= np.sign(T) * (np.abs(T))**(8 * (g["R"] * g["Y"] - g["A"] * g["G"] * g["Y"] / g["R"] - g["T"] * g["C"] * g["R"] / g["Y"]))
 
     return S
 
