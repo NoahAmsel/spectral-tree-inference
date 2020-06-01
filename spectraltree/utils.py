@@ -72,6 +72,9 @@ class TaxaIndexMapping(Mapping):
         return mask
 
     def taxa2bipartition(self, taxa):
+        """
+        taxa is list of taxon objects or labels
+        """
         taxa = self._convert_labels(taxa)
         return self._taxon_namespace.taxa_bipartition(taxa=taxa)
 
