@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+import numpy as np
 import dendropy
 import utils
 
@@ -83,6 +84,13 @@ class FastCharacterMatrix(Mapping):
             char_matrix.new_sequence(taxon, [alphabet[v] for v in sequence] if alphabet else [str(x) for x in sequence])
 
         return char_matrix
+    def to_array(self):
+        if isinstance(self.matrix, np.ndarray):
+            return self.matrix
+        matrix_array = list()
+        for t in self.matrix.taxon_namespace:
+            matrix_array.append([x.symbol for x in self.matrix[t]])
+        return np.array(matrix_array)
 
 
 import numpy as np

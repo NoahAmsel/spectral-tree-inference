@@ -64,6 +64,9 @@ def JC_similarity_matrix(observations, classes=None):
     assert classes is None
     if classes is None:
         classes = np.unique(observations)
+    if classes.dtype == np.dtype('<U1'):
+        vord = np.vectorize(ord)
+        observations = vord(observations)
     k = len(classes)
     hamming_matrix = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(observations, metric='hamming'))
     inside_log = 1 - hamming_matrix*k/(k-1)
@@ -301,7 +304,61 @@ def svd2(mat, normalized = False):
         else: 
             return sigmas[1]
 
-def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_namespace=None):
+def compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma):
+
+    # set indices
+    S_AB = S_11[bool_array,:]
+    S_AB = S_AB[:,~bool_array]
+    S_A2 = S_12[bool_array,:]
+    S_B2 = S_12[~bool_array,:]
+    u_A = u_12[bool_array]
+    u_B = u_12[~bool_array]
+
+    m = len(u_A)*len(u_B)*len(v_12)
+    U_T = np.zeros((m,1))
+    S_T = np.zeros((m,1))
+    
+    ctr = 0
+    for i in range(len(u_A)):
+        for j in range(len(u_B)):
+            for k in range(len(v_12)):
+                U_T[ctr] = u_A[i]*u_B[j]*v_12[k]
+                S_T[ctr] = S_AB[i,j]*S_A2[i,k]*S_B2[j,k]
+                ctr = ctr+1
+
+    alpha_square = np.linalg.lstsq( (U_T*sigma)**2,S_T)
+    return alpha_square[0]
+                
+def compute_merge_score(bool_array,S_11,S_12,u_12,sigma_12,v_12,O,merge_method):
+
+    # submatrix of similarities betweeb potential subgroups of 1:
+    S_11_AB = S_11[bool_array,:]
+    S_11_AB = S_11_AB[:,~bool_array]
+
+    #submatrix of outer product
+    O_AB = O[bool_array,:]
+    O_AB = O_AB[:,~bool_array]
+
+    # flattern submatrices
+    S_11_AB = np.reshape(S_11_AB,(-1,1))        
+    O_AB = np.reshape(O_AB,(-1,1))
+
+    if merge_method=='least_square':
+        # merge_method 0 is least square alpha        
+        alpha = np.linalg.lstsq(O_AB,S_11_AB,rcond=None)
+        score = alpha[1]/(np.linalg.norm(S_11_AB)**2)
+    if merge_method=='angle':
+        # merge_method 1 is angle between        
+        O_AB_n = O_AB/np.linalg.norm(O_AB)
+        S_11_AB_n = S_11_AB/np.linalg.norm(S_11_AB)        
+        score = 1-np.matmul(S_11_AB_n.T,O_AB_n)
+    if merge_method=='tensor':
+        # merge method 2 is tensor method
+        alpha_square = compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma_12)
+        score = np.linalg.norm(S_11_AB-alpha_square*O_AB)/np.linalg.norm(S_11_AB)
+    return score
+
+def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_method,taxon_namespace=None):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
     if taxon_namespace is None:
@@ -316,13 +373,11 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_na
     T2_labels = [x.taxon.label for x in T2.leaf_nodes()]
 
     half1_idx_bool = [x.label in T1_labels for x in taxon_namespace]
-    half1_idx = [i for i, x in enumerate(half1_idx_bool) if x]
-    half1_idx_array = np.array(half1_idx)
+    half1_idx = [i for i, x in enumerate(half1_idx_bool) if x]    
     T1.is_rooted = True
     
     half2_idx_bool = [x.label in T2_labels for x in taxon_namespace]
-    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]
-    half2_idx_array = np.array(half2_idx)
+    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]    
     T2.is_rooted = True
     
     # Get sbmatrix of siilarities between nodes in subset 1 
@@ -334,39 +389,23 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_na
     # Get sbmatrix of cross similarities between nodes in subsets 1 and 2
     S_12 = similarity_matrix[half1_idx,:]
     S_12 = S_12[:,half2_idx]
-    [u_12,s,v_12] = np.linalg.svd(S_12)
+    [u_12,sigma_12,v_12] = np.linalg.svd(S_12)
     O = np.outer(u_12[:,0],u_12[:,0])
     
     # find root of half 1
     bipartitions1 = T1.bipartition_edge_map
     min_score = float("inf")
     results = []
+    results = {'sizeA': [], 'sizeB': [], 'score': []}
     for bp in bipartitions1.keys():
         bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
-        h1_idx_A = half1_idx_array[bool_array]
-        h1_idx_B = half1_idx_array[~bool_array]
+
+        score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O,merge_method)
         
-        # submatrix of similarities betweeb potential subgroups of 1:
-        S_11_AB = S_11[bool_array,:]
-        S_11_AB = S_11_AB[:,~bool_array]
-
-        #submatrix of outer product
-        O_AB = O[bool_array,:]
-        O_AB = O_AB[:,~bool_array]
-
-        # flattern submatrices
-        S_11_AB = np.reshape(S_11_AB,(-1,1))        
-        O_AB = np.reshape(O_AB,(-1,1))
-
-        #estimate least sqare error               
-        O_AB_n = O_AB/np.linalg.norm(O_AB) # angle option
-        S_11_AB_n = S_11_AB/np.linalg.norm(S_11_AB) # angle option
-        #alpha = np.linalg.lstsq(O_AB,S_11_AB,rcond=None) # lstsq option
-        score = 1-np.matmul(S_11_AB_n.T,O_AB_n) # angle option
-        #normalize by number of elements
-        #score = alpha[1]/S_11_AB.shape[0]
-        #score = alpha[1]/(np.linalg.norm(S_11_AB)**2) # lstsq option
-        results.append([sum(bool_array),sum(~bool_array), score])
+        results['sizeA'].append(sum(bool_array))
+        results['sizeB'].append(sum(~bool_array))
+        results['score'].append(score)
+        #results.append([sum(bool_array),sum(~bool_array), score])
         if score <min_score:
             min_score = score
             bp_min = bp
@@ -387,31 +426,11 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, taxon_na
     results2 = []
     for bp in bipartitions2.keys():
         bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
-        h2_idx_A = half2_idx_array[bool_array]
-        h2_idx_B = half2_idx_array[~bool_array]
+        #h2_idx_A = half2_idx_array[bool_array]
+        #h2_idx_B = half2_idx_array[~bool_array]
         
-        # submatrix of similarities betweeb potential subgroups of 1:
-        S_22_AB = S_22[bool_array,:]
-        S_22_AB = S_22_AB[:,~bool_array]
-
-        #submatrix of outer product
-        O_AB = O[bool_array,:]
-        O_AB = O_AB[:,~bool_array]
-
-        # flattern submatrices
-        S_22_AB = np.reshape(S_22_AB,(-1,1))        
-        O_AB = np.reshape(O_AB,(-1,1))
-
-        #estimate least sqare error               
-        O_AB_n = O_AB/np.linalg.norm(O_AB)
-        S_22_AB_n = S_22_AB/np.linalg.norm(S_22_AB)
-
-        #alpha = np.linalg.lstsq(O_AB,S_22_AB,rcond=None) # lstsq option
-
-        #normalize by number of elements
-        #score = alpha[1]/S_22_AB.shape[0]
-        #score = alpha[1]/(np.linalg.norm(S_22_AB)**2) # lstsq option
-        score = 1-np.matmul(S_22_AB_n.T,O_AB_n)
+        score = compute_merge_score(bool_array,S_22,S_12.T,v_12[0,:],sigma_12[0],u_12[:,0],O,merge_method)
+        
         results2.append([sum(bool_array),sum(~bool_array), score])
         if score <min_score:
             min_score = score
@@ -1028,6 +1047,8 @@ class DistanceReconstructionMethod(ReconstructionMethod):
         self.similarity_metric = similarity_metric
 
     def __call__(self, sequences, taxon_namespace=None):
+        if isinstance(sequences, FastCharacterMatrix):
+            sequences = sequences.to_array()
         similarity_matrix = self.similarity_metric(sequences)
         return self.reconstruct_from_similarity(similarity_matrix, taxon_namespace)
 
@@ -1110,7 +1131,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def __repr__():
         return "spectralTree"
 
-    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,**kargs):
+    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = 0,**kargs):
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
@@ -1125,7 +1146,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         cur_node = partitioning_tree.root
         while True:
             if (cur_node.right != None) and (cur_node.right.tree !=None) and (cur_node.left.tree != None):
-                cur_node.tree = self.margeTreesLeftRight(cur_node)
+                cur_node.tree = self.margeTreesLeftRight(cur_node,merge_method)
                 if cur_node.parent == None:
                     break
                 if cur_node.parent.right == cur_node:
@@ -1166,11 +1187,11 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         bitmap2 = [True if i in ll2 else False for i in range(len(self.taxon_namespace))]
         return bitmap1, bitmap2
 
-    def margeTreesLeftRight(self, node):
+    def margeTreesLeftRight(self, node,merge_method):
         cur_namespace = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]])  
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
-        return join_trees_with_spectral_root_finding_ls(cur_similarity, node.left.tree, node.right.tree, taxon_namespace=cur_namespace)
+        return join_trees_with_spectral_root_finding_ls(cur_similarity, node.left.tree, node.right.tree, merge_method,taxon_namespace=cur_namespace)
     
     def reconstruct_alg_wrapper(self, node, **kargs):
         namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 

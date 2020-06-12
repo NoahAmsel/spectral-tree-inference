@@ -20,6 +20,54 @@ from dendropy.interop import raxml
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 
+
+num_taxa = 16
+N = 1000
+reference_tree = utils.balanced_binary(num_taxa)
+reference_tree.print_plot()
+
+data = simulate_discrete_chars(N, reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
+raxml = reconstruct_tree.RAxML()
+tree = raxml(data)
+
+tree.print_plot()
+
+print("")
+print("Data in DNAcharacterMatrix:")
+print("symmetric_difference: ",symmetric_difference(reference_tree, tree))
+RF,F1 = reconstruct_tree.compare_trees(reference_tree, tree)
+print("raxml: ")
+print("RF = ",RF)
+print("F1% = ",F1)
+print("")
+
+
+###########################################################################
+##                   TEST WITH NUMPY DATA
+###########################################################################
+
+jc = generation.Jukes_Cantor()
+mutation_rate = [jc.p2t(0.95)]
+
+observations = generation.simulate_sequences_ordered(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate)
+
+raxml = reconstruct_tree.RAxML()
+tree = raxml(data)
+print("")
+print("Data in numpy array:")
+print("symmetric_difference: ",symmetric_difference(reference_tree, tree))
+RF,F1 = reconstruct_tree.compare_trees(reference_tree, tree)
+print("raxml: ")
+print("RF = ",RF)
+print("F1% = ",F1)
+print("")
+
+
+###########################################################################
+##                   TEST WITHOUT CLASS
+###########################################################################
+from dendropy.interop import raxml
+
 reference_tree = utils.balanced_binary(16)
 reference_tree.print_plot()
 
@@ -39,7 +87,7 @@ tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
 
 type(data)
 
-tree.print_plot()
+#tree.print_plot()
 
 print("symmetric_difference: ",symmetric_difference(reference_tree, tree))
 RF,F1 = reconstruct_tree.compare_trees(reference_tree, tree)
