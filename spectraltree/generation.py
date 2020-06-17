@@ -166,7 +166,7 @@ class T92(TN93):
         super().__init__(np.array([AT, GC, GC, AT]), kappa1, kappa2)
 
 class HKY(TN93):
-    def __init__(self, stationary_freqs, kappa):
+    def __init__(self, kappa,  stationary_freqs=np.array([1,1,1,1])):
         super().__init__(stationary_freqs, kappa, kappa)
 
 class Jukes_Cantor(GTR):
