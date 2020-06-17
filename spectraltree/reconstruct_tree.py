@@ -98,7 +98,7 @@ def HKY_similarity_matrix(observations, classes=None, verbose = False):
     g = {}
     
     for x in classes:
-        obs_x = observations == x
+        obs_x = observations == x 
         g[x] = np.array([np.mean(np.hstack([a, b])) for a, b in product(obs_x, repeat = 2)]).reshape((m, m))
     
     g["R"] = g["A"] + g["G"]
@@ -122,7 +122,8 @@ def HKY_similarity_matrix(observations, classes=None, verbose = False):
             a_is_AG = np.isin(a, ["A", "G"])
             b_is_AG = np.isin(b, ["A", "G"])
             Q[i, j] = Q[j, i] = np.mean(np.logical_xor(a_is_AG, b_is_AG))
-                        
+    #print("P", P_1, P_2)
+    #print("Q", Q)                    
     # compute the similarity (formula 7)
     if verbose: print("Computing similarity matrix")
     R = (1 - g["R"]/(2 * g["A"] * g["G"]) * P_1 - 1 / (2 * g["R"]) * Q)
@@ -133,6 +134,72 @@ def HKY_similarity_matrix(observations, classes=None, verbose = False):
     S *= np.sign(T) * (np.abs(T))**(8 * (g["R"] * g["Y"] - g["A"] * g["G"] * g["Y"] / g["R"] - g["T"] * g["C"] * g["R"] / g["Y"]))
 
     return S
+
+
+
+def HKY_similarity_matrix_missing_data(observations, classes=None, verbose = False):
+    m, N = observations.shape
+    if classes is None:
+        classes = np.unique(observations)
+    k = len(classes)
+    # From Tamura, K., and M. Nei. 1993
+    # for each pair of sequences, 
+    # 1. estimate the average base frequency for pairs of sequences
+    # 2. compute purine transition proportion P1 (A <-> G)
+    # 3. compute pyrimidine transition proportion P2 (T <-> C)
+    # 3. compute transversion proportion Q (A <-> C, A <-> T, G <-> C, G <-> T)
+
+    if verbose: print("Computing the average base frequency for each pair of sequences...")
+    g = {}
+    
+    not_missing = observations != "-"
+    not_missing_sum = np.sum(not_missing, axis = 1) # # not missing for each taxon
+    not_missing_pair = np.array([a + b for a, b in product(not_missing_sum, repeat = 2)]).reshape((m, m))
+    
+    for x in classes:
+        obs_x = observations == x 
+        g[x] = np.array([np.sum(np.hstack([a, b])) for a, b in product(obs_x, repeat = 2)]).reshape((m, m))
+        g[x] = g[x] / not_missing_pair
+
+    
+    g["R"] = g["A"] + g["G"]
+    g["Y"] = g["T"] + g["C"]
+    
+    # compute transition and transversion proportion
+    if verbose: print("Computing transition and transversion proportion for each pair of sequences...")
+        
+    P_1 = np.zeros((m,m))
+    P_2 = np.zeros((m,m))
+    Q = np.zeros((m,m))
+    
+    for i in range(m):
+        for j in range(i + 1, m):
+            neither_missing = np.logical_and(not_missing[i,:], not_missing[j,:])
+            a = observations[i,:][neither_missing]
+            b = observations[j,:][neither_missing]
+            
+            A_G = np.mean(np.logical_and(a == "A", b == "G") + np.logical_and(a == "G", b == "A"))
+            P_1[i, j] = P_1[j, i] = A_G
+            
+            C_T = np.mean(np.logical_and(a == "C", b == "T") + np.logical_and(a == "T", b == "C"))
+            P_2[i, j] = P_2[j, i] = C_T
+            
+            a_is_AG = np.isin(a, ["A", "G"])
+            b_is_AG = np.isin(b, ["A", "G"])
+            Q[i, j] = Q[j, i] = np.mean(np.logical_xor(a_is_AG, b_is_AG))
+    #print("P", P_1, P_2)
+    #print("Q", Q)
+    # compute the similarity (formula 7)
+    if verbose: print("Computing similarity matrix")
+    R = (1 - g["R"]/(2 * g["A"] * g["G"]) * P_1 - 1 / (2 * g["R"]) * Q)
+    Y = (1 - g["Y"]/(2 * g["T"] * g["C"]) * P_2 - 1 / (2 * g["Y"]) * Q)
+    T = (1 - 1/(2 * g["R"] * g["Y"]) * Q)
+    S = np.sign(R) * (np.abs(R))**(8 * g["A"] * g["G"] / g["R"])
+    S *= np.sign(Y) * (np.abs(Y))**(8 * g["T"] * g["C"] / g["Y"])
+    S *= np.sign(T) * (np.abs(T))**(8 * (g["R"] * g["Y"] - g["A"] * g["G"] * g["Y"] / g["R"] - g["T"] * g["C"] * g["R"] / g["Y"]))
+
+    return S
+
 
 
 ##########################################################
