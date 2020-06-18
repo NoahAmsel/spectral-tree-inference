@@ -12,6 +12,7 @@ import dendropy     #should this library be independent of dendropy? is that eve
 from dendropy.interop import raxml
 import utils
 from character_matrix import FastCharacterMatrix
+import time
 
 RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
 RECONSTRUCT_TREE__DIR_PATH = os.path.dirname(RECONSTRUCT_TREE_PATH)
@@ -82,62 +83,19 @@ def estimate_edge_lengths(tree, distance_matrix):
     # check the PAUP* documentation
     pass
 
+
+def hamming_dist_missing_values(vals, missing_val = "-"):
+    classnames, indices = np.unique(vals, return_inverse=True)
+    num_arr = indices.reshape(vals.shape)
+    hamming_matrix = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(num_arr, metric='hamming'))
+    missing_array = (vals==missing_val)
+    pdist_xor = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(missing_array, lambda u,v: np.sum(np.logical_xor(u,v))))
+    pdist_or = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(missing_array, lambda u,v: np.sum(np.logical_or(u,v))))
+    
+    return (hamming_matrix*vals.shape[1] - pdist_xor) / (np.ones_like(hamming_matrix) * vals.shape[1] - pdist_or)
+
+
 def HKY_similarity_matrix(observations, classes=None, verbose = False):
-    m, N = observations.shape
-    if classes is None:
-        classes = np.unique(observations)
-    k = len(classes)
-    # From Tamura, K., and M. Nei. 1993
-    # for each pair of sequences, 
-    # 1. estimate the average base frequency for pairs of sequences
-    # 2. compute purine transition proportion P1 (A <-> G)
-    # 3. compute pyrimidine transition proportion P2 (T <-> C)
-    # 3. compute transversion proportion Q (A <-> C, A <-> T, G <-> C, G <-> T)
-
-    if verbose: print("Computing the average base frequency for each pair of sequences...")
-    g = {}
-    
-    for x in classes:
-        obs_x = observations == x 
-        g[x] = np.array([np.mean(np.hstack([a, b])) for a, b in product(obs_x, repeat = 2)]).reshape((m, m))
-    
-    g["R"] = g["A"] + g["G"]
-    g["Y"] = g["T"] + g["C"]
-    
-    # compute transition and transversion proportion
-    if verbose: print("Computing transition and transversion proportion for each pair of sequences...")
-        
-    P_1 = np.zeros((m,m))
-    P_2 = np.zeros((m,m))
-    Q = np.zeros((m,m))
-    
-    for i in range(m):
-        for j in range(i + 1, m):
-            a = observations[i,:]
-            b = observations[j,:]
-            A_G = np.mean(np.logical_and(a == "A", b == "G") + np.logical_and(a == "G", b == "A"))
-            P_1[i, j] = P_1[j, i] = A_G
-            C_T = np.mean(np.logical_and(a == "C", b == "T") + np.logical_and(a == "T", b == "C"))
-            P_2[i, j] = P_2[j, i] = C_T
-            a_is_AG = np.isin(a, ["A", "G"])
-            b_is_AG = np.isin(b, ["A", "G"])
-            Q[i, j] = Q[j, i] = np.mean(np.logical_xor(a_is_AG, b_is_AG))
-    #print("P", P_1, P_2)
-    #print("Q", Q)                    
-    # compute the similarity (formula 7)
-    if verbose: print("Computing similarity matrix")
-    R = (1 - g["R"]/(2 * g["A"] * g["G"]) * P_1 - 1 / (2 * g["R"]) * Q)
-    Y = (1 - g["Y"]/(2 * g["T"] * g["C"]) * P_2 - 1 / (2 * g["Y"]) * Q)
-    T = (1 - 1/(2 * g["R"] * g["Y"]) * Q)
-    S = np.sign(R) * (np.abs(R))**(8 * g["A"] * g["G"] / g["R"])
-    S *= np.sign(Y) * (np.abs(Y))**(8 * g["T"] * g["C"] / g["Y"])
-    S *= np.sign(T) * (np.abs(T))**(8 * (g["R"] * g["Y"] - g["A"] * g["G"] * g["Y"] / g["R"] - g["T"] * g["C"] * g["R"] / g["Y"]))
-
-    return S
-
-
-
-def HKY_similarity_matrix_missing_data(observations, classes=None, verbose = False):
     m, N = observations.shape
     if classes is None:
         classes = np.unique(observations)
@@ -170,7 +128,8 @@ def HKY_similarity_matrix_missing_data(observations, classes=None, verbose = Fal
         
     P_1 = np.zeros((m,m))
     P_2 = np.zeros((m,m))
-    Q = np.zeros((m,m))
+    
+    A = hamming_dist_missing_values(observations, missing_val = "-")
     
     for i in range(m):
         for j in range(i + 1, m):
@@ -184,9 +143,8 @@ def HKY_similarity_matrix_missing_data(observations, classes=None, verbose = Fal
             C_T = np.mean(np.logical_and(a == "C", b == "T") + np.logical_and(a == "T", b == "C"))
             P_2[i, j] = P_2[j, i] = C_T
             
-            a_is_AG = np.isin(a, ["A", "G"])
-            b_is_AG = np.isin(b, ["A", "G"])
-            Q[i, j] = Q[j, i] = np.mean(np.logical_xor(a_is_AG, b_is_AG))
+    Q = A - P_1 - P_2
+    
     #print("P", P_1, P_2)
     #print("Q", Q)
     # compute the similarity (formula 7)
@@ -1131,7 +1089,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def __repr__():
         return "spectralTree"
 
-    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = 0,**kargs):
+    def deep_spectral_tree_reonstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle",**kargs):
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
@@ -1162,7 +1120,10 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                 cur_node.setRight(MyNode(L2))
                 cur_node = cur_node.right
             else:
+                start_time = time.time()
                 cur_node.tree = self.reconstruct_alg_wrapper(cur_node, **kargs)
+                runtime = time.time() - start_time
+                print("--- %s seconds ---" % runtime)
                 if cur_node.parent == None:
                     break
                 if cur_node.parent.right == cur_node:
