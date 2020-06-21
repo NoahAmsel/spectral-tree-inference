@@ -8,7 +8,7 @@ import dendropy
 def default_namespace(num_taxa, prefix="T"):
     return dendropy.TaxonNamespace([prefix+str(i) for i in range(1, num_taxa+1)])
 
-class TaxaIndexMapping(Mapping):
+class TaxaMetadata(Mapping):
     def __init__(self, taxon_namespace, taxa_list):
         # TODO: modify init so that it detects repeated values (even if it's specified as a taxon object one time and as a label the other) and throws an error
         self._taxon_namespace = taxon_namespace
@@ -103,12 +103,12 @@ class TaxaIndexMapping(Mapping):
         return str([taxon.label for taxon in self])
 
     def __eq__(self, other):
-        return isinstance(other, TaxaIndexMapping) and (
+        return isinstance(other, TaxaMetadata) and (
             self.taxon_namespace == other.taxon_namespace) and (
                 all(self._taxa_list == other._taxa_list))
 
     def equals_unordered(self, other):
-        return isinstance(other, TaxaIndexMapping) and (
+        return isinstance(other, TaxaMetadata) and (
             self.taxon_namespace == other.taxon_namespace) and (
                 set(self._taxa_list) == set(other._taxa_list))
 
@@ -121,11 +121,11 @@ def charmatrix2array(charmatrix):
         taxa.append(taxon)
         sequences.append([state_id.index for state_id in charmatrix[taxon].values()])
     
-    return np.array(sequences), TaxaIndexMapping(charmatrix.taxon_namespace, taxa), alphabet
+    return np.array(sequences), TaxaMetadata(charmatrix.taxon_namespace, taxa), alphabet
 
 def array2charmatrix(matrix, alphabet=None, taxa_index_map=None):
     if taxa_index_map is None:
-        taxa_index_map = TaxaIndexMapping.default(matrix.shape[0])
+        taxa_index_map = TaxaMetadata.default(matrix.shape[0])
     else:
         assert len(taxa_index_map) == matrix.shape[0], "Taxon-Index map does not match size of matrix."
     
@@ -148,7 +148,7 @@ def array2distance_matrix(matrix, taxa_index_map=None):
     m, m2 = matrix.shape
     assert m == m2, "Distance matrix must be square"
     if taxa_index_map is None:
-        taxa_index_map = TaxaIndexMapping.default(m)
+        taxa_index_map = TaxaMetadata.default(m)
     else:
         assert len(taxa_index_map) == m, "Taxon-Index map does not match size of matrix."
 
@@ -165,7 +165,7 @@ def distance_matrix2array(dm):
     This is patristic distance: adding the branch lengths. If we set branches to
     have different transitions, this won't be the paralinear distance
     """
-    taxa = TaxaIndexMapping(dm.taxon_namespace, list(dm.taxon_iter()))
+    taxa = TaxaMetadata(dm.taxon_namespace, list(dm.taxon_iter()))
     return scipy.spatial.distance.squareform([dm.distance(taxon1, taxon2) for taxon1, taxon2 in combinations(taxa,2)]), taxa
 
 def tree2distance_matrix(tree):
@@ -201,9 +201,9 @@ from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_
 def balanced_binary(num_taxa=None, taxa=None, edge_length=1.):
     if taxa is None:
         if num_taxa:
-            taxa = TaxaIndexMapping.default(num_taxa)
+            taxa = TaxaMetadata.default(num_taxa)
         else:
-            assert False, "Must provide either the number of leaves or a TaxaIndexMapping"
+            assert False, "Must provide either the number of leaves or a TaxaMetadata"
 
     if num_taxa:
         assert num_taxa == len(taxa), "The number of leaves must match the number of taxa given."
@@ -222,9 +222,9 @@ def lopsided_tree(num_taxa, taxa=None, edge_length=1.):
     """One node splits off at each step"""
     if taxa is None:
         if num_taxa:
-            taxa = TaxaIndexMapping.default(num_taxa)
+            taxa = TaxaMetadata.default(num_taxa)
         else:
-            assert False, "Must provide either the number of leaves or a TaxaIndexMapping"
+            assert False, "Must provide either the number of leaves or a TaxaMetadata"
 
     if num_taxa:
         assert num_taxa == len(taxa), "The number of leaves must match the number of taxa given."

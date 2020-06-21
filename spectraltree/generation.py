@@ -4,7 +4,7 @@ import scipy.linalg
 import scipy.spatial.distance
 import dendropy
 
-from character_matrix import TaxaIndexMapping
+from character_matrix import TaxaMetadata
 
 def nchoose2(n):
     return int(n*(n-1)/2)
@@ -241,7 +241,7 @@ def numpy_matrix_with_characters_on_tree(seq_attr, tree):
         sequences.append(getattr(leaf, seq_attr)[-1])
         # sequences.append(np.concatenate(getattr(leaf, seq_attr)))  # TODO
     
-    return np.array(sequences), TaxaIndexMapping(tree.taxon_namespace, taxa)
+    return np.array(sequences), TaxaMetadata(tree.taxon_namespace, taxa)
 
 def simulate_sequences_ordered(seq_len, tree_model, seq_model, mutation_rate=1.0, root_states=None, retain_sequences_on_tree=False, rng=None):
     """
