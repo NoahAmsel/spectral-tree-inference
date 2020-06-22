@@ -9,7 +9,20 @@ def default_namespace(num_taxa, prefix="T"):
     return dendropy.TaxonNamespace([prefix+str(i) for i in range(1, num_taxa+1)])
 
 class TaxaMetadata(Mapping):
-    def __init__(self, taxon_namespace, taxa_list):
+    _alphabet_label2obj = {
+        "DNA": dendropy.DNA_STATE_ALPHABET,
+        "RNA": dendropy.RNA_STATE_ALPHABET,
+        "Nucleotide": dendropy.NUCLEOTIDE_STATE_ALPHABET,
+        "Protein": dendropy.PROTEIN_STATE_ALPHABET,
+        "Binary": dendropy.BINARY_STATE_ALPHABET,
+    }
+
+    def __init__(self, taxon_namespace, taxa_list, alphabet=None):
+        if isinstance(alphabet, dendropy.StateAlphabet) or (alphabet is None):
+            self._alphabet = alphabet
+        else:
+            self._alphabet = self._alphabet_label2obj[alphabet]
+
         # TODO: modify init so that it detects repeated values (even if it's specified as a taxon object one time and as a label the other) and throws an error
         self._taxon_namespace = taxon_namespace
         self._taxa_list = []
@@ -35,6 +48,10 @@ class TaxaMetadata(Mapping):
     @classmethod
     def default(cls, length):
         return cls.whole_namespace(default_namespace(length))
+
+    @property
+    def alphabet(self):
+        return self._alphabet
 
     @property
     def taxon_namespace(self):
@@ -121,43 +138,53 @@ def charmatrix2array(charmatrix):
         taxa.append(taxon)
         sequences.append([state_id.index for state_id in charmatrix[taxon].values()])
     
-    return np.array(sequences), TaxaMetadata(charmatrix.taxon_namespace, taxa), alphabet
+    return np.array(sequences), TaxaMetadata(charmatrix.taxon_namespace, taxa, alphabet=alphabet)
 
-def array2charmatrix(matrix, alphabet=None, taxa_index_map=None):
-    if taxa_index_map is None:
-        taxa_index_map = TaxaMetadata.default(matrix.shape[0])
+from collections import defaultdict
+
+def array2charmatrix(matrix, taxa_metadata=None):
+    if taxa_metadata is None:
+        taxa_metadata = TaxaMetadata.default(matrix.shape[0])
     else:
-        assert len(taxa_index_map) == matrix.shape[0], "Taxon-Index map does not match size of matrix."
+        assert len(taxa_metadata) == matrix.shape[0], "Taxon-Index map does not match size of matrix."
     
+    alphabet = taxa_metadata.alphabet
     # TODO: add support for DNACharacterMatrix and others
     if alphabet is None:
         # input the values in the matrix directly
         alphabet = dendropy.new_standard_state_alphabet(val for val in np.unique(matrix))
-        char_matrix = dendropy.StandardCharacterMatrix(default_state_alphabet=alphabet, taxon_namespace=taxa_index_map.taxon_namespace)
-        for taxon, ix in taxa_index_map.items():
+        char_matrix = dendropy.StandardCharacterMatrix(default_state_alphabet=alphabet, taxon_namespace=taxa_metadata.taxon_namespace)
+        for taxon, ix in taxa_metadata.items():
             char_matrix.new_sequence(taxon, [str(x) for x in matrix[ix, :]])
     else:
         # assume values in the matrix are indices into the alphabet
-        char_matrix = dendropy.StandardCharacterMatrix(default_state_alphabet=alphabet, taxon_namespace=taxa_index_map.taxon_namespace)
-        for taxon, ix in taxa_index_map.items():
+        matrix_class = {
+            dendropy.DNA_STATE_ALPHABET: dendropy.DnaCharacterMatrix,
+            dendropy.RNA_STATE_ALPHABET: dendropy.RnaCharacterMatrix,
+            dendropy.NUCLEOTIDE_STATE_ALPHABET: dendropy.NucleotideCharacterMatrix,
+            dendropy.PROTEIN_STATE_ALPHABET: dendropy.ProteinCharacterMatrix,
+            dendropy.BINARY_STATE_ALPHABET: dendropy.RestrictionSitesCharacterMatrix,
+        }.get(alphabet, dendropy.StandardCharacterMatrix)
+        char_matrix = matrix_class(default_state_alphabet=alphabet, taxon_namespace=taxa_metadata.taxon_namespace)
+        for taxon, ix in taxa_metadata.items():
             char_matrix.new_sequence(taxon, [alphabet[v] for v in matrix[ix, :]])
 
     return char_matrix
 
-def array2distance_matrix(matrix, taxa_index_map=None):
+def array2distance_matrix(matrix, taxa_metadata=None):
     m, m2 = matrix.shape
     assert m == m2, "Distance matrix must be square"
-    if taxa_index_map is None:
-        taxa_index_map = TaxaMetadata.default(m)
+    if taxa_metadata is None:
+        taxa_metadata = TaxaMetadata.default(m)
     else:
-        assert len(taxa_index_map) == m, "Taxon-Index map does not match size of matrix."
+        assert len(taxa_metadata) == m, "Taxon-Index map does not match size of matrix."
 
     dict_form = defaultdict(dict)
-    for row_taxon in taxa_index_map:
-        for column_taxon in taxa_index_map:
-            dict_form[row_taxon][column_taxon] = matrix[taxa_index_map.index2taxa(row_taxon), taxa_index_map.index2taxa(column_taxon)]
+    for row_taxon in taxa_metadata:
+        for column_taxon in taxa_metadata:
+            dict_form[row_taxon][column_taxon] = matrix[taxa_metadata.index2taxa(row_taxon), taxa_metadata.index2taxa(column_taxon)]
     dm = dendropy.calculate.phylogeneticdistance.PhylogeneticDistanceMatrix()
-    dm.compile_from_dict(dict_form, taxa_index_map.taxon_namespace)
+    dm.compile_from_dict(dict_form, taxa_metadata.taxon_namespace)
     return dm
 
 def distance_matrix2array(dm):

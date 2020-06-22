@@ -8,7 +8,7 @@ from spectraltree import utils
 class TestTaxaMetadata(unittest.TestCase):
     def setUp(self):
         self.namespace1 = dendropy.TaxonNamespace(["dog", "cat", "snake", "fish", "tree"])
-        self.taxa1 = utils.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"])
+        self.taxa1 = utils.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], "DNA")
         self.dog = self.namespace1.get_taxon("dog")
         self.snake = self.namespace1.get_taxon("snake")
 
@@ -17,6 +17,7 @@ class TestTaxaMetadata(unittest.TestCase):
         self.assertListEqual(list(self.taxa1), [self.namespace1[3], self.namespace1[2], self.namespace1[1], self.namespace1[0]])
         self.assertEqual(self.taxa1['snake'], 1)
         self.assertTrue(all(self.taxa1.index2taxa([1,3]) == np.array([self.snake, self.dog])))
+        self.assertEqual(self.taxa1.alphabet, dendropy.DNA_STATE_ALPHABET)
 
     def test_2mask(self):
         self.assertTrue(all(self.taxa1.taxon2mask('snake') == np.array([False, True, False, False])))
@@ -41,7 +42,7 @@ class TestTaxaMetadata(unittest.TestCase):
 class TestConversionFunctions(unittest.TestCase):
     def setUp(self):
         self.namespace1 = dendropy.TaxonNamespace(["dog", "cat", "snake", "fish", "tree"])
-        self.taxa1 = utils.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"])
+        self.taxa1 = utils.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], "DNA")
         self.dog = self.namespace1.get_taxon("dog")
         self.snake = self.namespace1.get_taxon("snake")
 

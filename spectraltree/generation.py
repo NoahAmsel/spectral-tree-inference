@@ -4,7 +4,7 @@ import scipy.linalg
 import scipy.spatial.distance
 import dendropy
 
-from character_matrix import TaxaMetadata
+from .utils import TaxaMetadata
 
 def nchoose2(n):
     return int(n*(n-1)/2)
@@ -203,33 +203,7 @@ class Jukes_Cantor(GTR):
         suff = "" if self.k==4 else " (k={})".format(self.k)
         return "Jukes Cantor" + suff
 
-def numpy_matrix_with_characters_on_tree_ordered(seq_attr, tree):
-    """
-    Extracts sequences from all leaves and packs them into a numpy matrix.
-    Repalces `extend_char_matrix_with_characters_on_tree` method of `DiscreteCharacterEvolver`, which doesn't use numpy.
-    """
-    sequences = [0 for i in tree.taxon_namespace]
-    for leaf_ix, leaf in enumerate(tree.leaf_node_iter()):
-        
-        sequences[tree.taxon_namespace[:].index(leaf.taxon)] = getattr(leaf, seq_attr)[-1]
-        #sequences.append(np.concatenate(getattr(leaf, seq_attr)))
-    return np.array(sequences)
-
-
-def OLD_numpy_matrix_with_characters_on_tree(seq_attr, tree):
-    """
-    Extracts sequences from all leaves and packs them into a numpy matrix.
-    Repalces `extend_char_matrix_with_characters_on_tree` method of `DiscreteCharacterEvolver`, which doesn't use numpy.
-    """
-    index_map = {taxon: ix for ix, taxon in enumerate(tree.taxon_namespace)}
-    sequences = [None]*len(tree.leaf_nodes())
-    assert len(sequences) == len(index_map)  # exactly one entry in taxon_namespace for each leaf
-    for leaf in tree.leaf_node_iter():
-        sequences[index_map[leaf.taxon]] = getattr(leaf, seq_attr)[-1]
-        #sequences[index_map(leaf.taxon)] = np.concatenate(getattr(leaf, seq_attr))
-    return np.array(sequences)
-
-def numpy_matrix_with_characters_on_tree(seq_attr, tree):
+def numpy_matrix_with_characters_on_tree(seq_attr, tree, alphabet=None):
     """
     Extracts sequences from all leaves and packs them into a numpy matrix.
     Repalces `extend_char_matrix_with_characters_on_tree` method of `DiscreteCharacterEvolver`, which doesn't use numpy.
@@ -241,9 +215,9 @@ def numpy_matrix_with_characters_on_tree(seq_attr, tree):
         sequences.append(getattr(leaf, seq_attr)[-1])
         # sequences.append(np.concatenate(getattr(leaf, seq_attr)))  # TODO
     
-    return np.array(sequences), TaxaMetadata(tree.taxon_namespace, taxa)
+    return np.array(sequences), TaxaMetadata(tree.taxon_namespace, taxa, alphabet=alphabet)
 
-def simulate_sequences_ordered(seq_len, tree_model, seq_model, mutation_rate=1.0, root_states=None, retain_sequences_on_tree=False, rng=None):
+def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_states=None, retain_sequences_on_tree=False, rng=None, alphabet=None):
     """
     Convenience function that generates a matrix of sequence observations from a given sequence model and tree
 
@@ -277,60 +251,15 @@ def simulate_sequences_ordered(seq_len, tree_model, seq_model, mutation_rate=1.0
 
     """
     seq_evolver = dendropy.model.discrete.DiscreteCharacterEvolver(seq_model=seq_model, mutation_rate=mutation_rate)
-    tree = seq_evolver.evolve_states(
+    tree_model = seq_evolver.evolve_states(
         tree=tree_model,
         seq_len=seq_len,
         root_states=root_states,
         rng=rng)
-    char_matrix = numpy_matrix_with_characters_on_tree_ordered(seq_evolver.seq_attr, tree_model)
+    char_matrix, meta = numpy_matrix_with_characters_on_tree(seq_evolver.seq_attr, tree_model, alphabet=alphabet)
     if not retain_sequences_on_tree:
-        seq_evolver.clean_tree(tree)
-    return char_matrix
-
-
-def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_states=None, retain_sequences_on_tree=False, rng=None):
-    """
-    Convenience function that generates a matrix of sequence observations from a given sequence model and tree
-
-    Parameters
-    ----------
-
-    seq_len       : int
-        Length of sequence (number of characters).
-    tree_model    : |Tree|
-        Tree on which to simulate.
-    seq_model     : |Transition|
-        The character substitution model under which to to evolve the
-        characters.
-    mutation_rate : float
-        Mutation *modifier* rate (should be 1.0 if branch lengths on tree
-        reflect true expected number of changes).
-    root_states   : list
-        Vector of root states (length must equal ``seq_len``).
-    retain_sequences_on_tree : bool
-        If |False|, sequence annotations will be cleared from tree after
-        simulation. Set to |True| if you want to, e.g., evolve and accumulate
-        different sequences on tree, or retain information for other purposes.
-    rng           : random number generator
-        If not given, 'GLOBAL_RNG' will be used.
-
-    Returns
-    -------
-
-    char_matrix :  |numpy.array|
-        Matrix where each row is the sequence generated for a given leaf.
-
-    """
-    seq_evolver = dendropy.model.discrete.DiscreteCharacterEvolver(seq_model=seq_model, mutation_rate=mutation_rate)
-    tree = seq_evolver.evolve_states(
-        tree=tree_model,
-        seq_len=seq_len,
-        root_states=root_states,
-        rng=rng)
-    char_matrix = numpy_matrix_with_characters_on_tree(seq_evolver.seq_attr, tree_model)
-    if not retain_sequences_on_tree:
-        seq_evolver.clean_tree(tree)
-    return char_matrix
+        seq_evolver.clean_tree(tree_model)
+    return char_matrix, meta
 
 if __name__ == "__main__":
     from utils import balanced_binary
@@ -344,8 +273,13 @@ if __name__ == "__main__":
 
 
 if __name__ == "__main__":
+    from utils import balanced_binary
+
     jc = Jukes_Cantor()
-    ttt = 4.
+    my_tree = balanced_binary(4)
+    seq, meta = simulate_sequences(seq_len=6, tree_model=my_tree, seq_model=jc, )
+
+
     print(0.25 + 0.75 * np.exp(-4.*ttt/3.))
     print(jc.pmatrix(2,2))
     jc.paralinear_distance(2,2)
