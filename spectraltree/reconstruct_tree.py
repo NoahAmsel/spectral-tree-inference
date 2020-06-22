@@ -563,7 +563,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def __repr__():
         return "spectralTree"
 
-    def deep_spectral_tree_reconstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle",**kargs):
+    def deep_spectral_tree_reconstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle", verbose = False, **kargs):
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
@@ -587,9 +587,9 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                     cur_node = cur_node.parent
             elif sum(cur_node.bitmap) > threshhold:
                 L1,L2 = self.splitTaxa(cur_node,num_gaps,min_split)
-                print("partition")
-                print("L1 size: ", sum(L1))
-                print("L2 size: ", sum(L2))
+                if verbose: print("partition")
+                if verbose: print("L1 size: ", sum(L1))
+                if verbose: print("L2 size: ", sum(L2))
                 cur_node.setLeft(MyNode(L1))
                 cur_node.setRight(MyNode(L2))
                 cur_node = cur_node.right
@@ -597,7 +597,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                 start_time = time.time()
                 cur_node.tree = self.reconstruct_alg_wrapper(cur_node, **kargs)
                 runtime = time.time() - start_time
-                print("--- %s seconds ---" % runtime)
+                if verbose: print("--- %s seconds ---" % runtime)
                 if cur_node.parent == None:
                     break
                 if cur_node.parent.right == cur_node:
