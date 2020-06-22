@@ -7,3 +7,5 @@ scripts/slurm-*.out
 scripts/data
 .ipynb_checkpoints
 .ipynb_checkpoints/*
+experiments/log/*
+experiments/results/*
