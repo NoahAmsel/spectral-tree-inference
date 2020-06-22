@@ -221,11 +221,18 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
     # the second singular value of the partition.
     m = len(v)
     partition_min = v>0
-    
+    if np.minimum(sum(partition_min),sum(~partition_min))<min_split:
+        if num_gaps == 0:
+            Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
+
     if num_gaps > 0:
-        s_sliced = similarity[partition_min,:]
-        s_sliced = s_sliced[:,~partition_min]
-        smin = svd2(s_sliced)
+        
+        if np.minimum(sum(partition_min),sum(~partition_min))>=min_split:
+            s_sliced = similarity[partition_min,:]
+            s_sliced = s_sliced[:,~partition_min]
+            smin = svd2(s_sliced)
+        else:
+            smin = np.inf
 
         v_sort = np.sort(v)
         gaps = v_sort[1:m]-v_sort[0:m-1]    
@@ -240,6 +247,8 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
                 if s2<smin:
                     partition_min = bool_bipartition
                     smin = s2
+    if smin == np.inf:
+        Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
     return partition_min
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
