@@ -223,22 +223,21 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
     partition_min = v>0
     if np.minimum(sum(partition_min),sum(~partition_min))<min_split:
         if num_gaps == 0:
-            Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
-
+            raise Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
+        else:
+            smin = np.inf
     if num_gaps > 0:
         
         if np.minimum(sum(partition_min),sum(~partition_min))>=min_split:
             s_sliced = similarity[partition_min,:]
             s_sliced = s_sliced[:,~partition_min]
             smin = svd2(s_sliced)
-        else:
-            smin = np.inf
 
         v_sort = np.sort(v)
-        gaps = v_sort[1:m]-v_sort[0:m-1]    
+        gaps = v_sort[min_split:m-min_split+1]-v_sort[min_split-1:m-min_split]
         sort_idx = np.argsort(gaps)
         for i in range(1, num_gaps+1):
-            threshold = (v_sort[sort_idx[-i]]+v_sort[sort_idx[-i]+1])/2
+            threshold = (v_sort[sort_idx[-i]+min_split-1]+v_sort[sort_idx[-i]+min_split])/2
             bool_bipartition = v<threshold
             if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))>min_split:
                 s_sliced = similarity[bool_bipartition,:]
@@ -248,7 +247,7 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
                     partition_min = bool_bipartition
                     smin = s2
     if smin == np.inf:
-        Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
+        raise Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
     return partition_min
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
@@ -622,7 +621,11 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity
         _, V = np.linalg.eigh(laplacian)
         bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
-        
+        # %%
+        if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))<min_split:
+            print("????")
+            bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
+
         #Building partitioning bitmaps from partial bitmaps
         ll = np.array([i for i, x in enumerate(node.bitmap) if x])
         ll1 = ll[bool_bipartition]
