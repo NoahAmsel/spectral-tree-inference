@@ -81,6 +81,7 @@ class TestConversionFunctions(unittest.TestCase):
     def test_array2charmatrix(self):
         charmatrix2 = utils.array2charmatrix(self.array1, self.taxa1)
         self.assertEqual(charmatrix2.as_string("nexus"), self.dna_charmatrix.as_string("nexus"))
+        self.assertTrue(isinstance(charmatrix2, dendropy.DnaCharacterMatrix))
 
     def test_array2distance_matrix(self):
         distance_mat = np.array([
@@ -96,8 +97,10 @@ class TestConversionFunctions(unittest.TestCase):
                 self.assertEqual(dm2.distance(taxon1, taxon2), self.dm.distance(taxon1, taxon2))
 
     def test_distance_matrix2array(self):    
-        distance_mat, matrix_taxa = utils.distance_matrix2array(self.dm)  
-        self.assertTrue(matrix_taxa.equals_unordered(self.taxa1))
+        distance_mat, matrix_taxa = utils.distance_matrix2array(self.dm)
+        # in this test, the taxa meta of a distance matrix needs no alphabet
+        taxa_temp = utils.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], None)
+        self.assertTrue(matrix_taxa.equals_unordered(taxa_temp))
         for taxon1 in self.taxa1:
             for taxon2 in self.taxa1:
                 self.assertEqual(distance_mat[matrix_taxa[taxon1], matrix_taxa[taxon2]], self.dm.distance(taxon1, taxon2))
