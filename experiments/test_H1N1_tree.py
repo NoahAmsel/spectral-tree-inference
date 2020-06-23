@@ -54,7 +54,7 @@ def run_method(method, tree, m = 300, kappa = 2,  mutation_rate=0.05, threshold 
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(ch_arr, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxon_namespace = tree.taxon_namespace, 
                                                             threshhold = threshold,
-                                                            raxml_args = "-T 2 --HKY85 -c 1", min_split = 10)
+                                                            raxml_args = "-T 2 --HKY85 -c 1", min_split = 5)
     runtime = time.time() - start_time
     RF,F1 = reconstruct_tree.compare_trees(tree_rec, tree)
     print(method)
