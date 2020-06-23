@@ -122,12 +122,14 @@ class TaxaMetadata(Mapping):
     def __eq__(self, other):
         return isinstance(other, TaxaMetadata) and (
             self.taxon_namespace == other.taxon_namespace) and (
-                all(self._taxa_list == other._taxa_list))
+                self.alphabet == other.alphabet) and (
+                    all(self._taxa_list == other._taxa_list))
 
     def equals_unordered(self, other):
         return isinstance(other, TaxaMetadata) and (
             self.taxon_namespace == other.taxon_namespace) and (
-                set(self._taxa_list) == set(other._taxa_list))
+                self.alphabet == other.alphabet) and (
+                    set(self._taxa_list) == set(other._taxa_list))
 
 def charmatrix2array(charmatrix):
     #charmatrix[taxon].values()
@@ -139,8 +141,6 @@ def charmatrix2array(charmatrix):
         sequences.append([state_id.index for state_id in charmatrix[taxon].values()])
     
     return np.array(sequences), TaxaMetadata(charmatrix.taxon_namespace, taxa, alphabet=alphabet)
-
-from collections import defaultdict
 
 def array2charmatrix(matrix, taxa_metadata=None):
     if taxa_metadata is None:
@@ -158,16 +158,21 @@ def array2charmatrix(matrix, taxa_metadata=None):
             char_matrix.new_sequence(taxon, [str(x) for x in matrix[ix, :]])
     else:
         # assume values in the matrix are indices into the alphabet
-        matrix_class = {
+        alpha2matrix_class = {
             dendropy.DNA_STATE_ALPHABET: dendropy.DnaCharacterMatrix,
             dendropy.RNA_STATE_ALPHABET: dendropy.RnaCharacterMatrix,
             dendropy.NUCLEOTIDE_STATE_ALPHABET: dendropy.NucleotideCharacterMatrix,
             dendropy.PROTEIN_STATE_ALPHABET: dendropy.ProteinCharacterMatrix,
             dendropy.BINARY_STATE_ALPHABET: dendropy.RestrictionSitesCharacterMatrix,
-        }.get(alphabet, dendropy.StandardCharacterMatrix)
-        char_matrix = matrix_class(default_state_alphabet=alphabet, taxon_namespace=taxa_metadata.taxon_namespace)
+        }
+        if alphabet in alpha2matrix_class:
+            char_matrix = alpha2matrix_class[alphabet](taxon_namespace=taxa_metadata.taxon_namespace)
+        else:
+            char_matrix = dendropy.StandardCharacterMatrix(default_state_alphabet=alphabet, taxon_namespace=taxa_metadata.taxon_namespace)
+
         for taxon, ix in taxa_metadata.items():
-            char_matrix.new_sequence(taxon, [alphabet[v] for v in matrix[ix, :]])
+            # you need .item to convert from numpy.int64 to int. dendropy expects only int
+            char_matrix.new_sequence(taxon, [alphabet[v.item()] for v in matrix[ix, :]])
 
     return char_matrix
 
@@ -182,7 +187,7 @@ def array2distance_matrix(matrix, taxa_metadata=None):
     dict_form = defaultdict(dict)
     for row_taxon in taxa_metadata:
         for column_taxon in taxa_metadata:
-            dict_form[row_taxon][column_taxon] = matrix[taxa_metadata.index2taxa(row_taxon), taxa_metadata.index2taxa(column_taxon)]
+            dict_form[row_taxon][column_taxon] = matrix[taxa_metadata[row_taxon], taxa_metadata[column_taxon]]
     dm = dendropy.calculate.phylogeneticdistance.PhylogeneticDistanceMatrix()
     dm.compile_from_dict(dict_form, taxa_metadata.taxon_namespace)
     return dm

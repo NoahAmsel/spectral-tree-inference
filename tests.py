@@ -46,17 +46,61 @@ class TestConversionFunctions(unittest.TestCase):
         self.dog = self.namespace1.get_taxon("dog")
         self.snake = self.namespace1.get_taxon("snake")
 
-    def test_charmatrix2array(self):
-        pass
+        self.array1 = np.array([
+            [3, 1, 1, 0, 0],
+            [3, 2, 1, 0, 0],
+            [3, 2, 4, 0, 0],
+            [2, 2, 0, 0, 0],
+        ])
 
-    def test_distance_matrix2array(self):        
+        self.tax2seq = {
+            "fish": self.array1[0,:],
+            "snake": self.array1[1,:],
+            "cat": self.array1[2,:],
+            "dog": self.array1[3,:],
+        }
+  
+        d = {
+            "fish" : "TCCAA",
+            "snake" : "TGCAA",
+            "cat" : "TG-AA",
+            "dog": "GGAAA",
+        }
+        self.dna_charmatrix = dendropy.DnaCharacterMatrix.from_dict(d, taxon_namespace=self.namespace1)
+
         tree = utils.lopsided_tree(4, self.taxa1)
-        dm = tree.phylogenetic_distance_matrix()
-        distance_mat, matrix_taxa = utils.distance_matrix2array(dm)
+        self.dm = tree.phylogenetic_distance_matrix()
+        
+    def test_charmatrix2array(self):
+        array2, taxa2 = utils.charmatrix2array(self.dna_charmatrix)
+        self.assertTrue(self.taxa1.equals_unordered(taxa2))
+        self.assertEqual(taxa2.alphabet, dendropy.DNA_STATE_ALPHABET)
+        for tax in taxa2:
+            self.assertTrue((array2[taxa2[tax], :] == self.tax2seq[tax.label]).all())
+
+    def test_array2charmatrix(self):
+        charmatrix2 = utils.array2charmatrix(self.array1, self.taxa1)
+        self.assertEqual(charmatrix2.as_string("nexus"), self.dna_charmatrix.as_string("nexus"))
+
+    def test_array2distance_matrix(self):
+        distance_mat = np.array([
+                [0., 3., 4., 4.],
+                [3., 0., 3., 3.],
+                [4., 3., 0., 2.],
+                [4., 3., 2., 0.]
+        ])
+
+        dm2 = utils.array2distance_matrix(distance_mat, self.taxa1)
+        for taxon1 in self.taxa1:
+            for taxon2 in self.taxa1:
+                self.assertEqual(dm2.distance(taxon1, taxon2), self.dm.distance(taxon1, taxon2))
+
+    def test_distance_matrix2array(self):    
+        distance_mat, matrix_taxa = utils.distance_matrix2array(self.dm)  
         self.assertTrue(matrix_taxa.equals_unordered(self.taxa1))
         for taxon1 in self.taxa1:
             for taxon2 in self.taxa1:
-                self.assertEqual(distance_mat[matrix_taxa[taxon1], matrix_taxa[taxon2]], dm.distance(taxon1, taxon2))
+                self.assertEqual(distance_mat[matrix_taxa[taxon1], matrix_taxa[taxon2]], self.dm.distance(taxon1, taxon2))
 
 if __name__ == "__main__":
     unittest.main()
