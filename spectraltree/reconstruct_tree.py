@@ -239,7 +239,7 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
         for i in range(1, num_gaps+1):
             threshold = (v_sort[sort_idx[-i]+min_split-1]+v_sort[sort_idx[-i]+min_split])/2
             bool_bipartition = v<threshold
-            if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))>min_split:
+            if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))>=min_split:
                 s_sliced = similarity[bool_bipartition,:]
                 s_sliced = s_sliced[:,~bool_bipartition]
                 s2 = svd2(s_sliced)
