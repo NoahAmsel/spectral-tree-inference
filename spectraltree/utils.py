@@ -1,22 +1,217 @@
 from collections import defaultdict
+from collections.abc import Mapping
 from itertools import combinations
 import scipy.spatial.distance
 import numpy as np
 import dendropy
 
-from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree # for convenience
+def default_namespace(num_taxa, prefix="T"):
+    return dendropy.TaxonNamespace([prefix+str(i) for i in range(1, num_taxa+1)])
 
-def default_namespace(num_taxa):
-    return dendropy.TaxonNamespace([str(i) for i in range(num_taxa)])
+class TaxaMetadata(Mapping):
+    _alphabet_label2obj = {
+        "DNA": dendropy.DNA_STATE_ALPHABET,
+        "RNA": dendropy.RNA_STATE_ALPHABET,
+        "Nucleotide": dendropy.NUCLEOTIDE_STATE_ALPHABET,
+        "Protein": dendropy.PROTEIN_STATE_ALPHABET,
+        "Binary": dendropy.BINARY_STATE_ALPHABET,
+    }
 
-def leaf(i, namespace, **kwargs):
-    # for now, `i` will specify the taxon but in the future can make it more flexible
-    assert 'taxon' not in kwargs
-    kwargs['taxon'] = namespace[i]
-    node = dendropy.Node(**kwargs)
-    node.taxa_set = np.full(len(namespace), False)
-    node.taxa_set[i] = True
-    return node
+    def __init__(self, taxon_namespace, taxa_list, alphabet=None):
+        if isinstance(alphabet, dendropy.StateAlphabet) or (alphabet is None):
+            self._alphabet = alphabet
+        else:
+            self._alphabet = self._alphabet_label2obj[alphabet]
+
+        # TODO: modify init so that it detects repeated values (even if it's specified as a taxon object one time and as a label the other) and throws an error
+        self._taxon_namespace = taxon_namespace
+        self._taxa_list = []
+        self._taxon2index = {}
+        for ix, taxon in enumerate(taxa_list):
+            taxon = self._convert_label(taxon)
+            if taxon in taxon_namespace:
+                self._taxon2index[taxon] = ix
+                self._taxon2index[taxon.label] = ix
+                # append one at a time to make sure labels have been converted to taxa first
+                self._taxa_list.append(taxon)
+            else:
+                # not in namespace, or wrong type
+                # TODO: throw a real error
+                assert False, "Each taxon must be included in the given taxon namespace."
+
+        self._taxa_list = np.array(self._taxa_list)
+
+    @classmethod
+    def whole_namespace(cls, namespace):
+        return cls(namespace, list(namespace))
+
+    @classmethod
+    def default(cls, length):
+        return cls.whole_namespace(default_namespace(length))
+
+    @property
+    def alphabet(self):
+        return self._alphabet
+
+    @property
+    def taxon_namespace(self):
+        return self._taxon_namespace
+
+    def __getitem__(self, taxon):
+        return self._taxon2index[taxon]
+
+    def __iter__(self):
+        for taxon in self._taxa_list:
+            yield taxon
+
+    def __len__(self):
+        return len(self._taxa_list)
+
+    def _convert_label(self, taxon_or_label):
+        return self.taxon_namespace.get_taxon(taxon_or_label) if self.taxon_namespace.has_taxon_label(taxon_or_label) else taxon_or_label
+
+    def _convert_labels(self, taxa_or_labels):
+        return [self._convert_label(t_or_l) for t_or_l in taxa_or_labels]
+
+    def index2taxa(self, indexer):
+        return self._taxa_list[indexer]
+
+    def taxon2mask(self, taxon):
+        taxon = self._convert_label(taxon)
+        mask = np.zeros(len(self), dtype=bool)
+        mask[self[taxon]] = True
+        return mask
+
+    def taxa2mask(self, taxa):
+        taxa = self._convert_labels(taxa)
+        mask = np.zeros(len(self), dtype=bool)
+        mask[[self[taxon] for taxon in taxa]] = True
+        return mask
+
+    def taxa2bipartition(self, taxa):
+        """
+        taxa is list of taxon objects or labels
+        """
+        taxa = self._convert_labels(taxa)
+        return self._taxon_namespace.taxa_bipartition(taxa=taxa)
+
+    def bipartition2taxa(self, bipartition):
+        """
+        Given a dendropy bipartition, output a list of taxa (objects)
+        that it includes
+        """
+        return bipartition.leafset_taxa(self._taxon_namespace)
+
+    def mask2bipartition(self, mask):
+        return self.taxa2bipartition(self.index2taxa(mask))
+
+    def bipartition2mask(self, bipartition):
+        return self.taxa2mask(self.bipartition2taxa(bipartition))
+
+    def leaf(self, taxon, **kwargs):
+        taxon = self._convert_label(taxon)
+        assert taxon in self, "Must supply taxon in the taxa map to produce a leaf."
+
+        kwargs['taxon'] = taxon
+        node = dendropy.Node(**kwargs)
+        node.mask = self.taxon2mask(taxon)
+        return node
+
+    def all_leaves(self, **kwargs):
+        return [self.leaf(taxon, **kwargs) for taxon in self]
+        
+    def reindex_matrix(self, matrix, old_taxa, axes=[0]):
+        assert False
+        assert self.equals_unordered(old_taxa), "Old and new taxa maps must have the same set of taxa."
+        new_matrix = np.zeros_like(matrix)
+        # how do we generalize this for different numbers of axes?
+
+    def __str__(self):
+        return str([taxon.label for taxon in self])
+
+    def __eq__(self, other):
+        return isinstance(other, TaxaMetadata) and (
+            self.taxon_namespace == other.taxon_namespace) and (
+                self.alphabet == other.alphabet) and (
+                    all(self._taxa_list == other._taxa_list))
+
+    def equals_unordered(self, other):
+        return isinstance(other, TaxaMetadata) and (
+            self.taxon_namespace == other.taxon_namespace) and (
+                self.alphabet == other.alphabet) and (
+                    set(self._taxa_list) == set(other._taxa_list))
+
+def charmatrix2array(charmatrix):
+    #charmatrix[taxon].values()
+    alphabet = charmatrix.state_alphabets[0] # TODO: what if there are multiple different state_alphabets?
+    taxa = []
+    sequences = []
+    for taxon in charmatrix:
+        taxa.append(taxon)
+        sequences.append([state_id.index for state_id in charmatrix[taxon].values()])
+    
+    return np.array(sequences), TaxaMetadata(charmatrix.taxon_namespace, taxa, alphabet=alphabet)
+
+def array2charmatrix(matrix, taxa_metadata=None):
+    if taxa_metadata is None:
+        taxa_metadata = TaxaMetadata.default(matrix.shape[0])
+    else:
+        assert len(taxa_metadata) == matrix.shape[0], "Taxon-Index map does not match size of matrix."
+    
+    alphabet = taxa_metadata.alphabet
+    # TODO: add support for DNACharacterMatrix and others
+    if alphabet is None:
+        # input the values in the matrix directly
+        alphabet = dendropy.new_standard_state_alphabet(val for val in np.unique(matrix))
+        char_matrix = dendropy.StandardCharacterMatrix(default_state_alphabet=alphabet, taxon_namespace=taxa_metadata.taxon_namespace)
+        for taxon, ix in taxa_metadata.items():
+            char_matrix.new_sequence(taxon, [str(x) for x in matrix[ix, :]])
+    else:
+        # assume values in the matrix are indices into the alphabet
+        alpha2matrix_class = {
+            dendropy.DNA_STATE_ALPHABET: dendropy.DnaCharacterMatrix,
+            dendropy.RNA_STATE_ALPHABET: dendropy.RnaCharacterMatrix,
+            dendropy.NUCLEOTIDE_STATE_ALPHABET: dendropy.NucleotideCharacterMatrix,
+            dendropy.PROTEIN_STATE_ALPHABET: dendropy.ProteinCharacterMatrix,
+            dendropy.BINARY_STATE_ALPHABET: dendropy.RestrictionSitesCharacterMatrix,
+        }
+        if alphabet in alpha2matrix_class:
+            char_matrix = alpha2matrix_class[alphabet](taxon_namespace=taxa_metadata.taxon_namespace)
+        else:
+            char_matrix = dendropy.StandardCharacterMatrix(default_state_alphabet=alphabet, taxon_namespace=taxa_metadata.taxon_namespace)
+
+        for taxon, ix in taxa_metadata.items():
+            # you need .item to convert from numpy.int64 to int. dendropy expects only int
+            char_matrix.new_sequence(taxon, [alphabet[v.item()] for v in matrix[ix, :]])
+
+    return char_matrix
+
+def array2distance_matrix(matrix, taxa_metadata=None):
+    m, m2 = matrix.shape
+    assert m == m2, "Distance matrix must be square"
+    if taxa_metadata is None:
+        taxa_metadata = TaxaMetadata.default(m)
+    else:
+        assert len(taxa_metadata) == m, "Taxon-Index map does not match size of matrix."
+
+    dict_form = defaultdict(dict)
+    for row_taxon in taxa_metadata:
+        for column_taxon in taxa_metadata:
+            dict_form[row_taxon][column_taxon] = matrix[taxa_metadata[row_taxon], taxa_metadata[column_taxon]]
+    dm = dendropy.calculate.phylogeneticdistance.PhylogeneticDistanceMatrix()
+    dm.compile_from_dict(dict_form, taxa_metadata.taxon_namespace)
+    return dm
+
+def distance_matrix2array(dm):
+    """
+    This is patristic distance: adding the branch lengths. If we set branches to
+    have different transitions, this won't be the paralinear distance
+    """
+    taxa = TaxaMetadata(dm.taxon_namespace, list(dm.taxon_iter()))
+    return scipy.spatial.distance.squareform([dm.distance(taxon1, taxon2) for taxon1, taxon2 in combinations(taxa,2)]), taxa
+
+def tree2distance_matrix(tree):
+    return distance_matrix2array(tree.phylogenetic_distance_matrix())
 
 def merge_children(children, **kwargs):
     node = dendropy.Node(**kwargs)
@@ -25,7 +220,6 @@ def merge_children(children, **kwargs):
     if all(hasattr(child,'taxa_set') for child in children):
         node.taxa_set = np.logical_or.reduce(tuple(child.taxa_set for child in children))
     return node
-
 
 def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
     for e in tree.edges():
@@ -39,80 +233,55 @@ def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
             assert uniform_range is not None
             e.length = np.random.uniform(*uniform_range)
 
-def charmatrix2array(charmatrix):
-    #charmatrix[taxon].values()
-    alphabet = charmatrix.state_alphabets[0]
-    return np.array([[state_id.index for state_id in charmatrix[taxon].values()] for taxon in charmatrix]), alphabet
-
-def array2charmatrix(matrix, alphabet=None, namespace=None):
-    if namespace is None:
-        namespace = default_namespace(matrix.shape[0])
-    else:
-        assert len(namespace) == matrix.shape[0]
-    if alphabet is None:
-        alphabet = dendropy.new_standard_state_alphabet(val for val in np.unique(matrix))
-
-    str_matrix = matrix.astype('str') # there must be a faster way...
-    return dendropy.StandardCharacterMatrix.from_dict({taxon: str_matrix[i,:] for (i, taxon) in enumerate(namespace)}, default_state_alphabet=alphabet)
-
-def array2distance_matrix(matrix, namespace=None):
-    m, m2 = matrix.shape
-    assert m == m2, "Distance matrix must be square"
-    if namespace is None:
-        namespace = default_namespace(m)
-    else:
-        assert len(namespace) >= m, "Namespace too small for distance matrix"
-
-    dict_form = defaultdict(dict)
-    for i in range(m):
-        for j in range(m):
-            dict_form[namespace[i]][namespace[j]] = matrix[i,j]
-    dm = dendropy.calculate.phylogeneticdistance.PhylogeneticDistanceMatrix()
-    dm.compile_from_dict(dict_form, namespace)
-    return dm
-
-def distance_matrix2array(dm):
-    """
-    This is patristic distance: adding the branch lengths. If we set branches to
-    have different transitions, this won't be the paralinear distance
-    """
-    taxa = list(dm.taxon_namespace)
-    return scipy.spatial.distance.squareform([dm.distance(taxon1, taxon2) for taxon1, taxon2 in combinations(taxa,2)])
-
-def tree2distance_matrix(tree):
-    return distance_matrix2array(tree.phylogenetic_distance_matrix())
-
 ##########################################################
 ##               Tree Generation
 ##########################################################
 
-def balanced_binary(num_taxa, namespace=None, edge_length=1.):
-    assert num_taxa == 2**int(np.log2(num_taxa)), "The number of leaves in a balanced binary tree must be a power of 2."
-    if namespace is None:
-        namespace = default_namespace(num_taxa)
-    else:
-        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
+# Including these functions here for convenience
+from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
 
-    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
+def balanced_binary(num_taxa=None, taxa=None, edge_length=1.):
+    if taxa is None:
+        if num_taxa:
+            taxa = TaxaMetadata.default(num_taxa)
+        else:
+            assert False, "Must provide either the number of leaves or a TaxaMetadata"
+
+    if num_taxa:
+        assert num_taxa == len(taxa), "The number of leaves must match the number of taxa given."
+    else:
+        num_taxa = len(taxa)
+
+    assert num_taxa == 2**int(np.log2(num_taxa)), "The number of leaves in a balanced binary tree must be a power of 2."
+
+    nodes = taxa.all_leaves(edge_length=edge_length)
     while len(nodes) > 1:
         nodes = [merge_children(nodes[2*i : 2*i+2], edge_length=edge_length) for i in range(len(nodes)//2)]
 
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0], is_rooted=False)
+    return dendropy.Tree(taxon_namespace=taxa.taxon_namespace, seed_node=nodes[0], is_rooted=False)
 
-def lopsided_tree(num_taxa, namespace=None, edge_length=1.):
-    # one node splits off at each step
-    if namespace is None:
-        namespace = default_namespace(num_taxa)
+def lopsided_tree(num_taxa, taxa=None, edge_length=1.):
+    """One node splits off at each step"""
+    if taxa is None:
+        if num_taxa:
+            taxa = TaxaMetadata.default(num_taxa)
+        else:
+            assert False, "Must provide either the number of leaves or a TaxaMetadata"
+
+    if num_taxa:
+        assert num_taxa == len(taxa), "The number of leaves must match the number of taxa given."
     else:
-        assert num_taxa == len(namespace), "The number of leaves must match the size of the given namespace."
+        num_taxa = len(taxa)
 
-    nodes = [leaf(i, namespace, edge_length=edge_length) for i in range(num_taxa)]
+    nodes = taxa.all_leaves(edge_length=edge_length)
     while len(nodes) > 1:
-        a = nodes.pop()
+        # maintain this order, because we want the order of the taxa when we
+        # iterate thru the leaves to be the same as specified in taxa argument
         b = nodes.pop()
+        a = nodes.pop()
         nodes.append(merge_children((a,b), edge_length=edge_length))
 
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=nodes[0], is_rooted=False)
+    return dendropy.Tree(taxon_namespace=taxa.taxon_namespace, seed_node=nodes[0], is_rooted=False)
 
 def unrooted_birth_death_tree(num_taxa, namespace=None, birth_rate=0.5, death_rate = 0, **kwargs):
     if namespace == None:
