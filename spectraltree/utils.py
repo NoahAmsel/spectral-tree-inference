@@ -95,8 +95,18 @@ class TaxaMetadata(Mapping):
         taxa = self._convert_labels(taxa)
         return self._taxon_namespace.taxa_bipartition(taxa=taxa)
 
+    def bipartition2taxa(self, bipartition):
+        """
+        Given a dendropy bipartition, output a list of taxa (objects)
+        that it includes
+        """
+        return bipartition.leafset_taxa(self._taxon_namespace)
+
     def mask2bipartition(self, mask):
         return self.taxa2bipartition(self.index2taxa(mask))
+
+    def bipartition2mask(self, bipartition):
+        return self.taxa2mask(self.bipartition2taxa(bipartition))
 
     def leaf(self, taxon, **kwargs):
         taxon = self._convert_label(taxon)
