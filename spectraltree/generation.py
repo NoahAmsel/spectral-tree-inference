@@ -4,7 +4,7 @@ import scipy.linalg
 import scipy.spatial.distance
 import dendropy
 
-from .utils import TaxaMetadata
+from utils import TaxaMetadata
 
 def nchoose2(n):
     return int(n*(n-1)/2)
@@ -167,6 +167,7 @@ class TN93(GTR):
         transition_rates = np.array([kappa1, 1, 1, 1, 1, kappa2]).astype(float)
         super().__init__(stationary_freqs, transition_rates, rng=rng)
 
+# TODO: THIS COMMENT IS WRONG!!! A and G are of one type, NOT A and C
 class T92(TN93):
     def __init__(self, theta, kappa1, kappa2, rng=None):
         #  we could allow for more than for classes

@@ -88,6 +88,11 @@ class TaxaMetadata(Mapping):
         mask[[self[taxon] for taxon in taxa]] = True
         return mask
 
+    def mask2taxa(self, mask):
+        # need comma because output is a tuple of one element
+        taxa_ix, = mask.nonzero()
+        return [self.index2taxa(ix) for ix in taxa_ix]
+
     def taxa2bipartition(self, taxa):
         """
         taxa is list of taxon objects or labels
@@ -107,6 +112,26 @@ class TaxaMetadata(Mapping):
 
     def bipartition2mask(self, bipartition):
         return self.taxa2mask(self.bipartition2taxa(bipartition))
+
+    def taxa2sub_taxa_metadata(self, taxa):
+        # TODO: replace TaxaMetadata with typeof(self)
+        return TaxaMetadata(self.taxon_namespace, taxa, self.alphabet)
+
+    def mask2sub_taxa_metadata(self, mask):
+        taxa = self.mask2taxa(mask)
+        return self.taxa2sub_taxa_metadata(taxa)
+
+    def tree2mask(self, tree):
+        return self.taxa2mask([leaf.taxon for leaf in tree.leaf_nodes()])
+
+    def invert_mask_in_tree(self, tree, mask):
+        tree_mask = self.tree2mask(tree)
+        # assure mask is a subset of the nodes in the tree
+        assert not np.logical_and(np.logical_not(tree_mask), mask).any()
+        return tree_mask ^ mask
+
+    def invert_bipartition_in_tree(self, tree, bipartition):
+        return self.invert_mask_in_tree(self.bipartition2mask(bipartition))
 
     def leaf(self, taxon, **kwargs):
         taxon = self._convert_label(taxon)
@@ -217,8 +242,8 @@ def merge_children(children, **kwargs):
     node = dendropy.Node(**kwargs)
     for child in children:
         node.add_child(child)
-    if all(hasattr(child,'taxa_set') for child in children):
-        node.taxa_set = np.logical_or.reduce(tuple(child.taxa_set for child in children))
+    if all(hasattr(child,'mask') for child in children):
+        node.mask = np.logical_or.reduce(tuple(child.mask for child in children))
     return node
 
 def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):

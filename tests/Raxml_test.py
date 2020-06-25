@@ -23,7 +23,7 @@ from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 
 
-num_taxa = 128
+num_taxa = 64
 N = 1000
 reference_tree = utils.balanced_binary(num_taxa)
 reference_tree.print_plot()
@@ -36,7 +36,7 @@ data = simulate_discrete_chars(N, reference_tree, Jc69(), mutation_rate=generati
 time_s = time.time()
 raxml = reconstruct_tree.RAxML()
 tree = raxml(data)
-runtime = time.time()-time()
+runtime = time.time()-time_s
 
 tree.print_plot()
 
@@ -58,12 +58,12 @@ print("")
 jc = generation.Jukes_Cantor()
 mutation_rate = [jc.p2t(0.95)]
 
-observations = generation.simulate_sequences_ordered(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate)
+observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
 
 time_s = time.time()
 raxml = reconstruct_tree.RAxML()
-tree = raxml(data)
-runtime = time.time()-time()
+tree = raxml(observations, taxa_meta)
+runtime = time.time()-time_s
 print("")
 print("Data in numpy array:")
 print("symmetric_difference: ",symmetric_difference(reference_tree, tree))
