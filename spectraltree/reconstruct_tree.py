@@ -390,11 +390,14 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     O2 = np.outer(v_12[0,:],v_12[0,:])
 
     # find root of half 1
-    bipartitions = T1.bipartition_edge_map.keys()
-    if len(bipartitions) > 1:
+    bipartitions1 = T1.bipartition_edge_map.keys()
+    if verbose: print("len(bipartitions1)", len(bipartitions1))
+    if len(bipartitions1) ==2:
+        print("NOOOOO")
+    if len(bipartitions1) > 1:
         min_score = float("inf")
         results = {'sizeA': [], 'sizeB': [], 'score': []}
-        for bp in bipartitions:
+        for bp in bipartitions1:
             mask1A = taxa_metadata.bipartition2mask(bp)
             mask1B = taxa_metadata.invert_mask_in_tree(T1, mask1A)
 
@@ -424,6 +427,9 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     #[u_12,s,v_12] = np.linalg.svd(S_12.T)
     
     bipartitions2 = T2.bipartition_edge_map.keys()
+    if verbose: print("len(bipartitions2)", len(bipartitions2))
+    # if len(bipartitions2) ==2:
+    #     print("NOOOOO")
     if len(bipartitions2) > 1:
         min_score = float("inf")
         results2 = {'sizeA': [], 'sizeB': [], 'score': []}
@@ -620,6 +626,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         return "spectralTree"
 
     def deep_spectral_tree_reconstruction(self, sequences, similarity_metric, taxa_metadata = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle", verbose = False, **kargs):
+        self.verbose = verbose
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
@@ -693,7 +700,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
 
         # cur_similarity = self.similarity_matrix[node.bitmap,:]
         # cur_similarity = cur_similarity[:,node.bitmap]
-        return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata)
+        return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
     
     def reconstruct_alg_wrapper(self, node, **kargs):
         # DELETE namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
