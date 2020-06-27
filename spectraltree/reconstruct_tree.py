@@ -380,6 +380,9 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
 
     T1_mask = taxa_metadata.tree2mask(T1)
     T2_mask = taxa_metadata.tree2mask(T2)
+    # Make sure this is necessary
+    T1.is_rooted = True
+    T2.is_rooted = True
 
     S_12 = similarity_matrix[np.ix_(T1_mask, T2_mask)]
 
