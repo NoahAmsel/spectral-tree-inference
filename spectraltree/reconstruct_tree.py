@@ -527,7 +527,7 @@ class RAxML(ReconstructionMethod):
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH, 'raxmlHPC-SSE3.exe'))
         elif platform.system() == 'Darwin':
             #MacOS version:
-            rx = raxml.RaxmlRunner()
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-macOS'))
         elif platform.system() == 'Linux':
             #Linux version
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-SSE3-linux'))
