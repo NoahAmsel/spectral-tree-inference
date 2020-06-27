@@ -25,6 +25,10 @@ class TaxaMetadata(Mapping):
 
         # TODO: modify init so that it detects repeated values (even if it's specified as a taxon object one time and as a label the other) and throws an error
         self._taxon_namespace = taxon_namespace
+
+        # for fast label lookups
+        self._label2taxon = {taxon.label: taxon for taxon in self._taxon_namespace}
+
         self._taxa_list = []
         self._taxon2index = {}
         for ix, taxon in enumerate(taxa_list):
@@ -68,7 +72,7 @@ class TaxaMetadata(Mapping):
         return len(self._taxa_list)
 
     def _convert_label(self, taxon_or_label):
-        return self.taxon_namespace.get_taxon(taxon_or_label) if self.taxon_namespace.has_taxon_label(taxon_or_label) else taxon_or_label
+        return self._label2taxon.get(taxon_or_label, taxon_or_label)
 
     def _convert_labels(self, taxa_or_labels):
         return [self._convert_label(t_or_l) for t_or_l in taxa_or_labels]
@@ -77,13 +81,11 @@ class TaxaMetadata(Mapping):
         return self._taxa_list[indexer]
 
     def taxon2mask(self, taxon):
-        taxon = self._convert_label(taxon)
         mask = np.zeros(len(self), dtype=bool)
         mask[self[taxon]] = True
         return mask
 
     def taxa2mask(self, taxa):
-        taxa = self._convert_labels(taxa)
         mask = np.zeros(len(self), dtype=bool)
         mask[[self[taxon] for taxon in taxa]] = True
         return mask
