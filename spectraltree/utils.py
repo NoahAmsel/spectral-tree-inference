@@ -124,6 +124,10 @@ class TaxaMetadata(Mapping):
         return self.taxa2sub_taxa_metadata(taxa)
 
     def tree2mask(self, tree):
+        """
+        Warning! This is slow. It's faster to store the mask as a 
+        member of the tree rather than calling this function again and again.
+        """
         return self.taxa2mask([leaf.taxon for leaf in tree.leaf_nodes()])
 
     def invert_mask_in_tree(self, tree, mask):

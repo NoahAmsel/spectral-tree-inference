@@ -402,14 +402,14 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
         results = {'sizeA': [], 'sizeB': [], 'score': []}
         for bp in bipartitions1:
             mask1A = taxa_metadata.bipartition2mask(bp)
-            mask1B = taxa_metadata.invert_mask_in_tree(T1, mask1A)
+            mask1B = (T1.mask ^ mask1A)
 
             score = compute_merge_score(mask1A, mask1B, T2_mask, similarity_matrix, u_12[:,0],sigma_12[0], v_12[0,:], O1, merge_method)
             # DELETE ME bool_array = taxa_metadata.bipartition2mask(bp)
             #DELETE ME score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O1,merge_method)
             
-            results['sizeA'].append(sum(mask1A))
-            results['sizeB'].append(sum(mask1B))
+            results['sizeA'].append(mask1A.sum())
+            results['sizeB'].append(mask1B.sum())
             results['score'].append(score)
             #results.append([sum(bool_array),sum(~bool_array), score])
             if score <min_score:
@@ -418,9 +418,9 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
                 min_mask1A = mask1A
 
         #bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
-        if sum(min_mask1A)==1:
+        if min_mask1A.sum()==1:
             print('one')
-        if verbose: print("one - merging: ",sum(min_mask1A), " out of: ", sum(T1_mask))
+        if verbose: print("one - merging: ",min_mask1A.sum(), " out of: ", T1_mask.sum())
         
         T1.reroot_at_edge(T1.bipartition_edge_map[bp_min])
     #if len(bipartitions) > 1: 
@@ -438,14 +438,14 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
         results2 = {'sizeA': [], 'sizeB': [], 'score': []}
         for bp in bipartitions2:
             mask2A = taxa_metadata.bipartition2mask(bp)
-            mask2B = taxa_metadata.invert_mask_in_tree(T2, mask2A)
+            mask2B = (T2.mask ^ mask2A)
 
             score = compute_merge_score(mask2A, mask2B, T1_mask, similarity_matrix, v_12[0,:],sigma_12[0], u_12[:,0], O2, merge_method)
             # DELETE ME bool_array = taxa_metadata.bipartition2mask(bp)
             #DELETE ME score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O1,merge_method)
             
-            results2['sizeA'].append(sum(mask2A))
-            results2['sizeB'].append(sum(mask2B))
+            results2['sizeA'].append(mask2A.sum())
+            results2['sizeB'].append(mask2B.sum())
             results2['score'].append(score)
             #results.append([sum(bool_array),sum(~bool_array), score])
             if score <min_score:
@@ -453,9 +453,9 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
                 bp_min2 = bp
                 min_mask2A = mask2A
 
-        if sum(min_mask2A)==1:
+        if min_mask2A.sum()==1:
             print('one')
-        if verbose: print("one - merging: ",sum(min_mask2A), " out of: ", sum(T2_mask))
+        if verbose: print("one - merging: ",min_mask2A.sum(), " out of: ", T2_mask.sum())
         T2.reroot_at_edge(T2.bipartition_edge_map[bp_min2])
         #if len(bipartitions2) > 1: 
         #    T2.reroot_at_edge(T2.bipartition_edge_map[bp_min2])
@@ -646,6 +646,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         while True:
             if (cur_node.right != None) and (cur_node.right.tree !=None) and (cur_node.left.tree != None):
                 cur_node.tree = self.margeTreesLeftRight(cur_node, merge_method)
+                cur_node.tree.mask = np.logical_or(cur_node.right.tree.mask, cur_node.left.tree.mask)
                 if cur_node.parent == None:
                     break
                 if cur_node.parent.right == cur_node:
@@ -663,6 +664,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
             else:
                 start_time = time.time()
                 cur_node.tree = self.reconstruct_alg_wrapper(cur_node, **kargs)
+                cur_node.tree.mask = taxa_metadata.tree2mask(cur_node.tree)
                 runtime = time.time() - start_time
                 if verbose: print("--- %s seconds ---" % runtime)
                 if cur_node.parent == None:
