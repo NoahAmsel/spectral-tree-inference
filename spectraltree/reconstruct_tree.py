@@ -221,14 +221,14 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
     # the second singular value of the partition.
     m = len(v)
     partition_min = v>0
-    if np.minimum(sum(partition_min),sum(~partition_min))<min_split:
+    if np.minimum(np.sum(partition_min),np.sum(~partition_min))<min_split:
         if num_gaps == 0:
             raise Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
         else:
             smin = np.inf
     if num_gaps > 0:
         
-        if np.minimum(sum(partition_min),sum(~partition_min))>=min_split:
+        if np.minimum(np.sum(partition_min),np.sum(~partition_min))>=min_split:
             s_sliced = similarity[partition_min,:]
             s_sliced = s_sliced[:,~partition_min]
             smin = svd2(s_sliced)
@@ -239,7 +239,7 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
         for i in range(1, num_gaps+1):
             threshold = (v_sort[sort_idx[-i]+min_split-1]+v_sort[sort_idx[-i]+min_split])/2
             bool_bipartition = v<threshold
-            if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))>=min_split:
+            if np.minimum(np.sum(bool_bipartition),np.sum(~bool_bipartition))>=min_split:
                 s_sliced = similarity[bool_bipartition,:]
                 s_sliced = s_sliced[:,~bool_bipartition]
                 s2 = svd2(s_sliced)
@@ -357,13 +357,16 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     min_score = float("inf")
     results = []
     results = {'sizeA': [], 'sizeB': [], 'score': []}
+    if verbose: print("len(bipartitions1)", len(bipartitions1))
+    if len(bipartitions1.keys()) ==2:
+        print("NOOOOO") 
     for bp in bipartitions1.keys():
         bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
 
         score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O,merge_method)
         
-        results['sizeA'].append(sum(bool_array))
-        results['sizeB'].append(sum(~bool_array))
+        results['sizeA'].append(np.sum(bool_array))
+        results['sizeB'].append(np.sum(~bool_array))
         results['score'].append(score)
         #results.append([sum(bool_array),sum(~bool_array), score])
         if score <min_score:
@@ -371,9 +374,10 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
             bp_min = bp
 
     bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
-    if sum(bool_array)==1:
-        print('one')
-    if verbose: print("one - merging: ",sum(bool_array), " out of: ", len(bool_array))
+    if verbose: 
+        if np.sum(bool_array)==1:
+            print('one')
+    if verbose: print("one - merging: ",np.sum(bool_array), " out of: ", len(bool_array))
     if len(bipartitions1.keys()) > 1: 
         T1.reroot_at_edge(bipartitions1[bp_min])
 
@@ -384,6 +388,9 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     bipartitions2 = T2.bipartition_edge_map
     min_score = float("inf")
     results2 = []
+    if verbose: print("len(bipartitions2)", len(bipartitions2))
+    if len(bipartitions2.keys()) ==2:
+        print("NOOOOO")
     for bp in bipartitions2.keys():
         bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
         #h2_idx_A = half2_idx_array[bool_array]
@@ -391,15 +398,16 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
         
         score = compute_merge_score(bool_array,S_22,S_12.T,v_12[0,:],sigma_12[0],u_12[:,0],O,merge_method)
         
-        results2.append([sum(bool_array),sum(~bool_array), score])
+        results2.append([np.sum(bool_array),np.sum(~bool_array), score])
         if score <min_score:
             min_score = score
             bp_min = bp
 
     bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
-    if sum(bool_array)==1:
-        print('one')
-    if verbose: print("one - merging: ",sum(bool_array), " out of: ", len(bool_array))
+    if verbose:
+        if np.sum(bool_array)==1:
+            print('one')
+    if verbose: print("one - merging: ",np.sum(bool_array), " out of: ", len(bool_array))
     if len(bipartitions2.keys()) > 1: 
         T2.reroot_at_edge(bipartitions2[bp_min])
 
@@ -572,6 +580,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         return "spectralTree"
 
     def deep_spectral_tree_reconstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle", verbose = False, **kargs):
+        self.verbose = verbose
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
@@ -593,11 +602,11 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                     cur_node = cur_node.parent.left
                 else:
                     cur_node = cur_node.parent
-            elif sum(cur_node.bitmap) > threshhold:
+            elif np.sum(cur_node.bitmap) > threshhold:
                 L1,L2 = self.splitTaxa(cur_node,num_gaps,min_split)
                 if verbose: print("partition")
-                if verbose: print("L1 size: ", sum(L1))
-                if verbose: print("L2 size: ", sum(L2))
+                if verbose: print("L1 size: ", np.sum(L1))
+                if verbose: print("L2 size: ", np.sum(L2))
                 cur_node.setLeft(MyNode(L1))
                 cur_node.setRight(MyNode(L2))
                 cur_node = cur_node.right
@@ -622,7 +631,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         _, V = np.linalg.eigh(laplacian)
         bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
         # %%
-        if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))<min_split:
+        if np.minimum(np.sum(bool_bipartition),np.sum(~bool_bipartition))<min_split:
             print("????")
             bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
 
@@ -639,7 +648,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         cur_namespace = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]])  
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
-        return join_trees_with_spectral_root_finding_ls(cur_similarity, node.left.tree, node.right.tree, merge_method,taxon_namespace=cur_namespace)
+        return join_trees_with_spectral_root_finding_ls(cur_similarity, node.left.tree, node.right.tree, merge_method,taxon_namespace=cur_namespace, verbose=self.verbose)
     
     def reconstruct_alg_wrapper(self, node, **kargs):
         namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
