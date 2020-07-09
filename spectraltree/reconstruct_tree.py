@@ -418,8 +418,9 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
                 min_mask1A = mask1A
 
         #bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
-        if min_mask1A.sum()==1:
-            print('one')
+        if verbose:
+            if min_mask1A.sum()==1:
+                print('one')
         if verbose: print("one - merging: ",min_mask1A.sum(), " out of: ", T1_mask.sum())
         
         T1.reroot_at_edge(T1.bipartition_edge_map[bp_min])
@@ -452,9 +453,9 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
                 min_score = score
                 bp_min2 = bp
                 min_mask2A = mask2A
-
-        if min_mask2A.sum()==1:
-            print('one')
+        if verbose:
+            if min_mask2A.sum()==1:
+                print('one')
         if verbose: print("one - merging: ",min_mask2A.sum(), " out of: ", T2_mask.sum())
         T2.reroot_at_edge(T2.bipartition_edge_map[bp_min2])
         #if len(bipartitions2) > 1: 
