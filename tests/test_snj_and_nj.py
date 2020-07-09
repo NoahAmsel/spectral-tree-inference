@@ -20,7 +20,6 @@ sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 import utils
 import generation
 import reconstruct_tree
-from character_matrix import FastCharacterMatrix
 
 from dendropy.model.discrete import simulate_discrete_chars, Jc69, Hky85
 from dendropy.calculate.treecompare import symmetric_difference
@@ -33,7 +32,7 @@ num_taxa = 32
 #################################
 print("Creating tree")
 jc = generation.Jukes_Cantor()
-# hky = generation.HKY(kappa = 2)
+hky = generation.HKY(kappa = 2)
 #mutation_rate = [jc.p2t(0.95)]
 mutation_rate = [0.1]
 
@@ -43,16 +42,20 @@ reference_tree = utils.lopsided_tree(num_taxa)
 # for x in reference_tree.preorder_edge_iter():
 #     x.length = 0.5
 print("Genration observations by JC and HKY")
+
+observationsJC, metaJC = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
+observationsHKY, metaHKY = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=hky, mutation_rate=mutation_rate, alphabet="DNA")
+
 #observationsJC = FastCharacterMatrix(generation.simulate_sequences_ordered(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate))
-observationsJC = FastCharacterMatrix(simulate_discrete_chars(N, reference_tree, Jc69(), mutation_rate=mutation_rate[0]))
-observationsHKY = FastCharacterMatrix(simulate_discrete_chars(N, reference_tree, Hky85(kappa = 1), mutation_rate=mutation_rate[0]))
+#observationsJC = FastCharacterMatrix(simulate_discrete_chars(N, reference_tree, Jc69(), mutation_rate=mutation_rate[0]))
+#observationsHKY = FastCharacterMatrix(simulate_discrete_chars(N, reference_tree, Hky85(kappa = 1), mutation_rate=mutation_rate[0]))
 
 #################################
 ## SNJ - Jukes_Cantor
 #################################
 t0 = _t()
 snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)   
-tree_rec = snj(observationsJC,reference_tree.taxon_namespace)
+tree_rec = snj(observationsJC, metaJC)
 RF,F1 = reconstruct_tree.compare_trees(tree_rec, reference_tree)
 print("###################")
 print("SNJ - Jukes_Cantor:")
@@ -65,7 +68,7 @@ print("")
 #################################
 t0 = _t()
 nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)   
-tree_rec = nj(observationsJC,reference_tree.taxon_namespace)
+tree_rec = nj(observationsJC, metaJC)
 RF,F1 = reconstruct_tree.compare_trees(tree_rec, reference_tree)
 
 print("###################")
@@ -81,7 +84,7 @@ print("")
 #################################
 t0 = _t()
 snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.HKY_similarity_matrix)   
-tree_rec = snj(observationsHKY,reference_tree.taxon_namespace)
+tree_rec = snj(observationsHKY, metaHKY)
 RF,F1 = reconstruct_tree.compare_trees(tree_rec, reference_tree)
 print("###################")
 print("SNJ - HKY:")
@@ -94,7 +97,7 @@ print("")
 #################################
 t0 = _t()
 nj = reconstruct_tree.NeighborJoining(reconstruct_tree.HKY_similarity_matrix)   
-tree_rec = nj(observationsHKY,reference_tree.taxon_namespace)
+tree_rec = nj(observationsHKY, metaHKY)
 RF,F1 = reconstruct_tree.compare_trees(tree_rec, reference_tree)
 print("###################")
 print("NJ - HKY:")
