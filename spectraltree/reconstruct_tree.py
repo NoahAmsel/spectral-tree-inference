@@ -11,7 +11,6 @@ from itertools import product
 import dendropy     #should this library be independent of dendropy? is that even possible?
 from dendropy.interop import raxml
 import utils
-from character_matrix import FastCharacterMatrix
 import time
 
 RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
@@ -35,12 +34,16 @@ def sum_squared_quartets(A1, A2, M):
     num = norm_sq**2 - np.linalg.norm(M_A.T.dot(M_A))**2
     return num / norm_sq
 
-def paralinear_similarity(observations, classes=None):
+def paralinear_similarity(observations, taxa_metadata=None):
     # build the similarity matrix M -- this is pretty optimized, at least assuming k << n
     # setting classes allows you to ignore missing data. e.g. set class to 1,2,3,4 and it will
     # treat np.nan, -1, and 5 as missing data
-    if classes is None:
-        classes = np.unique(observations)
+    
+    # TODO: clean and then delete these two
+    #if classes is None:
+    #    classes = np.unique(observations)
+    classes = np.unique(observations)
+
     observations_one_hot = np.array([observations==cls for cls in classes], dtype='int')
     # this command makes an (m x m) array of (k x k) confusion matrices
     # where m = number of leaves and k = number of classes
@@ -55,17 +58,16 @@ def paralinear_similarity(observations, classes=None):
     similarity = M / np.sqrt(np.outer(diag,diag))
     return similarity
 
-def paralinear_distance(observations, classes=None):
-    similarity = paralinear_similarity(observations, classes)
+def paralinear_distance(observations, taxa_metadata=None):
+    similarity = paralinear_similarity(observations)
     similarity = np.clip(similarity, a_min=1e-20, a_max=None)
     return -np.log(similarity)
 
-def JC_similarity_matrix(observations, classes=None):
+def JC_similarity_matrix(observations, taxa_metadata=None):
     """Jukes-Cantor Corrected Similarity"""
-    assert classes is None
-    if classes is None:
-        classes = np.unique(observations)
+    classes = np.unique(observations)
     if classes.dtype == np.dtype('<U1'):
+        # needed to use hamming distance with string arrays
         vord = np.vectorize(ord)
         observations = vord(observations)
     k = len(classes)
@@ -73,9 +75,9 @@ def JC_similarity_matrix(observations, classes=None):
     inside_log = 1 - hamming_matrix*k/(k-1)
     return inside_log**(k-1)
 
-def JC_distance_matrix(observations, classes=None):
+def JC_distance_matrix(observations, taxa_metadata=None):
     """Jukes-Cantor Corrected Distance"""
-    inside_log = JC_similarity_matrix(observations,classes)
+    inside_log = JC_similarity_matrix(observations, taxa_metadata)
     inside_log = np.clip(inside_log, a_min=1e-16, a_max=None)
     return - np.log(inside_log)
 
@@ -84,7 +86,7 @@ def estimate_edge_lengths(tree, distance_matrix):
     pass
 
 
-def hamming_dist_missing_values(vals, missing_val = "-"):
+def hamming_dist_missing_values(vals, missing_val):
     classnames, indices = np.unique(vals, return_inverse=True)
     num_arr = indices.reshape(vals.shape)
     hamming_matrix = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(num_arr, metric='hamming'))
@@ -94,7 +96,68 @@ def hamming_dist_missing_values(vals, missing_val = "-"):
     
     return (hamming_matrix*vals.shape[1] - pdist_xor) / (np.ones_like(hamming_matrix) * vals.shape[1] - pdist_or)
 
+def HKY_similarity_matrix(observations, taxa_metadata, verbose = False):
+    m, N = observations.shape
 
+    assert taxa_metadata.alphabet in [dendropy.DNA_STATE_ALPHABET, dendropy.RNA_STATE_ALPHABET]
+
+    if verbose: print("Computing the average base frequency for each pair of sequences...")
+    g = {}
+
+    # TODO: ignore other indice too, not just "-"
+    not_missing = observations != 4
+    not_missing_sum = np.sum(not_missing, axis = 1) # # not missing for each taxon
+    not_missing_pair = np.array([a + b for a, b in product(not_missing_sum, repeat = 2)]).reshape((m, m))
+
+    for x, ix in [("A",0), ("C",1), ("G",2), ("T",3)]:
+        obs_x = (observations == ix)
+        g[x] = np.array([np.sum(np.hstack([a, b])) for a, b in product(obs_x, repeat = 2)]).reshape((m, m))
+        g[x] = g[x] / not_missing_pair
+
+    # in DNA_STATE_ALPHABET, 0 => A, 1 => C, 2 => G, 3 => T (or U in RNA)
+    # Purines are A and G
+    # Pyrimidines are C and T (or U)
+
+    g["purines"] = g["A"] + g["G"]
+    g["pyrimidines"] = g["C"] + g["T"]
+
+    # compute transition and transversion proportion
+    if verbose: print("Computing transition and transversion proportion for each pair of sequences...")
+
+    P_1 = np.zeros((m,m))
+    P_2 = np.zeros((m,m))
+
+    A = hamming_dist_missing_values(observations, missing_val = 4)
+
+    for i in range(m):
+        for j in range(i + 1, m):
+            neither_missing = np.logical_and(not_missing[i,:], not_missing[j,:])
+            a = observations[i,:][neither_missing]
+            b = observations[j,:][neither_missing]
+            
+            # in DNA_STATE_ALPHABET, 0 => A, 1 => C, 2 => G, 3 => T (or U in RNA)
+            A_G = np.mean(np.logical_and(a == 0, b == 2) + np.logical_and(a == 2, b == 0))
+            P_1[i, j] = P_1[j, i] = A_G
+            
+            C_T = np.mean(np.logical_and(a == 1, b == 3) + np.logical_and(a == 3, b == 1))
+            P_2[i, j] = P_2[j, i] = C_T
+            
+    Q = A - P_1 - P_2
+    
+    #print("P", P_1, P_2)
+    #print("Q", Q)
+    # compute the similarity (formula 7)
+    if verbose: print("Computing similarity matrix")
+    R = (1 - g["purines"]/(2 * g["A"] * g["G"]) * P_1 - 1 / (2 * g["purines"]) * Q)
+    Y = (1 - g["pyrimidines"]/(2 * g["T"] * g["C"]) * P_2 - 1 / (2 * g["pyrimidines"]) * Q)
+    T = (1 - 1/(2 * g["purines"] * g["pyrimidines"]) * Q)
+    S = np.sign(R) * (np.abs(R))**(8 * g["A"] * g["G"] / g["purines"])
+    S *= np.sign(Y) * (np.abs(Y))**(8 * g["T"] * g["C"] / g["pyrimidines"])
+    S *= np.sign(T) * (np.abs(T))**(8 * (g["purines"] * g["pyrimidines"] - g["A"] * g["G"] * g["pyrimidines"] / g["purines"] - g["T"] * g["C"] * g["purines"] / g["pyrimidines"]))
+
+    return np.maximum(S,np.zeros_like(S))
+
+"""
 def HKY_similarity_matrix(observations, classes=None, verbose = False):
     m, N = observations.shape
     if classes is None:
@@ -158,7 +221,7 @@ def HKY_similarity_matrix(observations, classes=None, verbose = False):
 
     return np.maximum(S,np.zeros_like(S))
 
-
+"""
 
 ##########################################################
 ##               Reconstruction methods
@@ -169,48 +232,6 @@ def correlation_distance_matrix(observations):
     corr = np.abs(np.corrcoef(observations))
     corr = np.clip(corr, a_min=1e-16, a_max=None)
     return -np.log(corr)
-
-def estimate_tree_topology(similarity_matrix, taxon_namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
-    m, m2 = similarity_matrix.shape
-    assert m == m2, "Distance matrix must be square"
-    if taxon_namespace is None:
-        taxon_namespace = utils.default_namespace(m)
-    else:
-        assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
-    
-    # initialize leaf nodes
-    G = [utils.leaf(i, taxon_namespace) for i in range(m)]
-
-    available_clades = set(range(len(G)))   # len(G) == m
-    # initialize Sigma
-    Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
-    sv1 = np.full((2*m,2*m), np.nan)
-    for i,j in combinations(available_clades, 2):
-        Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, similarity_matrix)
-        Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
-
-    # merge
-    while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
-        left, right = min(combinations(available_clades, 2), key=lambda pair: Sigma[pair])
-        G.append(utils.merge_children((G[left], G[right])))
-        new_ix = len(G) - 1
-        available_clades.remove(left)
-        available_clades.remove(right)
-        for other_ix in available_clades:
-            Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, similarity_matrix)
-            Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
-        available_clades.add(new_ix)
-
-    # HEYYYY why does ariel do something special for the last THREE groups? (rather than last two)
-    # think about what would happen if at the end we have three groups: 1 leaf, 1 leaf, n-2 leaves
-    # how would we know which leaf to attach, since score would be 0 for both??
-
-    # return Phylo.BaseTree.Tree(G[-1])
-
-    # for a bifurcating tree we're combining the last two available clades
-    # for an unrooted one it's the last three because
-    # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
-    return dendropy.Tree(taxon_namespace=namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
 
 def raxml_reconstruct():
     pass
@@ -286,14 +307,18 @@ def compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma):
 
     alpha_square = np.linalg.lstsq( (U_T*sigma)**2,S_T)
     return alpha_square[0]
-                
-def compute_merge_score(bool_array,S_11,S_12,u_12,sigma_12,v_12,O,merge_method= 'least_square'):
+
+#DELETE ME def compute_merge_score(bool_array,S_11,S_12,u_12,sigma_12, v_12, O, merge_method= 'least_square'):
+def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12, v_12, O, merge_method= 'least_square'):
+    
+    mask1 = np.logical_or(mask1A, mask1B)
 
     # submatrix of similarities betweeb potential subgroups of 1:
-    S_11_AB = S_11[bool_array,:]
-    S_11_AB = S_11_AB[:,~bool_array]
+    S_11_AB = similarity_matrix[np.ix_(mask1A, mask1B)]
 
     #submatrix of outer product
+    # bool_array is indexer into O, which is size (# nodes in T1) x (# nodes in T1)
+    bool_array = mask1A[mask1]
     O_AB = O[bool_array,:]
     O_AB = O_AB[:,~bool_array]
 
@@ -312,32 +337,34 @@ def compute_merge_score(bool_array,S_11,S_12,u_12,sigma_12,v_12,O,merge_method= 
         score = 1-np.matmul(S_11_AB_n.T,O_AB_n)
     if merge_method=='tensor':
         # merge method 2 is tensor method
+        S_11 = S[np.ix_(mask1, mask1)]
+        S_12 = S[np.ix_(mask1, mask2)]
         alpha_square = compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma_12)
         score = np.linalg.norm(S_11_AB-alpha_square*O_AB)/np.linalg.norm(S_11_AB)
     else:
         Exception("Illigal method: choose least_square, angle or tensor")
     return score
 
-def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_method,taxon_namespace=None, verbose = False):
+def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_method, taxa_metadata, verbose = False):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
-    if taxon_namespace is None:
-        taxon_namespace = utils.default_namespace(m)
-    else:
-        assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
+    assert T1.taxon_namespace == T2.taxon_namespace == taxa_metadata.taxon_namespace
+    assert len(taxa_metadata) == m, "TaxaMetadata must correspond to the similarity matrix"
     
-    T = dendropy.Tree(taxon_namespace=taxon_namespace)
+    # the tree we get after combining T1 and T2
+    T = dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace)
 
+    """
     # Extracting inecies from namespace    
     T1_labels = [x.taxon.label for x in T1.leaf_nodes()]
     T2_labels = [x.taxon.label for x in T2.leaf_nodes()]
 
-    half1_idx_bool = [x.label in T1_labels for x in taxon_namespace]
-    half1_idx = [i for i, x in enumerate(half1_idx_bool) if x]    
+    half1_idx_bool = [x.label in T1_labels for x in taxa_metadata]
+    half1_idx = [i for i, x in enumerate(half1_idx_bool) if x]
     T1.is_rooted = True
     
-    half2_idx_bool = [x.label in T2_labels for x in taxon_namespace]
-    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]    
+    half2_idx_bool = [x.label in T2_labels for x in taxa_metadata]
+    half2_idx = [i for i, x in enumerate(half2_idx_bool) if x]  
     T2.is_rooted = True
     
     # Get sbmatrix of siilarities between nodes in subset 1 
@@ -349,67 +376,90 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     # Get sbmatrix of cross similarities between nodes in subsets 1 and 2
     S_12 = similarity_matrix[half1_idx,:]
     S_12 = S_12[:,half2_idx]
+    """
+
+    T1_mask = taxa_metadata.tree2mask(T1)
+    T2_mask = taxa_metadata.tree2mask(T2)
+    # Make sure this is necessary
+    T1.is_rooted = True
+    T2.is_rooted = True
+
+    S_12 = similarity_matrix[np.ix_(T1_mask, T2_mask)]
+
+    # TODO: truncated svd?
+    # u_12 is matrix
     [u_12,sigma_12,v_12] = np.linalg.svd(S_12)
-    O = np.outer(u_12[:,0],u_12[:,0])
-    
+    O1 = np.outer(u_12[:,0],u_12[:,0])
+    O2 = np.outer(v_12[0,:],v_12[0,:])
+
     # find root of half 1
-    bipartitions1 = T1.bipartition_edge_map
-    min_score = float("inf")
-    results = []
-    results = {'sizeA': [], 'sizeB': [], 'score': []}
+    bipartitions1 = T1.bipartition_edge_map.keys()
     if verbose: print("len(bipartitions1)", len(bipartitions1))
-    if len(bipartitions1.keys()) ==2:
-        print("NOOOOO") 
-    for bp in bipartitions1.keys():
-        bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
+    if len(bipartitions1) ==2:
+        print("NOOOOO")
+    if len(bipartitions1) > 1:
+        min_score = float("inf")
+        results = {'sizeA': [], 'sizeB': [], 'score': []}
+        for bp in bipartitions1:
+            mask1A = taxa_metadata.bipartition2mask(bp)
+            mask1B = (T1.mask ^ mask1A)
 
-        score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O,merge_method)
+            score = compute_merge_score(mask1A, mask1B, T2_mask, similarity_matrix, u_12[:,0],sigma_12[0], v_12[0,:], O1, merge_method)
+            # DELETE ME bool_array = taxa_metadata.bipartition2mask(bp)
+            #DELETE ME score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O1,merge_method)
+            
+            results['sizeA'].append(mask1A.sum())
+            results['sizeB'].append(mask1B.sum())
+            results['score'].append(score)
+            #results.append([sum(bool_array),sum(~bool_array), score])
+            if score <min_score:
+                min_score = score
+                bp_min = bp
+                min_mask1A = mask1A
+
+        #bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
+        if verbose:
+            if min_mask1A.sum()==1:
+                print('one')
+        if verbose: print("one - merging: ",min_mask1A.sum(), " out of: ", T1_mask.sum())
         
-        results['sizeA'].append(np.sum(bool_array))
-        results['sizeB'].append(np.sum(~bool_array))
-        results['score'].append(score)
-        #results.append([sum(bool_array),sum(~bool_array), score])
-        if score <min_score:
-            min_score = score
-            bp_min = bp
-
-    bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
-    if verbose: 
-        if np.sum(bool_array)==1:
-            print('one')
-    if verbose: print("one - merging: ",np.sum(bool_array), " out of: ", len(bool_array))
-    if len(bipartitions1.keys()) > 1: 
-        T1.reroot_at_edge(bipartitions1[bp_min])
+        T1.reroot_at_edge(T1.bipartition_edge_map[bp_min])
+    #if len(bipartitions) > 1: 
+    #    T1.reroot_at_edge(T1.bipartition_edge_map[bp_min])
 
     # find root of half 2
     #[u_12,s,v_12] = np.linalg.svd(S_12.T)
-    O = np.outer(v_12[0,:],v_12[0,:])
-    #O = np.outer(v_12[:,0],v_12[:,0])
-    bipartitions2 = T2.bipartition_edge_map
-    min_score = float("inf")
-    results2 = []
+    
+    bipartitions2 = T2.bipartition_edge_map.keys()
     if verbose: print("len(bipartitions2)", len(bipartitions2))
-    if len(bipartitions2.keys()) ==2:
-        print("NOOOOO")
-    for bp in bipartitions2.keys():
-        bool_array = np.array(list(map(bool,[int(i) for i in bp.leafset_as_bitstring()]))[::-1])
-        #h2_idx_A = half2_idx_array[bool_array]
-        #h2_idx_B = half2_idx_array[~bool_array]
-        
-        score = compute_merge_score(bool_array,S_22,S_12.T,v_12[0,:],sigma_12[0],u_12[:,0],O,merge_method)
-        
-        results2.append([np.sum(bool_array),np.sum(~bool_array), score])
-        if score <min_score:
-            min_score = score
-            bp_min = bp
+    # if len(bipartitions2) ==2:
+    #     print("NOOOOO")
+    if len(bipartitions2) > 1:
+        min_score = float("inf")
+        results2 = {'sizeA': [], 'sizeB': [], 'score': []}
+        for bp in bipartitions2:
+            mask2A = taxa_metadata.bipartition2mask(bp)
+            mask2B = (T2.mask ^ mask2A)
 
-    bool_array = np.array(list(map(bool,[int(i) for i in bp_min.leafset_as_bitstring()]))[::-1])
-    if verbose:
-        if np.sum(bool_array)==1:
-            print('one')
-    if verbose: print("one - merging: ",np.sum(bool_array), " out of: ", len(bool_array))
-    if len(bipartitions2.keys()) > 1: 
-        T2.reroot_at_edge(bipartitions2[bp_min])
+            score = compute_merge_score(mask2A, mask2B, T1_mask, similarity_matrix, v_12[0,:],sigma_12[0], u_12[:,0], O2, merge_method)
+            # DELETE ME bool_array = taxa_metadata.bipartition2mask(bp)
+            #DELETE ME score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O1,merge_method)
+            
+            results2['sizeA'].append(mask2A.sum())
+            results2['sizeB'].append(mask2B.sum())
+            results2['score'].append(score)
+            #results.append([sum(bool_array),sum(~bool_array), score])
+            if score <min_score:
+                min_score = score
+                bp_min2 = bp
+                min_mask2A = mask2A
+        if verbose:
+            if min_mask2A.sum()==1:
+                print('one')
+        if verbose: print("one - merging: ",min_mask2A.sum(), " out of: ", T2_mask.sum())
+        T2.reroot_at_edge(T2.bipartition_edge_map[bp_min2])
+        #if len(bipartitions2) > 1: 
+        #    T2.reroot_at_edge(T2.bipartition_edge_map[bp_min2])
 
     T.seed_node.set_child_nodes([T1.seed_node,T2.seed_node])
     return T
@@ -469,17 +519,19 @@ class ReconstructionMethod(ABC):
         pass
 
 class RAxML(ReconstructionMethod):
-    def __call__(self, sequences, taxon_namespace=None, raxml_args = "-T 2 --JC69 -c 1"):
+    def __call__(self, sequences, taxa_metadata=None, raxml_args = "-T 2 --JC69 -c 1"):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
-            data = FastCharacterMatrix(sequences, taxon_namespace=taxon_namespace).to_dendropy()
+            # data = FastCharacterMatrix(sequences, taxon_namespace=taxon_namespace).to_dendropy()
+            data = utils.array2charmatrix(sequences, taxa_metadata=taxa_metadata)
         else:
-            data = sequences     
+            data = sequences  
+
         if platform.system() == 'Windows':
             # Windows version:
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH, 'raxmlHPC-SSE3.exe'))
         elif platform.system() == 'Darwin':
             #MacOS version:
-            rx = raxml.RaxmlRunner()
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-macOS'))
         elif platform.system() == 'Linux':
             #Linux version
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-SSE3-linux'))
@@ -494,50 +546,48 @@ class DistanceReconstructionMethod(ReconstructionMethod):
     def __init__(self, similarity_metric):
         self.similarity_metric = similarity_metric
 
-    def __call__(self, sequences, taxon_namespace=None):
-        if isinstance(sequences, FastCharacterMatrix):
-            sequences = sequences.to_array()
-        similarity_matrix = self.similarity_metric(sequences)
-        return self.reconstruct_from_similarity(similarity_matrix, taxon_namespace)
+    def __call__(self, sequences, taxa_metadata=None):
+        similarity_matrix = self.similarity_metric(sequences, taxa_metadata)
+        return self.reconstruct_from_similarity(similarity_matrix, taxa_metadata)
 
     @abstractmethod
-    def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
+    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
         pass
 
 class NeighborJoining(DistanceReconstructionMethod):
-    def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
-        return self.neighbor_joining(similarity_matrix, taxon_namespace)
+    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
+        return self.neighbor_joining(similarity_matrix, taxa_metadata)
     
-    def neighbor_joining(self, similarity_matrix, taxon_namespace=None):
+    def neighbor_joining(self, similarity_matrix, taxa_metadata=None):
         similarity_matrix = np.clip(similarity_matrix, a_min=1e-20, a_max=None)
         distance_matrix = -np.log(similarity_matrix)
-        T = utils.array2distance_matrix(distance_matrix, taxon_namespace).nj_tree()
+        T = utils.array2distance_matrix(distance_matrix, taxa_metadata).nj_tree()
         return T
     def __repr__():
         return "NJ"
         
 class SpectralNeighborJoining(DistanceReconstructionMethod):
-    def reconstruct_from_similarity(self, similarity_matrix, taxon_namespace=None):
-        return self.estimate_tree_topology(similarity_matrix, taxon_namespace)
+    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
+        return self.estimate_tree_topology(similarity_matrix, taxa_metadata)
     #change to spectral_neighbor_joining
 
-    def estimate_tree_topology(self, similarity_matrix, taxon_namespace=None, scorer=sv2, scaler=1.0, bifurcating=False):
+    def estimate_tree_topology(self, similarity_matrix, taxa_metadata=None, scorer=sv2, scaler=1.0, bifurcating=False):
         m, m2 = similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
-        if taxon_namespace is None:
-            taxon_namespace = utils.default_namespace(m)
+        if taxa_metadata is None:
+            taxa_metadata = utils.TaxaMetadata.default(m)
         else:
-            assert len(taxon_namespace) >= m, "Namespace too small for distance matrix"
+            assert len(taxa_metadata) >= m, "Namespace too small for distance matrix"
         
         # initialize leaf nodes
-        G = [utils.leaf(i, taxon_namespace) for i in range(m)]
+        G = taxa_metadata.all_leaves()
 
         available_clades = set(range(len(G)))   # len(G) == m
         # initialize Sigma
         Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
         sv1 = np.full((2*m,2*m), np.nan)
         for i,j in combinations(available_clades, 2):
-            Sigma[i,j] = scorer(G[i].taxa_set, G[j].taxa_set, similarity_matrix)
+            Sigma[i,j] = scorer(G[i].mask, G[j].mask, similarity_matrix)
             Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
 
         # merge
@@ -548,7 +598,7 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
             available_clades.remove(left)
             available_clades.remove(right)
             for other_ix in available_clades:
-                Sigma[other_ix, new_ix] = scorer(G[other_ix].taxa_set, G[new_ix].taxa_set, similarity_matrix)
+                Sigma[other_ix, new_ix] = scorer(G[other_ix].mask, G[new_ix].mask, similarity_matrix)
                 Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
             available_clades.add(new_ix)
 
@@ -561,7 +611,7 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
         # for a bifurcating tree we're combining the last two available clades
         # for an unrooted one it's the last three because
         # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
-        return dendropy.Tree(taxon_namespace=taxon_namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
+        return dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
 def __repr__():
         return "SNJ"
 
@@ -574,18 +624,19 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         else:
             self.reconstruction_alg = inner_method()
             
-    def __call__(self, sequences, taxon_namespace=None):
-        return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxon_namespace=taxon_namespace, reconstruction_alg = self.inner_method)
+    def __call__(self, sequences, taxa_metadata=None):
+        return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxa_metadata=taxa_metadata, reconstruction_alg = self.inner_method)
     def __repr__():
         return "spectralTree"
 
-    def deep_spectral_tree_reconstruction(self, sequences, similarity_metric,taxon_namespace = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle", verbose = False, **kargs):
+    def deep_spectral_tree_reconstruction(self, sequences, similarity_metric, taxa_metadata = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle", verbose = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences)
         m, m2 = self.similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
-        self.taxon_namespace = taxon_namespace
+        self.taxa_metadata = taxa_metadata
+        self.taxon_namespace = self.taxa_metadata.taxon_namespace
         if self.taxon_namespace is None:
             self.taxon_namespace = utils.default_namespace(m)
         else:
@@ -595,7 +646,8 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         cur_node = partitioning_tree.root
         while True:
             if (cur_node.right != None) and (cur_node.right.tree !=None) and (cur_node.left.tree != None):
-                cur_node.tree = self.margeTreesLeftRight(cur_node,merge_method)
+                cur_node.tree = self.margeTreesLeftRight(cur_node, merge_method)
+                cur_node.tree.mask = np.logical_or(cur_node.right.tree.mask, cur_node.left.tree.mask)
                 if cur_node.parent == None:
                     break
                 if cur_node.parent.right == cur_node:
@@ -613,6 +665,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
             else:
                 start_time = time.time()
                 cur_node.tree = self.reconstruct_alg_wrapper(cur_node, **kargs)
+                cur_node.tree.mask = taxa_metadata.tree2mask(cur_node.tree)
                 runtime = time.time() - start_time
                 if verbose: print("--- %s seconds ---" % runtime)
                 if cur_node.parent == None:
@@ -621,7 +674,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                     cur_node = cur_node.parent.left
                 else:
                     cur_node = cur_node.parent
-        partitioning_tree.root.tree.taxon_namespace = self.taxon_namespace
+        #DELETE MEpartitioning_tree.root.tree.taxon_namespace = self.taxon_namespace
         return partitioning_tree.root.tree
         
     def splitTaxa(self,node,num_gaps,min_split):
@@ -630,36 +683,43 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity
         _, V = np.linalg.eigh(laplacian)
         bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
-        # %%
-        if np.minimum(np.sum(bool_bipartition),np.sum(~bool_bipartition))<min_split:
+
+        """# %%
+        if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))<min_split:
             print("????")
             bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
+        """
 
         #Building partitioning bitmaps from partial bitmaps
         ll = np.array([i for i, x in enumerate(node.bitmap) if x])
         ll1 = ll[bool_bipartition]
         not_bool_bipartition = [~i for i in bool_bipartition]
         ll2 = ll[not_bool_bipartition]
+
+        # TODO: use TaxaMetadata.taxa2mask here
         bitmap1 = [True if i in ll1 else False for i in range(len(self.taxon_namespace))]
         bitmap2 = [True if i in ll2 else False for i in range(len(self.taxon_namespace))]
         return bitmap1, bitmap2
 
-    def margeTreesLeftRight(self, node,merge_method):
-        cur_namespace = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]])  
-        cur_similarity = self.similarity_matrix[node.bitmap,:]
-        cur_similarity = cur_similarity[:,node.bitmap]
-        return join_trees_with_spectral_root_finding_ls(cur_similarity, node.left.tree, node.right.tree, merge_method,taxon_namespace=cur_namespace, verbose=self.verbose)
+    def margeTreesLeftRight(self, node, merge_method):
+        # DELETE ME cur_meta = self.taxa_metadata.mask2sub_taxa_metadata(np.array(node.bitmap))
+
+        # cur_similarity = self.similarity_matrix[node.bitmap,:]
+        # cur_similarity = cur_similarity[:,node.bitmap]
+        return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
     
     def reconstruct_alg_wrapper(self, node, **kargs):
-        namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
+        # DELETE namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
+        metadata1 = self.taxa_metadata.mask2sub_taxa_metadata(np.array(node.bitmap))
+
         if issubclass(self.inner_method, DistanceReconstructionMethod):
             similarity_matrix1 = self.similarity_matrix[node.bitmap,:]
             similarity_matrix1 = similarity_matrix1[:,node.bitmap]
-            return self.reconstruction_alg.reconstruct_from_similarity(similarity_matrix1, taxon_namespace = namespace1)
+            return self.reconstruction_alg.reconstruct_from_similarity(similarity_matrix1, taxa_metadata=metadata1)
         else:
             # print(type(self.sequences))
             sequences1 = self.sequences[node.bitmap,:]
-            return self.reconstruction_alg(sequences1, taxon_namespace = namespace1, **kargs)
+            return self.reconstruction_alg(sequences1, taxa_metadata= metadata1, **kargs)
     
 class MyNode(object):
     def __init__(self, data):
@@ -683,52 +743,6 @@ class MyTree(object):
     def setRight(self,node):
         self.right = node
         node.parent = self
-
-
-class Reconstruction_Method:
-    def __init__(self, core=estimate_tree_topology, similarity=paralinear_similarity, **kwargs):
-        self.core = core
-        self.similarity = similarity
-        if self.core == estimate_tree_topology:
-            kwargs["scorer"] = kwargs.get("scorer", sv2)
-            kwargs["scaler"] = kwargs.get("scaler", 1.0)
-        self.kwargs = kwargs
-
-    @property
-    def scorer(self):
-        return self.kwargs.get('scorer', None)
-
-    @property
-    def scaler(self):
-        return self.kwargs.get('scaler', None)
-
-    def __call__(self, observations, namespace=None):
-        T = self.reconstruct_from_array(observations, namespace)
-        #T.print_plot()
-        return T
-
-    def reconstruct_from_array(self, observations, namespace=None):
-        similarity_matrix = self.similarity(observations)
-        tree = self.core(similarity_matrix, namespace=namespace, **self.kwargs)
-        return tree
-
-    def reconstruct_from_charmatrix(self, char_matrix, namespace=None):
-        """
-        takes dendropy.datamodel.charmatrixmodel.CharacterMatrix
-        """
-        observations, alphabet = utils.charmatrix2array(char_matrix)
-        return self(observations)
-
-    def __str__(self):
-        if self.core == estimate_tree_topology:
-            s = self.scorer.__name__
-            if self.scaler != 1.0:
-                s += " x{:.2}".format(self.scaler)
-        elif self.core == neighbor_joining:
-            s = "NJ"
-        else:
-            s = self.core.__name__
-        return s
 
 # %%
 if __name__ == "__main__":
