@@ -1,0 +1,7 @@
+type	method	nrun	out	size	path	threshold	m	kappa	mutation_rate	verbose
+binary	NJ	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/binary_NJ_16384.csv	16384	None	0	300	2	0.05	True
+binary	STR+NJ	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/binary_STR_NJ_16384_128.csv	16384	None	128	300	2	0.05	True
+binary	STR+NJ	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/binary_STR_NJ_16384_256.csv	16384	None	256	300	2	0.05	True
+binary	STR+RaXML	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/binary_STR_RaXML_16384_128.csv	16384	None	128	300	2	0.05	True
+binary	STR+RaXML	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/binary_STR_RaXML_16384_256.csv	16384	None	256	300	2	0.05	True
+binary	RaXML	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/binary_RaXML_16384.csv	16384	None	0	300	2	0.05	True
