@@ -23,24 +23,22 @@ from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 
 
-num_taxa = 64
+num_taxa = 32
 N = 1000
 reference_tree = utils.balanced_binary(num_taxa)
-reference_tree.print_plot()
 # %%
 ###########################################################################
 ##                   TEST WITH DENDROPY DATA
 ###########################################################################
-
+time_s = time.time()
 data = simulate_discrete_chars(N, reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
+print("")
+print("Time for data generation", time.time()-time_s)
 time_s = time.time()
 raxml = reconstruct_tree.RAxML()
 tree = raxml(data)
 runtime = time.time()-time_s
 
-tree.print_plot()
-
-print("")
 print("Data in DNAcharacterMatrix:")
 print("symmetric_difference: ",symmetric_difference(reference_tree, tree))
 RF,F1 = reconstruct_tree.compare_trees(reference_tree, tree)
@@ -54,23 +52,24 @@ print("")
 ###########################################################################
 ##                   TEST WITH NUMPY DATA
 ###########################################################################
-
 jc = generation.Jukes_Cantor()
+time_s = time.time()
 mutation_rate = [jc.p2t(0.95)]
 
 observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
-
+print("")
+print("Time for data generation", time.time()-time_s)
 time_s = time.time()
 raxml = reconstruct_tree.RAxML()
 tree = raxml(observations, taxa_meta)
 runtime = time.time()-time_s
-print("")
 print("Data in numpy array:")
 print("symmetric_difference: ",symmetric_difference(reference_tree, tree))
 RF,F1 = reconstruct_tree.compare_trees(reference_tree, tree)
 print("raxml: ")
 print("RF = ",RF)
 print("F1% = ",F1)
+print("runtime = ",runtime)
 print("")
 
 # %%
@@ -80,7 +79,6 @@ print("")
 from dendropy.interop import raxml
 
 reference_tree = utils.balanced_binary(16)
-reference_tree.print_plot()
 
 data = simulate_discrete_chars(1000, reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
 
