@@ -87,7 +87,7 @@ if platform.system() == 'Windows':
     rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),r'spectraltree\raxmlHPC-SSE3.exe'))
 elif platform.system() == 'Darwin':
     #MacOS version:
-    rx = raxml.RaxmlRunner()
+    rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),'spectraltree/raxmlHPC-macOS'))
 elif platform.system() == 'Linux':
     #Linux version
     rx = raxml.RaxmlRunner(raxml_path = os.path.join(os.path.dirname(sys.path[0]),'spectraltree/raxmlHPC-SSE3-linux'))
