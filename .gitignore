@@ -17,3 +17,4 @@ tests/RAxML_result.dendropy_raxml
 .vscode/.ropeproject/objectdb
 .vscode/.ropeproject/config.py
 .vscode/launch.json
+*.pyc

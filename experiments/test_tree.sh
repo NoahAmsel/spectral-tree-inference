@@ -3,15 +3,18 @@
 #SBATCH --job-name=largeTrees
 #SBATCH --ntasks=1 --nodes=1
 #SBATCH --mem-per-cpu=20G
-#SBATCH --time=2-00:00:00
+#SBATCH --time=10:00:00
 #SBATCH --mail-type=ALL
-#SBATCH --array=2-5
+#SBATCH --array=1-3
 #SBATCH --error=log/large_trees.%A_%a.err
 #SBATCH --output=log/large_trees.%A_%a.out
 #SBATCH --mail-user=mamie.wang@yale.edu
 # reference script from https://rcc.uchicago.edu/docs/running-jobs/array/index.html
+
 module load miniconda/4.7.10
-source activate r_env
+source /ysm-gpfs/apps/software/miniconda/4.7.10/bin/activate r_env
+
+echo $CONDA_DEFAULT_ENV
 
 scriptDir="/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments"
 lookupFile=${scriptDir}/test_tree.lst
@@ -34,7 +37,7 @@ kappa=$(cat $lookupFile | awk -F"\t" -v taskID=$rowNum '(NR == taskID) { print $
 mutation_rate=$(cat $lookupFile | awk -F"\t" -v taskID=$rowNum '(NR == taskID) { print $10 }')
 verbose=$(cat $lookupFile | awk -F"\t" -v taskID=$rowNum '(NR == taskID) { print $11 }')
 
-echo "python $combineScript $type $method $nrun $out --size $size --path $path --threshold $threshold --m $m --kappa $kappa --mutation_rate $mutation_rate --verbose $verbose"
-python $combineScript $type $method $nrun $out --size $size --path $path --threshold $threshold --m $m --kappa $kappa --mutation_rate $mutation_rate --verbose $verbose
+echo "/gpfs/ysm/project/kleinstein/mw957/conda_envs/r_env/bin/python3.7 $combineScript $type $method $nrun $out --size $size --path $path --threshold $threshold --m $m --kappa $kappa --mutation_rate $mutation_rate --verbose $verbose"
+/gpfs/ysm/project/kleinstein/mw957/conda_envs/r_env/bin/python3.7 $combineScript $type $method $nrun $out --size $size --path $path --threshold $threshold --m $m --kappa $kappa --mutation_rate $mutation_rate --verbose $verbose
 
 echo "[$0 $(date +%Y%m%d-%H%M%S)] [array-end] hostname = $(hostname) SLURM_JOBID = ${SLURM_JOBID}; SLURM_ARRAY_TASK_ID = ${SLURM_ARRAY_TASK_ID}" >&2

@@ -522,9 +522,10 @@ class RAxML(ReconstructionMethod):
     def __call__(self, sequences, taxa_metadata=None, raxml_args = "-T 2 --JC69 -c 1"):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
             # data = FastCharacterMatrix(sequences, taxon_namespace=taxon_namespace).to_dendropy()
-            data = utils.array2charmatrix(sequences, taxa_metadata=taxa_metadata)
+            data = utils.array2charmatrix(sequences, taxa_metadata=taxa_metadata) # 
         else:
-            data = sequences  
+            data = sequences
+            
 
         if platform.system() == 'Windows':
             # Windows version:
@@ -632,7 +633,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def deep_spectral_tree_reconstruction(self, sequences, similarity_metric, taxa_metadata = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle", verbose = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
-        self.similarity_matrix = similarity_metric(sequences)
+        self.similarity_matrix = similarity_metric(sequences, taxa_metadata = taxa_metadata)
         m, m2 = self.similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         self.taxa_metadata = taxa_metadata
@@ -711,15 +712,14 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def reconstruct_alg_wrapper(self, node, **kargs):
         # DELETE namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
         metadata1 = self.taxa_metadata.mask2sub_taxa_metadata(np.array(node.bitmap))
-
+        
         if issubclass(self.inner_method, DistanceReconstructionMethod):
             similarity_matrix1 = self.similarity_matrix[node.bitmap,:]
             similarity_matrix1 = similarity_matrix1[:,node.bitmap]
             return self.reconstruction_alg.reconstruct_from_similarity(similarity_matrix1, taxa_metadata=metadata1)
         else:
-            # print(type(self.sequences))
             sequences1 = self.sequences[node.bitmap,:]
-            return self.reconstruction_alg(sequences1, taxa_metadata= metadata1, **kargs)
+            return self.reconstruction_alg(sequences1, taxa_metadata=metadata1, **kargs)
     
 class MyNode(object):
     def __init__(self, data):
