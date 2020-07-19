@@ -23,14 +23,14 @@ from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 import cProfile
 
-N = 1000
-num_taxa = 512
+N = 500
+num_taxa = 1024
 jc = generation.Jukes_Cantor()
 mutation_rate = [jc.p2t(0.95)]
 np.random.seed(0)
 # reference_tree = utils.unrooted_birth_death_tree(num_taxa, birth_rate=1)
-reference_tree = utils.lopsided_tree(num_taxa)
-# reference_tree = utils.balanced_binary(num_taxa)
+# reference_tree = utils.lopsided_tree(num_taxa)
+reference_tree = utils.balanced_binary(num_taxa)
 for x in reference_tree.preorder_edge_iter():
     x.length = 1
 np.random.seed(0)
@@ -46,7 +46,7 @@ t0 = time.time()
 # # To view with a nice GUI, run: snakeviz .\temp.prof
 tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix,
                                     taxa_metadata= meta,
-                                    threshhold = 4 ,verbose=False)
+                                    threshhold = 64 , merge_method = "least_square", verbose=False)
 t = time.time() - t0
 
 

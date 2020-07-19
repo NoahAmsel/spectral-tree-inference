@@ -308,8 +308,7 @@ def compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma):
     alpha_square = np.linalg.lstsq( (U_T*sigma)**2,S_T)
     return alpha_square[0]
 
-#DELETE ME def compute_merge_score(bool_array,S_11,S_12,u_12,sigma_12, v_12, O, merge_method= 'least_square'):
-def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12, v_12, O, merge_method= 'least_square'):
+def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12, v_12, O, merge_method= 'angle'):
     
     mask1 = np.logical_or(mask1A, mask1B)
 
@@ -319,6 +318,8 @@ def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12,
     #submatrix of outer product
     # bool_array is indexer into O, which is size (# nodes in T1) x (# nodes in T1)
     bool_array = mask1A[mask1]
+    if sum(bool_array) == len(bool_array):
+        return float("inf")
     O_AB = O[bool_array,:]
     O_AB = O_AB[:,~bool_array]
 
@@ -329,7 +330,18 @@ def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12,
     if merge_method=='least_square':
         # merge_method 0 is least square alpha        
         alpha = np.linalg.lstsq(O_AB,S_11_AB,rcond=None)
-        score = alpha[1]/(np.linalg.norm(S_11_AB)**2)
+        if len(alpha[1]) == 0:
+            score = 0
+        else:
+            score = alpha[1]/(np.linalg.norm(S_11_AB)**2)
+    if merge_method=='normalized_least_square':
+        O_AB_n = O_AB / S_11_AB
+        S_11_AB_n = np.ones(len(S_11_AB))
+        alpha = np.linalg.lstsq(O_AB_n, S_11_AB_n, rcond=None)
+        if len(alpha[1]) == 0:
+            score = 0
+        else:
+            score = alpha[1]
     if merge_method=='angle':
         # merge_method 1 is angle between        
         O_AB_n = O_AB/np.linalg.norm(O_AB)
@@ -342,7 +354,7 @@ def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12,
         alpha_square = compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma_12)
         score = np.linalg.norm(S_11_AB-alpha_square*O_AB)/np.linalg.norm(S_11_AB)
     else:
-        Exception("Illigal method: choose least_square, angle or tensor")
+        Exception("Illigal method: choose least_square, normalized_least_square, angle or tensor")
     return score
 
 def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_method, taxa_metadata, verbose = False):
@@ -394,7 +406,9 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
 
     # find root of half 1
     bipartitions1 = T1.bipartition_edge_map.keys()
+
     if verbose: print("len(bipartitions1)", len(bipartitions1))
+
     if len(bipartitions1) ==2:
         print("NOOOOO")
     if len(bipartitions1) > 1:
