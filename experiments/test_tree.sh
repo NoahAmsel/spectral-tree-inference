@@ -2,10 +2,10 @@
 #SBATCH --partition=general
 #SBATCH --job-name=largeTrees
 #SBATCH --ntasks=1 --nodes=1
-#SBATCH --mem-per-cpu=20G
-#SBATCH --time=10:00:00
+#SBATCH --mem-per-cpu=10G
+#SBATCH --time=12:00:00
 #SBATCH --mail-type=ALL
-#SBATCH --array=1-3
+#SBATCH --array=8-11
 #SBATCH --error=log/large_trees.%A_%a.err
 #SBATCH --output=log/large_trees.%A_%a.out
 #SBATCH --mail-user=mamie.wang@yale.edu

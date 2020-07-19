@@ -14,9 +14,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import argparse
 
-#from dendropy.model.discrete import simulate_discrete_chars, Jc69, Hky85
-#from dendropy.calculate.treecompare import symmetric_difference
-
 def run_method(method, tree, m = 300, kappa = 2,  mutation_rate=0.05, threshold = None, verbose = False):
     start_time = time.time()
     observations, taxa_meta = generation.simulate_sequences(m, tree_model=tree, seq_model=generation.HKY(kappa = kappa), mutation_rate=mutation_rate, alphabet="DNA")
@@ -69,6 +66,8 @@ def get_trees(tree_type, tree_size, tree_path):
         tree = utils.balanced_binary(tree_size)
     elif tree_type == "catepillar":
         tree = utils.lopsided_tree(tree_size)
+    elif tree_type == "birthdeath":
+        tree = utils.unrooted_birth_death_tree(tree_size)
     elif tree_type == "path":
         tree = dendropy.Tree.get(path=args.path, schema="newick")
     return tree
