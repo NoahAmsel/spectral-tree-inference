@@ -5,7 +5,7 @@
 #SBATCH --mem-per-cpu=10G
 #SBATCH --time=12:00:00
 #SBATCH --mail-type=ALL
-#SBATCH --array=8-11
+#SBATCH --array=4-5
 #SBATCH --error=log/large_trees.%A_%a.err
 #SBATCH --output=log/large_trees.%A_%a.out
 #SBATCH --mail-user=mamie.wang@yale.edu
