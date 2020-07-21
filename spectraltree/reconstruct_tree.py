@@ -554,7 +554,8 @@ class RAxML(ReconstructionMethod):
 
         tree = rx.estimate_tree(char_matrix=data, raxml_args=[raxml_args])
         tree.is_rooted = False
-        tree.taxon_namespace = taxa_metadata.taxon_namespace
+        if taxa_metadata != None:
+            tree.taxon_namespace = taxa_metadata.taxon_namespace
         return tree
     def __repr__():
         return "RAxML"
