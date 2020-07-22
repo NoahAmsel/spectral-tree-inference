@@ -321,7 +321,9 @@ def unrooted_birth_death_tree(num_taxa, namespace=None, birth_rate=0.5, death_ra
     tree.is_rooted = False
     return tree
 
-def unrooted_pure_kingman_tree(taxon_namespace, pop_size=1, rng=None):
+def unrooted_pure_kingman_tree(num_taxa,taxon_namespace=None, pop_size=1, rng=None):
+    if taxon_namespace == None:
+        taxon_namespace = default_namespace(num_taxa)
     tree = pure_kingman_tree(taxon_namespace, pop_size=pop_size, rng=rng)
     tree.is_rooted = False
     return tree
