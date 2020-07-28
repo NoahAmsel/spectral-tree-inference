@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from functools import partial
 from itertools import combinations
 import os, sys
-
 import numpy as np
 import scipy.spatial.distance
 from sklearn.decomposition import TruncatedSVD
@@ -16,6 +15,9 @@ import os
 import psutil
 from numba import jit
 from sklearn.utils.extmath import randomized_svd
+import oct2py
+from oct2py import octave
+import scipy
 
 RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
 RECONSTRUCT_TREE__DIR_PATH = os.path.dirname(RECONSTRUCT_TREE_PATH)
@@ -660,7 +662,36 @@ class TreeSVD(ReconstructionMethod):
         return dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace, seed_node=utils.merge_children((G[i] for i in available_clades)), is_rooted=False)
     def __repr__(self):
         return "TreeSVD"
+    
+class RG(ReconstructionMethod):
+    
+    def __call__(self, observations, taxa_metadata=None):        
+        return self.estimate_tree_topology(observations, taxa_metadata)
+    def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
+        octave.addpath('./experiments/ChoilatentTree/')
+        oc = oct2py.Oct2Py()
+        num_taxa = observations.shape[0]
+        adj_mat = oc.feval("./experiments/ChoilatentTree/toolbox/RGb.m",observations+1,0)
+        adj_mat = scipy.sparse.csr_matrix.todense(adj_mat)
+        tree_RG = utils.adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
+        return tree_RG
+    def __repr__(self):
+        return "RG"
 
+class CLRG(ReconstructionMethod):
+    
+    def __call__(self, observations, taxa_metadata=None):        
+        return self.estimate_tree_topology(observations, taxa_metadata)
+    def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
+        octave.addpath('./experiments/ChoilatentTree/')
+        oc = oct2py.Oct2Py()
+        num_taxa = observations.shape[0]
+        adj_mat = oc.feval("./experiments/ChoilatentTree/toolbox/CLRGb.m",observations+1,0)
+        adj_mat = scipy.sparse.csr_matrix.todense(adj_mat)
+        tree_CLRG = utils.adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
+        return tree_CLRG
+    def __repr__(self):
+        return "CLRG"
 
 
 class DistanceReconstructionMethod(ReconstructionMethod):
