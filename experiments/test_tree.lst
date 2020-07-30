@@ -10,3 +10,4 @@ birthdeath	NJ	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference
 birthdeath	STR+NJ	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/birth_death_STR_NJ_4096_128.csv	4096	None	128	300	2	0.05	True
 birthdeath	STR+NJ	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/birth_death_STR_NJ_4096_256.csv	4096	None	256	300	2	0.05	True
 birthdeath	RaXML	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/birth_death_RaXML.csv	4096	None	0	300	2	0.05	True
+binary	STR+RaXML	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/binary_STR_RaXML_4096_8.csv	4096	None	8	500	2	0.05	True

@@ -47,22 +47,37 @@ for i in np.arange(num_reps):
         print('iteration ',i,' length ',n)
         observations, taxa_meta = generation.simulate_sequences(n, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
     
-        # run raxml    
+        # run raxml
+        print("RAXML")
         t_s = time.time()
         tree_raxml = raxml(observations, taxa_meta)
         runtime = time.time()-t_s
+        print(runtime)
         RF,F1 = reconstruct_tree.compare_trees(tree_raxml, reference_tree)       
         df = df.append({'method': 'RaXML', 'runtime': runtime, 'RF': RF,'F1':F1,'n': n}, ignore_index=True) 
-
+        
+        
         # run deep spectral    
+        print("Spectral deep")
         t_s = time.time()
         tree_spectral = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix,
                                          taxa_metadata= taxa_meta,
                                         threshhold = 100 ,min_split = 5, merge_method = "least_square", verbose=False)
         runtime = time.time()-t_s
+        print(runtime)
+        tree_spectral.write(path="temp.tre", schema="newick")
         RF,F1 = reconstruct_tree.compare_trees(tree_spectral, reference_tree)       
         df = df.append({'method': 'STR+RAXML', 'runtime': runtime, 'RF': RF,'F1':F1,'n': n}, ignore_index=True) 
-
+        
+        # run raxml with deep spectral initilization
+        print("RAXML with init")
+        t_s = time.time()
+        tree_raxml = raxml(observations, taxa_meta, raxml_args="-T 2 --JC69 -c 1 -t temp.tre")
+        runtime = time.time()-t_s
+        print(runtime)
+        RF,F1 = reconstruct_tree.compare_trees(tree_spectral, reference_tree)       
+        df = df.append({'method': 'RAXML (init)', 'runtime': runtime, 'RF': RF,'F1':F1,'n': n}, ignore_index=True) 
+        
 pickle_out = open("./data/coalescent_m_1000.pkl","wb")
 pkl.dump(df, pickle_out)
 pickle_out.close()
