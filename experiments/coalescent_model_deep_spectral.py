@@ -75,7 +75,7 @@ for i in np.arange(num_reps):
         tree_raxml = raxml(observations, taxa_meta, raxml_args="-T 2 --JC69 -c 1 -t temp.tre")
         runtime = time.time()-t_s
         print(runtime)
-        RF,F1 = reconstruct_tree.compare_trees(tree_spectral, reference_tree)       
+        RF,F1 = reconstruct_tree.compare_trees(tree_raxml, reference_tree)       
         df = df.append({'method': 'RAXML (init)', 'runtime': runtime, 'RF': RF,'F1':F1,'n': n}, ignore_index=True) 
         
 pickle_out = open("./data/coalescent_m_1000.pkl","wb")
