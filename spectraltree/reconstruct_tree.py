@@ -314,7 +314,7 @@ def compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma):
     alpha_square = np.linalg.lstsq( (U_T*sigma)**2,S_T)
     return alpha_square[0]
 
-#@jit(nopython=True)
+@jit(nopython=True)
 def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12, v_12, O, merge_method= 'angle'):
     
     mask1 = np.logical_or(mask1A, mask1B)
@@ -668,10 +668,10 @@ class RG(ReconstructionMethod):
     def __call__(self, observations, taxa_metadata=None):        
         return self.estimate_tree_topology(observations, taxa_metadata)
     def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
-        octave.addpath('./experiments/ChoilatentTree/')
+        octave.addpath('./spectraltree/ChoilatentTree/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
-        adj_mat = oc.feval("./experiments/ChoilatentTree/toolbox/RGb.m",observations+1,0)
+        adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/RGb.m",observations+1,0)
         adj_mat = scipy.sparse.csr_matrix.todense(adj_mat)
         tree_RG = utils.adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
         return tree_RG
@@ -683,10 +683,10 @@ class CLRG(ReconstructionMethod):
     def __call__(self, observations, taxa_metadata=None):        
         return self.estimate_tree_topology(observations, taxa_metadata)
     def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
-        octave.addpath('./experiments/ChoilatentTree/')
+        octave.addpath('./spectraltree/ChoilatentTree/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
-        adj_mat = oc.feval("./experiments/ChoilatentTree/toolbox/CLRGb.m",observations+1,0)
+        adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/CLRGb.m",observations+1,0)
         adj_mat = scipy.sparse.csr_matrix.todense(adj_mat)
         tree_CLRG = utils.adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
         return tree_CLRG
@@ -698,10 +698,10 @@ class Forrest(ReconstructionMethod):
     def __call__(self, observations, taxa_metadata=None):        
         return self.estimate_tree_topology(observations, taxa_metadata)
     def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
-        octave.addpath('./experiments/ltt-1.4/')
+        octave.addpath('./spectraltree/ltt-1.4/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
-        adj_mat = oc.feval("./experiments/ltt-1.4/bin_forrest_wrapper.m",observations+1,4)
+        adj_mat = oc.feval("./spectraltree/ltt-1.4/bin_forrest_wrapper.m",observations+1,4)
         tree_Forrest = utils.adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
         return tree_Forrest
     def __repr__(self):
