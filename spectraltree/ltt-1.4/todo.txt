@@ -1,0 +1,16 @@
+paper:
+- remove hinton plots from the news20w100_bin.pdf
+* update the likelihoods in the table for news20w100
+* mention matlab code in the paper
+* create small script that generate the different figures
+
+before release
+* remove orientation after each merge
+- comment out the tree generation code
+- remove absolute path from create_data.m
+- add notice where to download the missing datasets
+* check all copyrights
+* remove *~
+- remove results/.
+* check 20newsw100_stats.m
+* remove this file
