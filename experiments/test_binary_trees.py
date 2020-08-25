@@ -2,59 +2,49 @@ import sys, os
 
 sys.path.append("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/spectraltree")
 
-import numpy as np
-import utils
 import generation
 import reconstruct_tree
-import dendropy
-import scipy
 import time
-from itertools import product
-import matplotlib.pyplot as plt
+import utils
 import pandas as pd
 
-from dendropy.model.discrete import simulate_discrete_chars, Jc69, Hky85
-from dendropy.calculate.treecompare import symmetric_difference
-
-def run_method(method, tree, m = 300, kappa = 2,  mutation_rate=0.05, threshold = None):
-    data_HKY = simulate_discrete_chars(m, tree, Hky85(kappa = kappa), mutation_rate=mutation_rate)
-    ch_list = list()
-    for t in data_HKY.taxon_namespace:
-        ch_list.append([x.symbol for x in data_HKY[t]])
-    ch_arr = np.array(ch_list)
+def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold = None, verbose = False):
+    start_time = time.time()
+    observations, taxa_meta = generation.simulate_sequences(m, tree_model=tree, seq_model=generation.HKY(kappa = kappa), mutation_rate=mutation_rate, alphabet="DNA")
+    runtime = time.time() - start_time
+    print("Simulation took %s seconds" % runtime)
     
     if method == "RaXML":
         raxml_HKY = reconstruct_tree.RAxML()
         start_time = time.time()
-        tree_rec = raxml_HKY(data_HKY, raxml_args="-T 2 --HKY85 -c 1")      
+        tree_rec = raxml_HKY(observations, taxa_meta, raxml_args="-T 2 --HKY85 -c 1")      
     if method == "SNJ":
         snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
-        tree_rec = snj(ch_arr, tree.taxon_namespace)
+        tree_rec = snj(observations, taxa_meta)
     if method == "NJ":
         nj = reconstruct_tree.NeighborJoining(reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
-        tree_rec = nj(ch_arr, tree.taxon_namespace)
-    if method == "STR + NJ":
+        tree_rec = nj(observations, taxa_meta)
+    if method == "STR+NJ":
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
-        tree_rec = spectral_method.deep_spectral_tree_reconstruction(ch_arr, reconstruct_tree.HKY_similarity_matrix, 
-                                                            taxon_namespace = tree.taxon_namespace, 
-                                                            threshhold = threshold, min_split = 5)
-    if method == "STR + SNJ":
+        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
+                                                            taxa_metadata = taxa_meta,
+                                                            threshhold = threshold, min_split = 5, verbose = verbose)
+    if method == "STR+SNJ":
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.SpectralNeighborJoining, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
-        tree_rec = spectral_method.deep_spectral_tree_reconstruction(ch_arr, reconstruct_tree.HKY_similarity_matrix, 
-                                                            taxon_namespace = tree.taxon_namespace, 
-                                                            threshhold = threshold, min_split = 5)
-    if method == "STR + RaXML":
-        spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML,
-                                                              reconstruct_tree.HKY_similarity_matrix)
+        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
+                                                            taxa_metadata = taxa_meta, 
+                                                            threshhold = threshold, min_split = 5, verbose = verbose)
+    if method == "STR+RaXML":
+        spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
-        tree_rec = spectral_method.deep_spectral_tree_reconstruction(ch_arr, reconstruct_tree.HKY_similarity_matrix, 
-                                                            taxon_namespace = tree.taxon_namespace, 
+        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
+                                                            taxa_metadata = taxa_meta, 
                                                             threshhold = threshold,
-                                                            raxml_args = "-T 2 --HKY85 -c 1", min_split = 5)
+                                                            raxml_args = "-T 2 --HKY85 -c 1", min_split = 5, verbose = verbose)
     runtime = time.time() - start_time
     RF,F1 = reconstruct_tree.compare_trees(tree_rec, tree)
     print(method)
@@ -66,13 +56,11 @@ def run_method(method, tree, m = 300, kappa = 2,  mutation_rate=0.05, threshold 
 
 
 
-
-
 n = 512
 binary_tree = utils.balanced_binary(n)
 n_runs = 10
 
-methods = ["RaXML", "SNJ", "NJ", "STR + NJ", "STR + NJ", "STR + NJ", "STR + SNJ", "STR + SNJ", "STR + SNJ", "STR + RaXML", "STR + RaXML", "STR + RaXML"]
+methods = ["RaXML", "SNJ", "NJ", "STR+NJ", "STR+NJ", "STR+NJ", "STR+SNJ", "STR+SNJ", "STR+SNJ", "STR+RaXML", "STR+RaXML", "STR+RaXML"]
 thresholds = [None, None, None, n/8, n/4, n/2, n/8, n/4, n/2, n/8, n/4, n/2]
 
 ms = []

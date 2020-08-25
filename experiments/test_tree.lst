@@ -11,3 +11,15 @@ birthdeath	STR+NJ	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-infer
 birthdeath	STR+NJ	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/birth_death_STR_NJ_4096_256.csv	4096	None	256	300	2	0.05	True
 birthdeath	RaXML	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/birth_death_RaXML.csv	4096	None	0	300	2	0.05	True
 binary	STR+RaXML	1	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/binary_STR_RaXML_4096_8.csv	4096	None	8	500	2	0.05	True
+kingman	RaXML	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_RaXML_2000.csv	2000	None	0	1000	2	0.1	True
+kingman	STR+RaXML	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_RaXML_2000_64.csv	2000	None	64	1000	2	0.1	True
+kingman	STR+RaXML	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_RaXML_2000_128.csv	2000	None	128	1000	2	0.1	True
+kingman	STR+RaXML	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_RaXML_2000_256.csv	2000	None	256	1000	2	0.1	True
+kingman	NJ	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_NJ_2000.csv	2000	None	0	1000	2	0.1	True
+kingman	STR+NJ	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_NJ_2000_64.csv	2000	None	64	1000	2	0.1	True
+kingman	STR+NJ	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_NJ_2000_128.csv	2000	None	128	1000	2	0.1	True
+kingman	STR+NJ	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_NJ_2000_256.csv	2000	None	256	1000	2	0.1	True
+kingman	SNJ	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_SNJ_2000.csv	2000	None	0	1000	2	0.1	True
+kingman	STR+SNJ	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_SNJ_2000_64.csv	2000	None	64	1000	2	0.1	True
+kingman	STR+SNJ	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_SNJ_2000_128.csv	2000	None	128	1000	2	0.1	True
+kingman	STR+SNJ	5	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_STR_SNJ_2000_256.csv	2000	None	256	1000	2	0.1	True

@@ -55,15 +55,14 @@ def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold =
     print("F1% = ",F1) 
     return([method, str(threshold), runtime, RF, F1])
 
-tree_path = "/home/mw957/project/repos/spec_tree/data/skygrid_J2.newick"
-fasta_path = "/home/mw957/project/repos/spec_tree/data/H3N2_NewYork.fasta"
 
-H3N2_tree = dendropy.Tree.get(path=tree_path, schema="newick")
+
+
+n = 2000
 n_runs = 10
-n = len(H3N2_tree.taxon_namespace)
 
 methods = ["RaXML", "SNJ", "NJ", "STR+NJ", "STR+NJ", "STR+NJ", "STR+SNJ", "STR+SNJ", "STR+SNJ", "STR+RaXML", "STR+RaXML", "STR+RaXML"]
-thresholds = [None, None, None, 64, 128, 256, 64, 128, 256, 64, 128, 256]
+thresholds = [None, None, None, 32, 64, 128, 32, 64, 128, 32, 64, 128]
 
 ms = []
 ts = []
@@ -76,7 +75,8 @@ for i in range(n_runs):
         method = methods[j]
         threshold = thresholds[j]
         print(method, threshold)
-        res = run_method(method, H3N2_tree, m = 1000, mutation_rate=0.1, threshold = threshold)
+        kingman_tree = utils.unrooted_pure_kingman_tree(n)
+        res = run_method(method, kingman_tree, m = 1000, mutation_rate=0.1, threshold = threshold)
         ms.append(res[0])
         ts.append(res[1])
         rts.append(res[2])
@@ -84,4 +84,5 @@ for i in range(n_runs):
         f1s.append(res[4])
 
 perf_metrics = pd.DataFrame({'method': ms, 'threshold': ts, 'runtime': rts, 'RF': rfs, "F1": f1s})
-perf_metrics.to_csv("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/H3N2_angle_" + str(n) + ".csv")
+perf_metrics.to_csv("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kingman_angle_" + str(n) + ".csv")
+

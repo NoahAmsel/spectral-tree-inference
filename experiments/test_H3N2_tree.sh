@@ -9,6 +9,7 @@
 #SBATCH --output=log/h3n2.%A.out
 #SBATCH --mail-user=mamie.wang@yale.edu
 # reference script from https://rcc.uchicago.edu/docs/running-jobs/array/index.html
+module load Octave
 module load miniconda/4.7.10
 source activate r_env
 

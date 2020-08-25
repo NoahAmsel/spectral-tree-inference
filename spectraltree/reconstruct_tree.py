@@ -502,9 +502,7 @@ def compare_trees(reference_tree, inferred_tree):
     
     true_positives = total_inferred - false_positives
     precision = true_positives / total_inferred
-    true_positives = total_inferred - false_positives
     recall = true_positives / total_reference
-
 
     F1 = 100* 2*(precision * recall)/(precision + recall)
     RF = false_positives + false_negatives

@@ -28,7 +28,6 @@ def generate_figure(df,x='n',y='RF',hue="method", kind="point"):
 #generate_figure(df,y='runtime')
 
 num_taxa = 1000
-reference_tree = utils.unrooted_pure_kingman_tree(num_taxa)
 jc = generation.Jukes_Cantor(num_classes=4)
 mutation_rate = jc.p2t(0.9)
 N_vec = [800,1000,1200,1400]
@@ -39,12 +38,11 @@ raxml = reconstruct_tree.RAxML()
 spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML,reconstruct_tree.JC_similarity_matrix)
 
 
-
-
 df = pd.DataFrame(columns=['method', 'runtime', 'RF','n'])
 for i in np.arange(num_reps):    
     for n in N_vec:
         print('iteration ',i,' length ',n)
+        reference_tree = utils.unrooted_pure_kingman_tree(num_taxa)
         observations, taxa_meta = generation.simulate_sequences(n, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
     
         # run raxml
@@ -78,7 +76,7 @@ for i in np.arange(num_reps):
         RF,F1 = reconstruct_tree.compare_trees(tree_raxml, reference_tree)       
         df = df.append({'method': 'RAXML (init)', 'runtime': runtime, 'RF': RF,'F1':F1,'n': n}, ignore_index=True) 
         
-pickle_out = open("./data/coalescent_m_1000.pkl","wb")
+pickle_out = open("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/coalescent_m_1000.pkl","wb")
 pkl.dump(df, pickle_out)
 pickle_out.close()
 
