@@ -1,0 +1,24 @@
+Latent Tree Toolbox (LTT)
+
+Version 1.4, 10-Apr-2010
+* changed little details
+* added scripts to reproduce figures in paper
+* added refinement for hc_forrest.m
+
+Version 1.3, 14-Sep-2009
+* improved tree2fig.m to minimize tree flipping
+
+Version 1.2, 14-Sep-2009
+* added tree2fig.m to remove dependency on GraphViz
+
+Version 1.1, 7-Sep-2009
+* created demos ltt_demo?.m inspired by netlab's demos
+* reworked the verbose output:
+     verbose == 0   NO OUTPUT
+     verbose == 1   DEMO
+     verbose == 2   DEBUG
+* repaired the graphviz interface
+* improved the mex compilation mechanism for normalizzze.c
+
+Version 1.0, 25-June-2009
+* initial release

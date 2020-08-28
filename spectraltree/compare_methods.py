@@ -108,7 +108,7 @@ def load_results(*files, folder="data", throw_error=True):
         print("Successfully read {} files.".format(successful))
     return total_results
 
-def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data", overwrite=False, verbose=True):
+def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps_per_tree=1, savepath=None, folder="data", overwrite=False, alphabet="DNA", verbose=True):
 
     if verbose:
         print("==== Beginning Experiment =====")
@@ -129,11 +129,12 @@ def experiment(tree_list, sequence_model, Ns, methods, mutation_rates=[1.], reps
         for mutation_rate in mutation_rates:
             # we can parallelize this loop too, but then we need to set different random seeds
             for _ in range(reps_per_tree):
-                observations = generation.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
+                #observations = generation.simulate_sequences(seq_len=max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate)
+                observations, taxa_meta = generation.simulate_sequences(max(Ns), tree_model=reference_tree, seq_model=sequence_model, mutation_rate=mutation_rate, alphabet=alphabet)
                 for n in Ns:
                     for method in methods:
                         t1 = time.time()
-                        inferred_tree = method(observations[:,:n], taxon_namespace=reference_tree.taxon_namespace)
+                        inferred_tree = method(observations[:,:n], taxa_meta)
                         run_time = time.time() - t1
                         results.append(Experiment_Datum(sequence_model, n, method, mutation_rate, inferred_tree, reference_tree,run_time))
                         i += 1
