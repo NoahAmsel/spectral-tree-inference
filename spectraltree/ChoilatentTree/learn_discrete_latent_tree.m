@@ -28,8 +28,8 @@ T = generate_transition_matrices(K,m,pr_bounds,1);
 %X = generate_tree_samples_multiclass(M,n,T,(1/K)*ones(1,K));        
 
 
-% method = 'RG';
- method = 'NJ';
+method = 'RG';
+% method = 'NJ';
 %method = 'CLRG';
 % method = 'CLNJ';
 % method = 'regCLRG';

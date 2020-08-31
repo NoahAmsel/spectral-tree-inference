@@ -271,6 +271,29 @@ def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
 # Including these functions here for convenience
 from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
 
+def adjacency_matrix_to_tree(A,num_taxa,taxa_metadata):
+    m = A.shape[0]
+    edge_length = 1
+    #taxa = TaxaMetadata.default(num_taxa)    
+    taxa = taxa_metadata
+    nodes = taxa.all_leaves(edge_length=edge_length)
+    active_nodes = np.arange(num_taxa)
+    
+    for p_idx in np.arange(num_taxa,m):        
+        child_idx = np.where(A[p_idx,active_nodes]>0)[0]              
+        child_nodes = [nodes[i] for i in active_nodes[child_idx]]
+        p_node = merge_children(child_nodes, edge_length=edge_length)    
+        nodes.append(p_node)
+        active_nodes = np.delete(active_nodes,child_idx)
+        active_nodes = np.append(active_nodes,p_idx)
+        
+    return dendropy.Tree(taxon_namespace=taxa.taxon_namespace, seed_node=nodes[-1], is_rooted=False)    
+
+    #    A[n_idx,:]=[]
+    #    A[:,n_idx]=[]
+
+
+
 def balanced_binary(num_taxa=None, taxa=None, edge_length=1.):
     if taxa is None:
         if num_taxa:
