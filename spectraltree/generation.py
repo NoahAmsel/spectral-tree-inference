@@ -223,8 +223,8 @@ def numpy_matrix_with_characters_on_tree(seq_attr, tree, alphabet=None):
     sequences = []
     for leaf in tree.leaf_node_iter():
         taxa.append(leaf.taxon)
-        sequences.append(getattr(leaf, seq_attr)[-1])
-        # sequences.append(np.concatenate(getattr(leaf, seq_attr)))  # TODO
+        # sequences.append(getattr(leaf, seq_attr)[-1])
+        sequences.append(np.concatenate(getattr(leaf, seq_attr)))  # TODO
     
     return np.array(sequences), TaxaMetadata(tree.taxon_namespace, taxa, alphabet=alphabet)
 
@@ -285,6 +285,38 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
 
     return char_matrix, meta
 
+def simulate_sequences_gamma(seq_len, tree_model, seq_model, gamma_shape, gamma_scale=1.0, root_states=None, retain_sequences_on_tree=False, rng=None, alphabet=None):
+    """
+    Like the above, but rates are drawn from a gamma distribution with the given shape and scale parameters. Significantly slower, since
+    each site has its own rate and requires a separate pass through the tree.
+    """
+    # dendropy actually has an error in it where the evolve_states function 
+    # doesn't use the rng where it should. so we have to do a little surgery on the seq_model's rng
+    # see call to `simulate_descendant_states` in https://dendropy.org/_modules/dendropy/model/discrete.html#DiscreteCharacterEvolver.evolve_states
+    model_rng = seq_model.rng
+    if rng is not None:
+        seq_model.rng = rng
+
+    rates = seq_model.rng.gamma(shape=gamma_shape, scale=gamma_scale, size=seq_len)
+
+    for site, rate in enumerate(rates):
+        seq_evolver = dendropy.model.discrete.DiscreteCharacterEvolver(seq_model=seq_model, mutation_rate=rate)
+        tree_model = seq_evolver.evolve_states(
+            tree=tree_model,
+            seq_len=1,
+            root_states=(None if root_states is None else root_states[site:site+1]),
+            rng=seq_model.rng)
+        print(site, rate)
+
+    char_matrix, meta = numpy_matrix_with_characters_on_tree(seq_evolver.seq_attr, tree_model, alphabet=alphabet)
+    if not retain_sequences_on_tree:
+        seq_evolver.clean_tree(tree_model)
+
+    # undo our surgery 
+    seq_model.rng = model_rng
+
+    return char_matrix, meta
+
 """
 if __name__ == "__main__":
     from utils import balanced_binary
@@ -302,7 +334,8 @@ if __name__ == "__main__":
 
     jc = Jukes_Cantor(rng=np.random.default_rng(42))
     my_tree = balanced_binary(4)
-    seq, meta = simulate_sequences(seq_len=6, tree_model=my_tree, seq_model=jc, )
+    # seq, meta = simulate_sequences(seq_len=6, tree_model=my_tree, seq_model=jc, )
+    seq, meta = simulate_sequences_gamma(seq_len=15, tree_model=my_tree, seq_model=jc, gamma_shape=1, gamma_scale=0.2)
 
     print(seq)
 
