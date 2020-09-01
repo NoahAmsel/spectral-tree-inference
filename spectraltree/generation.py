@@ -285,7 +285,7 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
 
     return char_matrix, meta
 
-def simulate_sequences_gamma(seq_len, tree_model, seq_model, gamma_shape, gamma_scale=1.0, root_states=None, retain_sequences_on_tree=False, rng=None, alphabet=None):
+def simulate_sequences_gamma(seq_len, tree_model, seq_model, base_rate, gamma_shape, block_size=1, root_states=None, retain_sequences_on_tree=False, rng=None, alphabet=None):
     """
     Like the above, but rates are drawn from a gamma distribution with the given shape and scale parameters. Significantly slower, since
     each site has its own rate and requires a separate pass through the tree.
@@ -297,16 +297,16 @@ def simulate_sequences_gamma(seq_len, tree_model, seq_model, gamma_shape, gamma_
     if rng is not None:
         seq_model.rng = rng
 
-    rates = seq_model.rng.gamma(shape=gamma_shape, scale=gamma_scale, size=seq_len)
+    num_blocks = int(np.ceil(seq_len / block_size))
+    rates = base_rate * seq_model.rng.gamma(shape=gamma_shape, scale=1/gamma_shape, size=num_blocks)
 
-    for site, rate in enumerate(rates):
+    for block_num, rate in enumerate(rates):
         seq_evolver = dendropy.model.discrete.DiscreteCharacterEvolver(seq_model=seq_model, mutation_rate=rate)
         tree_model = seq_evolver.evolve_states(
             tree=tree_model,
-            seq_len=1,
-            root_states=(None if root_states is None else root_states[site:site+1]),
+            seq_len=block_size,
+            root_states=(None if root_states is None else root_states[(block_num * block_size):((block_num+1) * block_size)]),
             rng=seq_model.rng)
-        print(site, rate)
 
     char_matrix, meta = numpy_matrix_with_characters_on_tree(seq_evolver.seq_attr, tree_model, alphabet=alphabet)
     if not retain_sequences_on_tree:
@@ -335,7 +335,7 @@ if __name__ == "__main__":
     jc = Jukes_Cantor(rng=np.random.default_rng(42))
     my_tree = balanced_binary(4)
     # seq, meta = simulate_sequences(seq_len=6, tree_model=my_tree, seq_model=jc, )
-    seq, meta = simulate_sequences_gamma(seq_len=15, tree_model=my_tree, seq_model=jc, gamma_shape=1, gamma_scale=0.2)
+    seq, meta = simulate_sequences_gamma(seq_len=2000, tree_model=my_tree, seq_model=jc, base_rate=1, gamma_shape=1, block_size=10)
 
     print(seq)
 
