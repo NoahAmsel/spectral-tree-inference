@@ -104,7 +104,7 @@ def paralinear_distance(observations, taxa_metadata=None):
     similarity = np.clip(similarity, a_min=1e-20, a_max=None)
     return -np.log(similarity)
 
-def JC_similarity_matrix(observations, taxa_metadata=None):
+def JC_similarity_matrix(observations, taxa_metadata=None,params=None):
     """Jukes-Cantor Corrected Similarity"""
     classes = np.unique(observations)
     if classes.dtype == np.dtype('<U1'):
@@ -116,6 +116,22 @@ def JC_similarity_matrix(observations, taxa_metadata=None):
     inside_log = 1 - hamming_matrix*k/(k-1)
     return inside_log**(k-1)
     #return inside_log**(3)
+
+def gamma_func(P,a):
+    return (3/4)*a*( (1-(4/3)*P)**(-1/a)-1 )
+
+def JC_gamma_similarity_matrix(observations, taxa_metadata=None,params = None):
+    """Jukes-Cantor Corrected Similarity"""
+    classes = np.unique(observations)
+    if classes.dtype == np.dtype('<U1'):
+        # needed to use hamming distance with string arrays
+        vord = np.vectorize(ord)
+        observations = vord(observations)
+    k = len(classes)
+    hamming_matrix = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(observations, metric='hamming'))
+    #inside_log = 1 - hamming_matrix*k/(k-1)
+    a = params.alpha
+    return np.exp(gamma_func(hamming_matrix,a))
 
 def JC_distance_matrix(observations, taxa_metadata=None):
     """Jukes-Cantor Corrected Distance"""
@@ -751,7 +767,7 @@ class DistanceReconstructionMethod(ReconstructionMethod):
 
     def __call__(self, sequences, taxa_metadata=None,params = None):
         # params are other needed parameters. i.e. params.spectral_criterion = 'sv2', params.alpha = 1
-        similarity_matrix = self.similarity_metric(sequences, taxa_metadata)
+        similarity_matrix = self.similarity_metric(sequences, taxa_metadata,params)
         return self.reconstruct_from_similarity(similarity_matrix, taxa_metadata, params=params)
 
     @abstractmethod
