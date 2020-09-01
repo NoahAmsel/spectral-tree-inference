@@ -10,16 +10,17 @@ from itertools import product
 from itertools import combinations
 import dendropy     #should this library be independent of dendropy? is that even possible?
 from dendropy.interop import raxml
+import subprocess
 import utils
 import time
 import os
 import psutil
 from numba import jit
 from sklearn.utils.extmath import randomized_svd
-import oct2py
-from oct2py import octave
+#import oct2py
+#from oct2py import octave
 import scipy
-from reconstruct_tree_par import join_trees_with_spectral_root_finding_par
+#from reconstruct_tree_par import join_trees_with_spectral_root_finding_par
 
 RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
 RECONSTRUCT_TREE__DIR_PATH = os.path.dirname(RECONSTRUCT_TREE_PATH)
@@ -138,6 +139,42 @@ def JC_distance_matrix(observations, taxa_metadata=None):
     inside_log = JC_similarity_matrix(observations, taxa_metadata)
     inside_log = np.clip(inside_log, a_min=1e-16, a_max=None)
     return - np.log(inside_log)
+
+def raxml_gamma_corrected_distance_matrix(observations, taxa_metadata):
+    charmatrix = utils.array2charmatrix(observations, taxa_metadata)
+    tempfile_path = "tempfile54321.tree"
+    outfile_path = "temp.phylib"
+    charmatrix.write(path=tempfile_path, schema="phylip")
+
+    if platform.system() == 'Windows':
+        # Windows version:
+        raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH, 'raxmlHPC-SSE3.exe')
+    elif platform.system() == 'Darwin':
+        #MacOS version:
+        raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-macOS')
+    elif platform.system() == 'Linux':
+        #Linux version
+        raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-SSE3-linux')
+
+    subprocess.call([raxml_path, '-f', 'x', '-T', '4', '-p', '12345', '-s', tempfile_path, '-m', 'GTRGAMMA', '-n', outfile_path], stdout=subprocess.DEVNULL)
+    distances_path = f"RAxML_distances.{outfile_path}"
+    info_path = f"RAxML_info.{outfile_path}"
+    parsimony_path = f"RAxML_parsimonyTree.{outfile_path}"
+
+    m, n = observations.shape
+    distance_matrix = np.zeros((m, m))
+    with open(distances_path) as f:
+        for line in f:
+            T1, T2, distance = line.split()
+            distance_matrix[taxa_metadata[T1], taxa_metadata[T2]] = float(distance) 
+            distance_matrix[taxa_metadata[T2], taxa_metadata[T1]] = float(distance) 
+
+    os.remove(tempfile_path)
+    os.remove(distances_path)
+    os.remove(info_path)
+    os.remove(parsimony_path)
+
+    return distance_matrix
 
 def estimate_edge_lengths(tree, distance_matrix):
     # check the PAUP* documentation
@@ -984,14 +1021,20 @@ if __name__ == "__main__":
     ref = utils.balanced_binary(8)
     #all_data = utils.temp_dataset_maker(ref, 1000, 0.01)[0]
     all_data = dendropy.model.discrete.simulate_discrete_chars(1000, ref, dendropy.model.discrete.Jc69(), mutation_rate=0.05)
-    observations, _ = utils.charmatrix2array(all_data)
+    observations, taxon_meta = utils.charmatrix2array(all_data)
+    
     dist = paralinear_distance(observations)
+    dist2 = raxml_gamma_corrected_distance_matrix(observations, taxon_meta)
+    
     dist
-    inf = neighbor_joining(dist)
+    inf = NeighborJoining(lambda x: x).reconstruct_from_similarity(np.exp(-dist), taxon_meta)
+    dist2
+    inf2 = NeighborJoining(lambda x: x).reconstruct_from_similarity(np.exp(-dist2), taxon_meta)
     print('ref:')
     ref.print_plot()
     print("inf:")
     inf.print_plot()
+    inf2.print_plot()
 
     print([leaf.distance_from_root() for leaf in ref.leaf_nodes()])
 
