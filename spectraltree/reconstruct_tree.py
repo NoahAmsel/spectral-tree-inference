@@ -7,20 +7,24 @@ import numpy as np
 import scipy.spatial.distance
 from sklearn.decomposition import TruncatedSVD
 from itertools import product
+from itertools import combinations
 import dendropy     #should this library be independent of dendropy? is that even possible?
 from dendropy.interop import raxml
+import subprocess
 import utils
 import time
 import os
 import psutil
 from numba import jit
 from sklearn.utils.extmath import randomized_svd
-import oct2py
-from oct2py import octave
+#import oct2py
+#from oct2py import octave
 import scipy
+#from reconstruct_tree_par import join_trees_with_spectral_root_finding_par
 
 RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
 RECONSTRUCT_TREE__DIR_PATH = os.path.dirname(RECONSTRUCT_TREE_PATH)
+
 
 def sv2(A1, A2, M):
     """Second Singular Value"""
@@ -32,11 +36,43 @@ def sv2(A1, A2, M):
     else:
         return s[1] # the second eigenvalue
 
+def max_quartet(A1,A2,M):
+    "maximal quartet criterion"
+    A = A1 | A2
+    M_A = M[np.ix_(A, ~A)]
+    m_1,m_2 = M_A.shape
+    max_w = 0
+    for x in combinations(range(m_1), 2):
+        for y in combinations(range(m_2),2):
+            w = np.abs(M_A[x[0],y[0]]*M_A[x[1],y[1]]-M_A[x[0],y[1]]*M_A[x[1],y[0]])
+            if w>max_w:
+                max_w = w
+    return max_w
+    #for (i,j) in  
+
+def sum_sigular_values(A1, A2, M):
+    """Normalized Sum of Squared Quartets"""
+    A = A1 | A2
+    M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
+    s = np.linalg.svd(M_A, compute_uv=False)
+    return np.linalg.norm(s[1:])
+
 def sum_squared_quartets(A1, A2, M):
     """Normalized Sum of Squared Quartets"""
     A = A1 | A2
     M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
     norm_sq = np.linalg.norm(M_A)**2
+    num = norm_sq**2 - np.linalg.norm(M_A.T.dot(M_A))**2
+    return num / norm_sq
+
+def average_quartets(A1, A2, M):
+    """Normalized Sum of Squared Quartets"""
+    A = A1 | A2
+    M_A = M[np.ix_(A, ~A)]        # same as M[A,:][:,~A]
+    #norm_sq = np.linalg.norm(M_A)**2
+    m_1 = np.sum(A1)+np.sum(A2)
+    m_2 = len(A1)-m_1
+    norm_sq = m_1*(m_1-1)*m_2*(m_2-1)
     num = norm_sq**2 - np.linalg.norm(M_A.T.dot(M_A))**2
     return num / norm_sq
 
@@ -69,7 +105,7 @@ def paralinear_distance(observations, taxa_metadata=None):
     similarity = np.clip(similarity, a_min=1e-20, a_max=None)
     return -np.log(similarity)
 
-def JC_similarity_matrix(observations, taxa_metadata=None):
+def JC_similarity_matrix(observations, taxa_metadata=None,params=None):
     """Jukes-Cantor Corrected Similarity"""
     classes = np.unique(observations)
     if classes.dtype == np.dtype('<U1'):
@@ -80,12 +116,65 @@ def JC_similarity_matrix(observations, taxa_metadata=None):
     hamming_matrix = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(observations, metric='hamming'))
     inside_log = 1 - hamming_matrix*k/(k-1)
     return inside_log**(k-1)
+    #return inside_log**(3)
+
+def gamma_func(P,a):
+    return (3/4)*a*( (1-(4/3)*P)**(-1/a)-1 )
+
+def JC_gamma_similarity_matrix(observations, taxa_metadata=None,params = None):
+    """Jukes-Cantor Corrected Similarity"""
+    classes = np.unique(observations)
+    if classes.dtype == np.dtype('<U1'):
+        # needed to use hamming distance with string arrays
+        vord = np.vectorize(ord)
+        observations = vord(observations)
+    k = len(classes)
+    hamming_matrix = scipy.spatial.distance.squareform(scipy.spatial.distance.pdist(observations, metric='hamming'))
+    #inside_log = 1 - hamming_matrix*k/(k-1)
+    a = params.alpha
+    return np.exp(gamma_func(hamming_matrix,a))
 
 def JC_distance_matrix(observations, taxa_metadata=None):
     """Jukes-Cantor Corrected Distance"""
     inside_log = JC_similarity_matrix(observations, taxa_metadata)
     inside_log = np.clip(inside_log, a_min=1e-16, a_max=None)
     return - np.log(inside_log)
+
+def raxml_gamma_corrected_distance_matrix(observations, taxa_metadata):
+    charmatrix = utils.array2charmatrix(observations, taxa_metadata)
+    tempfile_path = "tempfile54321.tree"
+    outfile_path = "temp.phylib"
+    charmatrix.write(path=tempfile_path, schema="phylip")
+
+    if platform.system() == 'Windows':
+        # Windows version:
+        raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH, 'raxmlHPC-SSE3.exe')
+    elif platform.system() == 'Darwin':
+        #MacOS version:
+        raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-macOS')
+    elif platform.system() == 'Linux':
+        #Linux version
+        raxml_path = os.path.join(RECONSTRUCT_TREE__DIR_PATH,'raxmlHPC-SSE3-linux')
+
+    subprocess.call([raxml_path, '-f', 'x', '-T', '4', '-p', '12345', '-s', tempfile_path, '-m', 'GTRGAMMA', '-n', outfile_path], stdout=subprocess.DEVNULL)
+    distances_path = f"RAxML_distances.{outfile_path}"
+    info_path = f"RAxML_info.{outfile_path}"
+    parsimony_path = f"RAxML_parsimonyTree.{outfile_path}"
+
+    m, n = observations.shape
+    distance_matrix = np.zeros((m, m))
+    with open(distances_path) as f:
+        for line in f:
+            T1, T2, distance = line.split()
+            distance_matrix[taxa_metadata[T1], taxa_metadata[T2]] = float(distance) 
+            distance_matrix[taxa_metadata[T2], taxa_metadata[T1]] = float(distance) 
+
+    os.remove(tempfile_path)
+    os.remove(distances_path)
+    os.remove(info_path)
+    os.remove(parsimony_path)
+
+    return distance_matrix
 
 def estimate_edge_lengths(tree, distance_matrix):
     # check the PAUP* documentation
@@ -314,7 +403,7 @@ def compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma):
     alpha_square = np.linalg.lstsq( (U_T*sigma)**2,S_T)
     return alpha_square[0]
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12, v_12, O, merge_method= 'angle'):
     
     mask1 = np.logical_or(mask1A, mask1B)
@@ -669,7 +758,9 @@ class RG(ReconstructionMethod):
         octave.addpath('./spectraltree/ChoilatentTree/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
-        adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/RGb.m",observations+1,0)
+        D = JC_distance_matrix(observations)
+        #adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/RGb.m",observations+1,0)
+        adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/RGb.m",D,1,observations.shape[1])
         adj_mat = scipy.sparse.csr_matrix.todense(adj_mat)
         tree_RG = utils.adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
         return tree_RG
@@ -709,16 +800,17 @@ class DistanceReconstructionMethod(ReconstructionMethod):
     def __init__(self, similarity_metric):
         self.similarity_metric = similarity_metric
 
-    def __call__(self, sequences, taxa_metadata=None):
-        similarity_matrix = self.similarity_metric(sequences, taxa_metadata)
-        return self.reconstruct_from_similarity(similarity_matrix, taxa_metadata)
+    def __call__(self, sequences, taxa_metadata=None,params = None):
+        # params are other needed parameters. i.e. params.spectral_criterion = 'sv2', params.alpha = 1
+        similarity_matrix = self.similarity_metric(sequences, taxa_metadata,params)
+        return self.reconstruct_from_similarity(similarity_matrix, taxa_metadata, params=params)
 
     @abstractmethod
-    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
+    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None, params = None):
         pass
 
 class NeighborJoining(DistanceReconstructionMethod):
-    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
+    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None, params = None):
         return self.neighbor_joining(similarity_matrix, taxa_metadata)
     
     def neighbor_joining(self, similarity_matrix, taxa_metadata=None):
@@ -729,12 +821,14 @@ class NeighborJoining(DistanceReconstructionMethod):
     def __repr__(self):
         return "NJ"
         
-class SpectralNeighborJoining(DistanceReconstructionMethod):
-    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
-        return self.estimate_tree_topology(similarity_matrix, taxa_metadata)
+class SpectralNeighborJoining(DistanceReconstructionMethod):    
+    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None, params = None):
+        return self.estimate_tree_topology(similarity_matrix, taxa_metadata, params = params)
     #change to spectral_neighbor_joining
 
-    def estimate_tree_topology(self, similarity_matrix, taxa_metadata=None, scorer=sv2, scaler=1.0, bifurcating=False):
+    def estimate_tree_topology(self, similarity_matrix, taxa_metadata=None, scorer=sv2, scaler=1.0, bifurcating=False, params = None):
+        if hasattr(params,'alpha'):
+            similarity_matrix = similarity_matrix**params.alpha
         m, m2 = similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         if taxa_metadata is None:
@@ -746,6 +840,13 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
         G = taxa_metadata.all_leaves()
 
         available_clades = set(range(len(G)))   # len(G) == m
+        
+        # choose spectral score function
+        if hasattr(params,'score_func'):
+            scorer = params.score_func
+        else:
+            scorer = sv2
+
         # initialize Sigma
         Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
         sv1 = np.full((2*m,2*m), np.nan)
@@ -789,14 +890,16 @@ class SpectralTreeReconstruction(ReconstructionMethod):
             self.reconstruction_alg = inner_method()
             
     def __call__(self, sequences, taxa_metadata=None):
-        return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxa_metadata=taxa_metadata, reconstruction_alg = self.inner_method)
+        return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxa_metadata=taxa_metadata, 
+            reconstruction_alg = self.inner_method)
     def __repr__(self):
         return "spectralTree" + " + " + self.inner_method.__repr__(self.inner_method)
 
-    def deep_spectral_tree_reconstruction(self, sequences, similarity_metric, taxa_metadata = None, num_gaps =1,threshhold = 100, min_split = 1,merge_method = "angle", verbose = False, **kargs):
+    def deep_spectral_tree_reconstruction(self, sequences, similarity_metric, taxa_metadata = None, num_gaps =1,threshhold = 100, 
+        alpha = 1,min_split = 1,merge_method = "angle", verbose = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
-        self.similarity_matrix = similarity_metric(sequences, taxa_metadata = taxa_metadata)
+        self.similarity_matrix = similarity_metric(sequences, taxa_metadata = taxa_metadata)**alpha
         m, m2 = self.similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         self.taxa_metadata = taxa_metadata
@@ -872,7 +975,8 @@ class SpectralTreeReconstruction(ReconstructionMethod):
 
         # cur_similarity = self.similarity_matrix[node.bitmap,:]
         # cur_similarity = cur_similarity[:,node.bitmap]
-        return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
+        #return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
+        return join_trees_with_spectral_root_finding_par(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
     
     def reconstruct_alg_wrapper(self, node, **kargs):
         # DELETE namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 
@@ -915,14 +1019,20 @@ if __name__ == "__main__":
     ref = utils.balanced_binary(8)
     #all_data = utils.temp_dataset_maker(ref, 1000, 0.01)[0]
     all_data = dendropy.model.discrete.simulate_discrete_chars(1000, ref, dendropy.model.discrete.Jc69(), mutation_rate=0.05)
-    observations, _ = utils.charmatrix2array(all_data)
+    observations, taxon_meta = utils.charmatrix2array(all_data)
+    
     dist = paralinear_distance(observations)
+    dist2 = raxml_gamma_corrected_distance_matrix(observations, taxon_meta)
+    
     dist
-    inf = neighbor_joining(dist)
+    inf = NeighborJoining(lambda x: x).reconstruct_from_similarity(np.exp(-dist), taxon_meta)
+    dist2
+    inf2 = NeighborJoining(lambda x: x).reconstruct_from_similarity(np.exp(-dist2), taxon_meta)
     print('ref:')
     ref.print_plot()
     print("inf:")
     inf.print_plot()
+    inf2.print_plot()
 
     print([leaf.distance_from_root() for leaf in ref.leaf_nodes()])
 
