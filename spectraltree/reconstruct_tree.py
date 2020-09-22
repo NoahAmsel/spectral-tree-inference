@@ -582,6 +582,13 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
 def compute_score_test(bp):
     return bp
 
+
+def compute_score_test2(mask1A,T1,T2_mask,similarity_matrix, u_12,sigma_12, v_12, O1, merge_method):      
+    mask1B = (T1.mask ^ mask1A)
+    score = compute_merge_score(mask1A, mask1B, T2_mask, similarity_matrix, 
+        u_12[:,0],sigma_12[0], v_12[0,:], O1, merge_method)
+    return score
+
 def compute_score(bp,taxa_metadata,T1,T2_mask,similarity_matrix, u_12,sigma_12, v_12, O1, merge_method):      
     mask1A = taxa_metadata.bipartition2mask(bp)
     mask1B = (T1.mask ^ mask1A)
@@ -656,8 +663,8 @@ def join_trees_with_spectral_root_finding_par(similarity_matrix, T1, T2, merge_m
         
         # score_list = Parallel(n_jobs=4)(delayed(compute_score)(bp,taxa_metadata,T1,T2_mask,
         #     similarity_matrix, u_12,sigma_12, v_12, O1, merge_method) for bp in bipartitions1)
-        score_list = Parallel(n_jobs=4)(delayed(compute_score_test)(bp) for bp in [taxa_metadata,taxa_metadata,taxa_metadata,taxa_metadata])
-        
+        bp_mask = [taxa_metadata.bipartition2mask(bp) for bp in bipartitions1]
+        score_list = Parallel(n_jobs=4)(delayed(compute_score_test2)(bp_mask[i], T1, T2_mask, similarity_matrix, u_12, sigma_12, v_12, O1, merge_method) for i in range(len(bp_mask)))
         
         #score_list = [pool.apply(compute_score, args=(bp,taxa_metadata,T1,T2_mask,
         #    similarity_matrix, u_12,sigma_12, v_12, O1, merge_method)) for bp in bipartitions1]
@@ -672,7 +679,7 @@ def join_trees_with_spectral_root_finding_par(similarity_matrix, T1, T2, merge_m
             mask1A = taxa_metadata.bipartition2mask(bp)
             mask1B = (T1.mask ^ mask1A)
 
-            score = reconstruct_tree.compute_merge_score(mask1A, mask1B, T2_mask, similarity_matrix, u_12[:,0],sigma_12[0], v_12[0,:], O1, merge_method)
+            score = compute_merge_score(mask1A, mask1B, T2_mask, similarity_matrix, u_12[:,0],sigma_12[0], v_12[0,:], O1, merge_method)
             # DELETE ME bool_array = taxa_metadata.bipartition2mask(bp)
             #DELETE ME score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O1,merge_method)
             
@@ -1209,3 +1216,4 @@ if __name__ == "__main__":
 
     mm = np.array([[1,2],[-3, -1]])
     np.linalg.norm(mm)**2
+

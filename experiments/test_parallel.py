@@ -45,7 +45,7 @@ tree_spectral = spectral_method.deep_spectral_tree_reconstruction(observations, 
 
 
 
-
+"""
 def square(x): 
     return x * x 
    
@@ -56,3 +56,4 @@ if __name__ == '__main__':
     outputs = pool.map(square, inputs) 
     print("Input: {}".format(inputs)) 
     print("Output: {}".format(outputs)) 
+"""
