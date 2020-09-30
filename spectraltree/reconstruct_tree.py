@@ -1144,8 +1144,8 @@ class SpectralTreeReconstruction(ReconstructionMethod):
 
         # cur_similarity = self.similarity_matrix[node.bitmap,:]
         # cur_similarity = cur_similarity[:,node.bitmap]
-        #return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
-        return join_trees_with_spectral_root_finding_par(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
+        return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
+        #return join_trees_with_spectral_root_finding_par(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
     
     def reconstruct_alg_wrapper(self, node, **kargs):
         # DELETE namespace1 = dendropy.TaxonNamespace([self.taxon_namespace[i] for i in [i for i, x in enumerate(node.bitmap) if x]]) 

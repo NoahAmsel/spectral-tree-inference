@@ -21,7 +21,7 @@ import multiprocessing as mp
 
 import time 
   
-num_taxa = 100
+num_taxa = 1000
 reference_tree = utils.unrooted_pure_kingman_tree(num_taxa)
 jc = generation.Jukes_Cantor(num_classes=4)
 mutation_rate = jc.p2t(0.9)
