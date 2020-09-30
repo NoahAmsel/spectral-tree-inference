@@ -1076,9 +1076,9 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         if self.taxon_namespace is None:
             self.taxon_namespace = utils.default_namespace(m)
         else:
-            assert len(self.taxon_namespace) >= m, "Namespace too small for distance matrix"
+            assert len(self.taxa_metadata) >= m, "Namespace too small for distance matrix"
 
-        partitioning_tree = MyTree([True]*len(self.taxon_namespace))
+        partitioning_tree = MyTree([True]*len(self.taxa_metadata))
         cur_node = partitioning_tree.root
         if self.verbose: process = psutil.Process(os.getpid())
         while True:
@@ -1135,8 +1135,8 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         ll2 = ll[not_bool_bipartition]
 
         # TODO: use TaxaMetadata.taxa2mask here
-        bitmap1 = [True if i in ll1 else False for i in range(len(self.taxon_namespace))]
-        bitmap2 = [True if i in ll2 else False for i in range(len(self.taxon_namespace))]
+        bitmap1 = [True if i in ll1 else False for i in range(len(self.taxa_metadata))]
+        bitmap2 = [True if i in ll2 else False for i in range(len(self.taxa_metadata))]
         return bitmap1, bitmap2
 
     def margeTreesLeftRight(self, node, merge_method):
