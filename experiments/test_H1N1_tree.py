@@ -1,7 +1,10 @@
 import sys, os
 
 sys.path.append("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/spectraltree")
-
+sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
+sys.path.append(os.path.join(sys.path[0],'spectraltree'))
+import numpy as np
+import utils
 import generation
 import reconstruct_tree
 import time
