@@ -73,7 +73,7 @@ def get_trees(tree_type, tree_size, tree_path):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Run different tree reconstruction methods.', )
-    parser.add_argument("type", help="tree type: binary, catepillar, kingman, or path (have to provide the path to the tree file).")
+    parser.add_argument("type", help="tree type: binary, catepillar, or path (have to provide the path to the tree file).")
     parser.add_argument('method', help='method to run: RaXML, SNJ, NJ, STR+NJ, STR+SNJ, STR+RaXML.')
     parser.add_argument('nrun', type=int, help="Number of times to run the method.")
     parser.add_argument("--size", type=int, help="Size of the tree.")
@@ -111,4 +111,4 @@ if __name__ == "__main__":
         f1s.append(res[4])
 
     perf_metrics = pd.DataFrame({'method': ms, "m": m, "mut_rate": mutation_rate, 'threshold': ts, 'runtime': rts, 'RF': rfs, "F1": f1s})
-    perf_metrics.to_csv("/home/mw957/project/repos/spectral-tree-inference/experiments/results/kingman_m" + str(m) + "_" + str(method) + "_" + str(threshold) + ".csv", index=False)
+    perf_metrics.to_csv("/home/mw957/project/repos/spectral-tree-inference/experiments/results/birthdeath_m" + str(m) + "_" + str(method) + "_" + str(threshold) + ".csv", index=False)

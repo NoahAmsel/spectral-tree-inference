@@ -1,40 +1,23 @@
 import sys, os
 
-sys.path.append("../spectraltree")
+sys.path.append("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/spectraltree")
 
 import generation
 import reconstruct_tree
 import time
 import utils
 import pandas as pd
-import dendropy
 import argparse
-import numpy as np
+import dendropy
 
-def run_method(method, path, threshold = None, verbose = False):
-    seqs = dendropy.RnaCharacterMatrix.get(path=path, schema="nexus")
-    tree = dendropy.Tree.get(path=path, schema="nexus", taxon_namespace = seqs.taxon_namespace)
+#@profile
+def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold = None, verbose = False):
+    start_time = time.time()
+    observations, taxa_meta = generation.simulate_sequences(m, tree_model=tree, seq_model=generation.HKY(kappa = kappa), mutation_rate=mutation_rate, alphabet="DNA")
+    runtime = time.time() - start_time
+    print("Simulation took %s seconds" % runtime)
     
-    leafs_idx = [i.label[0] != " " for i in seqs.taxon_namespace]
-
-    ch_list = list()
-    for t in seqs.taxon_namespace:
-        ch_list.append([x.symbol for x in seqs[t]])
-
-    observations = np.array(ch_list)
-    observations = observations[leafs_idx]
-    observations = np.where(observations=='A', 0, observations) 
-    observations = np.where(observations=='C', 1, observations) 
-    observations = np.where(observations=='G', 2, observations) 
-    observations = np.where(observations=='U', 3, observations) 
-    observations = np.where(observations=='-', 4, observations) 
-    observations = observations.astype('int')
-
-    taxa = np.array(seqs.taxon_namespace._taxa)[leafs_idx]
-
-    taxa_meta = utils.TaxaMetadata(seqs.taxon_namespace, list(taxa), alphabet=dendropy.RNA_STATE_ALPHABET)
-    
-    if method == "RaXML":
+    if method == "RAxML":
         raxml_HKY = reconstruct_tree.RAxML()
         start_time = time.time()
         tree_rec = raxml_HKY(observations, taxa_meta, raxml_args="-T 2 --HKY85 -c 1")      
@@ -46,19 +29,19 @@ def run_method(method, path, threshold = None, verbose = False):
         nj = reconstruct_tree.NeighborJoining(reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = nj(observations, taxa_meta)
-    if method == "STR+NJ":
+    if method == "STDR+NJ":
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxa_metadata = taxa_meta,
                                                             threshhold = threshold, min_split = 5, verbose = verbose)
-    if method == "STR+SNJ":
+    if method == "STDR+SNJ":
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.SpectralNeighborJoining, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxa_metadata = taxa_meta, 
                                                             threshhold = threshold, min_split = 5, verbose = verbose)
-    if method == "STR+RaXML":
+    if method == "STDR+RAxML":
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
@@ -74,22 +57,44 @@ def run_method(method, path, threshold = None, verbose = False):
     print("F1% = ",F1) 
     return([method, str(threshold), runtime, RF, F1])
 
+#@profile
+def get_trees(tree_type, tree_size, tree_path):
+    if tree_type == "binary":
+        tree = utils.balanced_binary(tree_size)
+    elif tree_type == "catepillar":
+        tree = utils.lopsided_tree(tree_size)
+    elif tree_type == "birthdeath":
+        tree = utils.unrooted_birth_death_tree(tree_size)
+    elif tree_type == "kingman":
+        tree = utils.unrooted_pure_kingman_tree(tree_size)
+    elif tree_type == "path":
+        tree = dendropy.Tree.get(path=args.path, schema="nexus")
+    return tree
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Run different tree reconstruction methods.', )
+    parser.add_argument("type", help="tree type: binary, catepillar, or path (have to provide the path to the tree file).")
     parser.add_argument('method', help='method to run: RaXML, SNJ, NJ, STR+NJ, STR+SNJ, STR+RaXML.')
-    parser.add_argument("path", help="Path to the tree file.")
-    parser.add_argument('out', help="Path to output data files.")
+    parser.add_argument('nrun', type=int, help="Number of times to run the method.")
+    parser.add_argument("--size", type=int, help="Size of the tree.")
+    parser.add_argument("--path", help="Path to the tree file.")
     parser.add_argument('--threshold', type=int, help='Minimum tree size to run the submethod for STR methods.')
+    parser.add_argument("--m", type=int, help="Length of the sequence.", default=300)
+    parser.add_argument("--kappa", type=float, help="Transversion/transition rate ratio", default=2)
+    parser.add_argument("--mutation_rate", type=float, help="Mutation rate", default=0.05)
     parser.add_argument("--verbose", help="Whether to print the diagnostic messages.")
 
     args = parser.parse_args()
 
+    tree = get_trees(args.type, args.size, args.path)
+    n_runs = args.nrun
     method = args.method
     threshold = args.threshold
-    path = args.path
     verbose = args.verbose == "True"
+    m = args.m
+    kappa = args.kappa
+    mutation_rate = args.mutation_rate
 
     ms = []
     ts = []
@@ -97,13 +102,14 @@ if __name__ == "__main__":
     rfs = []
     f1s = []
 
-    print(method, threshold)
-    res = run_method(method, path, threshold = threshold, verbose = verbose)
-    ms.append(res[0])
-    ts.append(res[1])
-    rts.append(res[2])
-    rfs.append(res[3])
-    f1s.append(res[4])
+    for i in range(n_runs):
+        print(method, threshold)
+        res = run_method(method, tree, m, kappa, mutation_rate, threshold = threshold, verbose = verbose)
+        ms.append(res[0])
+        ts.append(res[1])
+        rts.append(res[2])
+        rfs.append(res[3])
+        f1s.append(res[4])
 
-    perf_metrics = pd.DataFrame({'method': ms, 'threshold': ts, 'runtime': rts, 'RF': rfs, "F1": f1s})
-    perf_metrics.to_csv(args.out, index=False)
+    perf_metrics = pd.DataFrame({'method': ms, "m": m, "mut_rate": mutation_rate, 'threshold': ts, 'runtime': rts, 'RF': rfs, "F1": f1s})
+    perf_metrics.to_csv("/home/mw957/project/repos/spectral-tree-inference/experiments/results/kim2048_m" + str(m) + "_" + str(method) + "_" + str(threshold) + ".csv", index=False)

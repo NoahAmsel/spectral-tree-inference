@@ -1,62 +1,61 @@
-method	path	out	threshold	verbose
-NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_NJ_2048_0.csv	0	True
-NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_NJ_2048_1.csv	0	True
-NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_NJ_2048_2.csv	0	True
-NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_NJ_2048_3.csv	0	True
-NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_NJ_2048_4.csv	0	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_64_2048_0.csv	64	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_64_2048_1.csv	64	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_64_2048_2.csv	64	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_64_2048_3.csv	64	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_64_2048_4.csv	64	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_128_2048_0.csv	128	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_128_2048_1.csv	128	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_128_2048_2.csv	128	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_128_2048_3.csv	128	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_128_2048_4.csv	128	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_256_2048_0.csv	256	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_256_2048_1.csv	256	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_256_2048_2.csv	256	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_256_2048_3.csv	256	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_256_2048_4.csv	256	True
-SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_SNJ_2048_0.csv	0	True
-SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_SNJ_2048_1.csv	0	True
-SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_SNJ_2048_2.csv	0	True
-SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_SNJ_2048_3.csv	0	True
-SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_SNJ_2048_4.csv	0	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_64_2048_0.csv	64	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_64_2048_1.csv	64	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_64_2048_2.csv	64	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_64_2048_3.csv	64	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_64_2048_4.csv	64	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_128_2048_0.csv	128	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_128_2048_1.csv	128	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_128_2048_2.csv	128	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_128_2048_3.csv	128	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_128_2048_4.csv	128	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_256_2048_0.csv	256	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_256_2048_1.csv	256	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_256_2048_2.csv	256	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_256_2048_3.csv	256	True
-STR+SNJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_SNJ_256_2048_4.csv	256	True
-RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_RaXML_2048_0.csv	0	True
-RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_RaXML_2048_1.csv	0	True
-RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_RaXML_2048_2.csv	0	True
-RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_RaXML_2048_3.csv	0	True
-RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_RaXML_2048_4.csv	0	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_64_2048_0.csv	64	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_64_2048_1.csv	64	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_64_2048_2.csv	64	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_64_2048_3.csv	64	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_64_2048_4.csv	64	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_128_2048_0.csv	128	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_128_2048_1.csv	128	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_128_2048_2.csv	128	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_128_2048_3.csv	128	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_128_2048_4.csv	128	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_256_2048_0.csv	256	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_1.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_256_2048_1.csv	256	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_2.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_256_2048_2.csv	256	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_3.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_256_2048_3.csv	256	True
-STR+RaXML	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_4.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_RaXML_256_2048_4.csv	256	True
-STR+NJ	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-128_0.nex	/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/kim_STR_NJ_128_0.csv	32	True
+type	method	nrun	size	path	threshold	m	kappa	mutation_rate	verbose
+path	NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	400	2	0.005	True
+path	NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	600	2	0.005	True
+path	NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	800	2	0.005	True
+path	NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	1000	2	0.005	True
+path	NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	1200	2	0.005	True
+path	SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	400	2	0.005	True
+path	SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	600	2	0.005	True
+path	SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	800	2	0.005	True
+path	SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	1000	2	0.005	True
+path	SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	1200	2	0.005	True
+path	RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	400	2	0.005	True
+path	RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	600	2	0.005	True
+path	RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	800	2	0.005	True
+path	RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	1000	2	0.005	True
+path	RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	0	1200	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	400	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	600	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	800	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	1000	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	1200	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	400	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	600	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	800	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	1000	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	1200	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	400	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	600	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	800	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	1000	2	0.005	True
+path	STDR+NJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	1200	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	400	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	600	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	800	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	1000	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	1200	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	400	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	600	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	800	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	1000	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	1200	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	400	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	600	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	800	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	1000	2	0.005	True
+path	STDR+SNJ	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	1200	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	400	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	600	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	800	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	1000	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	256	1200	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	400	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	600	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	800	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	1000	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	128	1200	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	400	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	600	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	800	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	1000	2	0.005	True
+path	STDR+RAxML	5	512	/gpfs/ysm/project/kleinstein/mw957/data/processed/STDR/steps-2048_0.nex	64	1200	2	0.005	True

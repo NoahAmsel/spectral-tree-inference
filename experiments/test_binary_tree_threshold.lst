@@ -1,0 +1,16 @@
+type	method	nrun	size	path	threshold	m	kappa	mutation_rate	verbose
+binary	STDR+NJ	5	2048	None	32	1000	2	0.1	True
+binary	STDR+NJ	5	2048	None	64	1000	2	0.1	True
+binary	STDR+NJ	5	2048	None	128	1000	2	0.1	True
+binary	STDR+NJ	5	2048	None	256	1000	2	0.1	True
+binary	STDR+NJ	5	2048	None	512	1000	2	0.1	True
+binary	STDR+SNJ	5	2048	None	32	1000	2	0.1	True
+binary	STDR+SNJ	5	2048	None	64	1000	2	0.1	True
+binary	STDR+SNJ	5	2048	None	128	1000	2	0.1	True
+binary	STDR+SNJ	5	2048	None	256	1000	2	0.1	True
+binary	STDR+SNJ	5	2048	None	512	1000	2	0.1	True
+binary	STDR+RAxML	5	2048	None	32	1000	2	0.1	True
+binary	STDR+RAxML	5	2048	None	64	1000	2	0.1	True
+binary	STDR+RAxML	5	2048	None	128	1000	2	0.1	True
+binary	STDR+RAxML	5	2048	None	256	1000	2	0.1	True
+binary	STDR+RAxML	5	2048	None	512	1000	2	0.1	True

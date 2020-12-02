@@ -17,8 +17,8 @@ source /ysm-gpfs/apps/software/miniconda/4.7.10/bin/activate r_env
 echo $CONDA_DEFAULT_ENV
 
 scriptDir="/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments"
-lookupFile=${scriptDir}/test_binary_tree.lst
-combineScript=${scriptDir}/test_tree.py
+lookupFile=${scriptDir}/test_caterpillar_tree.lst
+combineScript=${scriptDir}/test_caterpillar_tree.py
 
 taskID=${SLURM_ARRAY_TASK_ID}
 rowNum=$(($taskID+1))

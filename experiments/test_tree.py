@@ -16,7 +16,7 @@ def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold =
     runtime = time.time() - start_time
     print("Simulation took %s seconds" % runtime)
     
-    if method == "RaXML":
+    if method == "RAxML":
         raxml_HKY = reconstruct_tree.RAxML()
         start_time = time.time()
         tree_rec = raxml_HKY(observations, taxa_meta, raxml_args="-T 2 --HKY85 -c 1")      
@@ -28,19 +28,19 @@ def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold =
         nj = reconstruct_tree.NeighborJoining(reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = nj(observations, taxa_meta)
-    if method == "STR+NJ":
+    if method == "STDR+NJ":
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxa_metadata = taxa_meta,
                                                             threshhold = threshold, min_split = 5, verbose = verbose)
-    if method == "STR+SNJ":
+    if method == "STDR+SNJ":
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.SpectralNeighborJoining, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxa_metadata = taxa_meta, 
                                                             threshhold = threshold, min_split = 5, verbose = verbose)
-    if method == "STR+RaXML":
+    if method == "STDR+RAxML":
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
@@ -76,7 +76,6 @@ if __name__ == "__main__":
     parser.add_argument("type", help="tree type: binary, catepillar, or path (have to provide the path to the tree file).")
     parser.add_argument('method', help='method to run: RaXML, SNJ, NJ, STR+NJ, STR+SNJ, STR+RaXML.')
     parser.add_argument('nrun', type=int, help="Number of times to run the method.")
-    parser.add_argument('out', help="Path to output data files.")
     parser.add_argument("--size", type=int, help="Size of the tree.")
     parser.add_argument("--path", help="Path to the tree file.")
     parser.add_argument('--threshold', type=int, help='Minimum tree size to run the submethod for STR methods.')
@@ -112,4 +111,4 @@ if __name__ == "__main__":
         f1s.append(res[4])
 
     perf_metrics = pd.DataFrame({'method': ms, 'threshold': ts, 'runtime': rts, 'RF': rfs, "F1": f1s})
-    perf_metrics.to_csv(args.out, index=False)
+    perf_metrics.to_csv("/home/mw957/project/repos/spectral-tree-inference/experiments/results/binary_m" + str(m) + "_" + str(method) + "_" + str(threshold) + ".csv", index=False)

@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --partition=general
-#SBATCH --job-name=largeTrees
+#SBATCH --job-name=birthdeath
 #SBATCH --ntasks=1 --nodes=1
 #SBATCH --mem-per-cpu=10G
 #SBATCH --time=1-00:00:00
 #SBATCH --mail-type=ALL
-#SBATCH --error=log/large_trees.%A_%a.err
-#SBATCH --output=log/large_trees.%A_%a.out
+#SBATCH --error=log/birthdeath.%A_%a.err
+#SBATCH --output=log/birthdeath.%A_%a.out
 #SBATCH --mail-user=mamie.wang@yale.edu
 # reference script from https://rcc.uchicago.edu/docs/running-jobs/array/index.html
 
@@ -17,8 +17,8 @@ source /ysm-gpfs/apps/software/miniconda/4.7.10/bin/activate r_env
 echo $CONDA_DEFAULT_ENV
 
 scriptDir="/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments"
-lookupFile=${scriptDir}/test_binary_tree.lst
-combineScript=${scriptDir}/test_tree.py
+lookupFile=${scriptDir}/test_birthdeath_tree.lst
+combineScript=${scriptDir}/test_birthdeath_tree.py
 
 taskID=${SLURM_ARRAY_TASK_ID}
 rowNum=$(($taskID+1))
