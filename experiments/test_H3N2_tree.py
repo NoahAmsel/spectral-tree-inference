@@ -1,7 +1,10 @@
 import sys, os
 
 sys.path.append("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/spectraltree")
-
+sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
+sys.path.append(os.path.join(sys.path[0],'spectraltree'))
+import numpy as np
+import utils
 import generation
 import reconstruct_tree
 import time
@@ -55,8 +58,21 @@ def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold =
     print("F1% = ",F1) 
     return([method, str(threshold), runtime, RF, F1])
 
-tree_path = "/home/mw957/project/repos/spec_tree/data/skygrid_J2.newick"
-fasta_path = "/home/mw957/project/repos/spec_tree/data/H3N2_NewYork.fasta"
+tree_path = r"C:\Personal\Dropbox\Yariv\postdoc\eigen_tree_reconstruction\spectral-tree-inference\data\NY_H3N2.newick"
+fasta_path = "../data/H3N2_NewYork.fasta"
+
+
+H1N1_tree = dendropy.Tree.get(path=tree_path, schema="newick")
+n_runs = 1
+n = len(H1N1_tree.taxon_namespace)
+
+method = "STR + NJ"
+threshold = 64
+
+res = run_method(method, H1N1_tree, m = 1000, mutation_rate=0.1, threshold = threshold)
+
+
+
 
 H3N2_tree = dendropy.Tree.get(path=tree_path, schema="newick")
 n_runs = 10
