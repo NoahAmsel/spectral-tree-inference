@@ -59,7 +59,7 @@ fprintf('[%s.m]  BIC (test)  == %f\n', mfilename, t_hat.bic);
 fprintf('[%s.m] ------------------------------------\n', mfilename);
 
 % plot the tree
-tree2fig(t_hat)       % pure matlab
+%tree2fig(t_hat)       % pure matlab
 %tree2dot(t_hat, fname, 'pdf'); % might work but requires GraphViz
 %tree2dot(t_hat, fname, 'png'); % might work but requires GraphViz
 %tree2dot(t_hat, fname, 'svg'); % might work but requires GraphViz

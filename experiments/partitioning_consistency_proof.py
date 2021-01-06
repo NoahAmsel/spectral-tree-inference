@@ -40,6 +40,8 @@ def myPlot(G):
     igraph.plot(G, **visual_style)
 
 def find_parant_in_active_set(current_G, active_set, added_nodes, avoid_nodes = []):
+    #retunrs a node that is not in added_nodes such that it has two children in active_set and not in avoid_nodes
+    # also returns the children (that are in active_set and not in avoid_nodes)
     for node in current_G.vs:
         if not(node.index in added_nodes):
             children = []
@@ -82,9 +84,12 @@ while len(added_nodes) < len(G_orig.vs):
     d = 0
     #correct weight for children of added node
     for i in children:
-        active_set.remove(i)
+        active_set.remove(i) # step 5 in the paper
+        # Setting child =[v,w] from the paper
         child = resultingG.vs.select(lambda vertex: vertex["name"] == i )[0].index #child's index in resultingG
+        # step 2 - disconnect v,w from the active set.
         resultingG.delete_edges(resultingG.es.select( _between =([child],active_set_idx)))
+        # computing new weight for v and w
         cur_weight = current_G.es.select( _between = ([i],[new_node.index]) )[0]["weight"]
         resultingG.add_edge(child,new_node_idx)["weight"] = cur_weight
         d+=np.exp(-cur_weight)
@@ -101,6 +106,8 @@ while len(added_nodes) < len(G_orig.vs):
     for i in resultingG.es.select(lambda edge: edge.target == new_node_idx):
         i["weight"] = i["weight"] + d
     
+    # Until here we finished step 3 in the paper
+    
     #correct weights for all pairs of old active nodes
     for i,j in itertools.combinations(active_set,2):
         resultingG_i_idx = resultingG.vs.select(lambda vertex: vertex["name"] == i )[0].index
@@ -110,6 +117,7 @@ while len(added_nodes) < len(G_orig.vs):
         s_j_new = resultingG.es.select( _between = ([resultingG_j_idx],[new_node_idx]) )[0]["weight"]
         s_j_new = s_j_new-d
         curr_s_i_j = resultingG.es.select( _between = ([resultingG_i_idx],[resultingG_j_idx]) )[0]["weight"]
+        # step 4
         resultingG.es.select( _between = ([resultingG_i_idx],[resultingG_j_idx]) )["weight"] = -np.log( np.exp(-curr_s_i_j) - np.exp(-s_i_new - s_j_new))
     # add new node to active nodes
     active_set.append(new_node.index)

@@ -99,5 +99,5 @@ fprintf('[%s.m] saving final results in "%s.mat"\n', mfilename, fname);
 save(fname);
 
 % plot the tree
-tree2fig(t_hat)       % pure matlab
+%tree2fig(t_hat)       % pure matlab
 %%%tree2dot(t_hat, fname, 'png'); % might work but requires GraphViz

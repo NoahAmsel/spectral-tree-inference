@@ -95,7 +95,7 @@ while 1
       thet.name = [data.name '_bin'];
       figure(1)
       subplot(122)
-      tree2fig(thet)       % pure matlab
+      %tree2fig(thet)       % pure matlab
       %%% tree2dot(thet)   % might work but requires GraphViz
       title('estimate')
       disp(' ')
@@ -133,7 +133,7 @@ while 1
     thet.name = [data.name '_bin'];
     figure(1)
     subplot(122)
-    tree2fig(thet)       % pure matlab
+    %tree2fig(thet)       % pure matlab
     %%% tree2dot(thet)   % might work but requires GraphViz
     title('estimate')
     disp(' ')
