@@ -20,7 +20,7 @@ clc
 figure(1)
 clf
 subplot(121)
-tree2fig(t)       % pure matlab
+%tree2fig(t)       % pure matlab
 %%% tree2dot(t)   % might work but requires GraphViz
 title('true structure')
 disp(' ')

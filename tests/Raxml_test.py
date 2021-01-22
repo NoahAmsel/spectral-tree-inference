@@ -30,6 +30,7 @@ reference_tree = utils.balanced_binary(num_taxa)
 ###########################################################################
 ##                   TEST WITH DENDROPY DATA
 ###########################################################################
+print("test dendropy data")
 time_s = time.time()
 data = simulate_discrete_chars(N, reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
 print("")
@@ -56,6 +57,7 @@ jc = generation.Jukes_Cantor()
 time_s = time.time()
 mutation_rate = [jc.p2t(0.95)]
 
+print("test numpy data")
 observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
 print("")
 print("Time for data generation", time.time()-time_s)

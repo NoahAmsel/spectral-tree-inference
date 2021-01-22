@@ -4,6 +4,7 @@ from itertools import combinations
 import scipy.spatial.distance
 import numpy as np
 import dendropy
+import igraph
 
 def default_namespace(num_taxa, prefix="T"):
     return dendropy.TaxonNamespace([prefix+str(i) for i in range(1, num_taxa+1)])
@@ -271,6 +272,17 @@ def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
 # Including these functions here for convenience
 from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
 
+def adjacency_matrix_to_tree_igraph(A,num_taxa,taxa_metadata):
+
+    
+    G = igraph.Graph.Adjacency((A > 0).tolist())
+    merges = [x.tuple for x in G.es]
+    T = igraph.Dendrogram(merges)
+
+    
+
+    
+
 def adjacency_matrix_to_tree(A,num_taxa,taxa_metadata):
     m = A.shape[0]
     edge_length = 1
@@ -280,7 +292,9 @@ def adjacency_matrix_to_tree(A,num_taxa,taxa_metadata):
     active_nodes = np.arange(num_taxa)
     
     for p_idx in np.arange(num_taxa,m):        
-        child_idx = np.where(A[p_idx,active_nodes]>0)[0]              
+        #child_idx = np.where(A[p_idx,active_nodes]>0)[0]  
+        a = np.array(A[p_idx,active_nodes])[0]
+        child_idx = [i for i in range(len(a)) if a[i] > 0]            
         child_nodes = [nodes[i] for i in active_nodes[child_idx]]
         p_node = merge_children(child_nodes, edge_length=edge_length)    
         nodes.append(p_node)

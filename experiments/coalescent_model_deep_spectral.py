@@ -27,7 +27,8 @@ def generate_figure(df,x='n',y='RF',hue="method", kind="point"):
 #df = pkl.load( open( "./data/coalescent_m_400.pkl", "rb" ) )
 #generate_figure(df,y='runtime')
 
-num_taxa = 1000
+num_taxa = 100
+reference_tree = utils.unrooted_pure_kingman_tree(num_taxa)
 jc = generation.Jukes_Cantor(num_classes=4)
 mutation_rate = jc.p2t(0.9)
 N_vec = [800,1000,1200,1400]
@@ -44,6 +45,19 @@ for i in np.arange(num_reps):
         print('iteration ',i,' length ',n)
         reference_tree = utils.unrooted_pure_kingman_tree(num_taxa)
         observations, taxa_meta = generation.simulate_sequences(n, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
+
+        # run deep spectral    
+        print("Spectral deep")
+        t_s = time.time()
+        tree_spectral = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix,
+                                         taxa_metadata= taxa_meta,
+                                        threshhold = 20 ,min_split = 5, merge_method = "least_square", verbose=False)
+        runtime = time.time()-t_s
+        print(runtime)
+        tree_spectral.write(path="temp.tre", schema="newick")
+        RF,F1 = reconstruct_tree.compare_trees(tree_spectral, reference_tree)       
+        df = df.append({'method': 'STR+RAXML', 'runtime': runtime, 'RF': RF,'F1':F1,'n': n}, ignore_index=True) 
+        
     
         # run raxml
         print("RAXML")
@@ -55,17 +69,6 @@ for i in np.arange(num_reps):
         df = df.append({'method': 'RaXML', 'runtime': runtime, 'RF': RF,'F1':F1,'n': n}, ignore_index=True) 
         
         
-        # run deep spectral    
-        print("Spectral deep")
-        t_s = time.time()
-        tree_spectral = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix,
-                                         taxa_metadata= taxa_meta,
-                                        threshhold = 100 ,min_split = 5, merge_method = "least_square", verbose=False)
-        runtime = time.time()-t_s
-        print(runtime)
-        tree_spectral.write(path="temp.tre", schema="newick")
-        RF,F1 = reconstruct_tree.compare_trees(tree_spectral, reference_tree)       
-        df = df.append({'method': 'STR+RAXML', 'runtime': runtime, 'RF': RF,'F1':F1,'n': n}, ignore_index=True) 
         
         # run raxml with deep spectral initilization
         print("RAXML with init")

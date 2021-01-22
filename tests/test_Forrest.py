@@ -24,8 +24,8 @@ import reconstruct_tree
 from dendropy.model.discrete import simulate_discrete_chars, Jc69, Hky85
 from dendropy.calculate.treecompare import symmetric_difference
 
-N = 3000
-num_taxa = 16
+N = 500
+num_taxa = 8
 
 #################################
 ## Tree generation

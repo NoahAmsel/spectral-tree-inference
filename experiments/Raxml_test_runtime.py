@@ -22,29 +22,47 @@ from dendropy.interop import raxml
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 import pandas as pd
+import numpy as np
 
-num_taxa = [128,256,512,1024,2048,4096]
+#num_taxa = [128,256,512,1024,2048,4096]
+num_taxa = np.arange(200,2000,200)
+n_itr = 10
 #num_taxa = [8,16,32]
 N = 1000
-tree_list = [utils.balanced_binary(m) for m in num_taxa]
+jc = generation.Jukes_Cantor()
+mutation_rate = jc.p2t(0.95)
+nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix) 
+raxml = reconstruct_tree.RAxML()
+#tree_list = [utils.balanced_binary(m) for m in num_taxa]
 
-runtime = []
-RF = []
-F1 = []
-for reference_tree in tree_list:
-    data = simulate_discrete_chars(N, reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
-    time_s = time.time()
-    raxml = reconstruct_tree.RAxML()
-    tree = raxml(data)
-    runtime.append(time.time()-time_s)
-    print('runtime is ',runtime)
-    RF_,F1_ = reconstruct_tree.compare_trees(reference_tree, tree)
-    RF.append(RF_)
-    F1.append(F1_)
 
-    #tree.print_plot()
-res = pd.DataFrame({"N": num_taxa, "runtime": runtime, "Accuracy": F1})
-print(res)
+df = pd.DataFrame(columns=['method', 'runtime', 'RF','m'])
+for m in num_taxa:
+    for n_itr in range(n_itr):
+        reference_tree = utils.unrooted_pure_kingman_tree(m)
+        observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, 
+            seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
+        
+        # NJ
+        time_s = time.time()
+        tree_rec = nj(observations,taxa_meta)
+        runtime = time.time()-time_s
+        RF,F1 = reconstruct_tree.compare_trees(reference_tree, tree_rec)
+        print('NJ iteration: ',n_itr, ' num_taxa: ',m,' time: ',runtime)
+    
+        df = df.append({'method': 'nj', 'runtime': runtime, 'RF': RF,
+            'm': m}, ignore_index=True)
+
+        #RAXML
+        time_s = time.time()
+        tree_rec = raxml(observations,taxa_meta)
+        runtime = time.time()-time_s
+        RF,F1 = reconstruct_tree.compare_trees(reference_tree, tree_rec)
+        print('RAxML iteration: ',n_itr, ' num_taxa: ',m,' time: ',runtime)
+    
+        df = df.append({'method': 'raxml', 'runtime': runtime, 'RF': RF,
+            'm': m}, ignore_index=True)
+print(df)
 print('')
 
 # print("runtime")
