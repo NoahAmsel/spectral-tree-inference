@@ -3,7 +3,7 @@
 #SBATCH --job-name=largeTrees
 #SBATCH --ntasks=1 --nodes=1
 #SBATCH --mem-per-cpu=10G
-#SBATCH --time=1-00:00:00
+#SBATCH --time=3-00:00:00
 #SBATCH --mail-type=ALL
 #SBATCH --error=log/large_trees.%A_%a.err
 #SBATCH --output=log/large_trees.%A_%a.out

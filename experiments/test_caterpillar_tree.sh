@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=general
-#SBATCH --job-name=largeTrees
+#SBATCH --job-name=caterpillar
 #SBATCH --ntasks=1 --nodes=1
 #SBATCH --mem-per-cpu=10G
 #SBATCH --time=1-00:00:00

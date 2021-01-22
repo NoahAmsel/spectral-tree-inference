@@ -111,4 +111,4 @@ if __name__ == "__main__":
         f1s.append(res[4])
 
     perf_metrics = pd.DataFrame({'method': ms, "m": m, "mut_rate": mutation_rate, 'threshold': ts, 'runtime': rts, 'RF': rfs, "F1": f1s})
-    perf_metrics.to_csv("/home/mw957/project/repos/spectral-tree-inference/experiments/results/kingman_m" + str(m) + "_" + str(method) + "_" + str(threshold) + ".csv", index=False)
+    perf_metrics.to_csv("/home/mw957/project/repos/spectral-tree-inference/experiments/results/kingman_rw_m" + str(m) + "_" + str(method) + "_" + str(threshold) + ".csv", index=False)
