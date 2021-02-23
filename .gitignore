@@ -1,9 +1,18 @@
-__pycache__
+# Compiled python modules.
+*.pyc
+
+# Setuptools distribution folder.
+/dist/
+
+# Python egg metadata, regenerated from source files by setuptools.
+/*.egg-info
+
+*.DS_Store
+.vscode
+.ipynb_checkpoints
 figures
 matlab_tests
-*.DS_Store
-data/*
-.ipynb_checkpoints
+data
 experiments/log/*
 experiments/results/*
 tests/RAxML_bestTree.dendropy_raxml
@@ -11,5 +20,3 @@ tests/RAxML_info.dendropy_raxml
 tests/RAxML_log.dendropy_raxml
 tests/RAxML_parsimonyTree.dendropy_raxml
 tests/RAxML_result.dendropy_raxml
-.vscode
-*.pyc
