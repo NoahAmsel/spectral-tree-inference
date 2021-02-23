@@ -275,7 +275,8 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
         tree=tree_model,
         seq_len=seq_len,
         root_states=root_states,
-        rng=seq_model.rng)
+        rng=seq_model.rng
+    )
     char_matrix, meta = numpy_matrix_with_characters_on_tree(seq_evolver.seq_attr, tree_model, alphabet=alphabet)
     if not retain_sequences_on_tree:
         seq_evolver.clean_tree(tree_model)

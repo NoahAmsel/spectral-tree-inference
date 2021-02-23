@@ -13,6 +13,8 @@ from dendropy.interop import raxml
 import subprocess
 import utils
 import time
+import string
+import random
 import os
 import psutil
 from numba import jit
@@ -1065,7 +1067,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         return "spectralTree" + " + " + self.inner_method.__repr__(self.inner_method)
 
     def deep_spectral_tree_reconstruction(self, sequences, similarity_metric, taxa_metadata = None, num_gaps =1,threshhold = 100, 
-        alpha = 1,min_split = 1,merge_method = "angle", verbose = False, **kargs):
+        alpha = 1,min_split = 1,merge_method = "angle", verbose = False, subtree_filename = None, return_sim = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
         self.similarity_matrix = similarity_metric(sequences, taxa_metadata = taxa_metadata)**alpha
@@ -1103,6 +1105,11 @@ class SpectralTreeReconstruction(ReconstructionMethod):
             else:
                 start_time = time.time()
                 cur_node.tree = self.reconstruct_alg_wrapper(cur_node, **kargs)
+                letters = string.digits
+                if not subtree_filename is None:
+                    random_string = ''.join(random.choice(letters) for i in range(20))
+                    filename = subtree_filename%random_string
+                    cur_node.tree.write(path=filename, schema="newick")
                 cur_node.tree.mask = taxa_metadata.tree2mask(cur_node.tree)
                 runtime = time.time() - start_time
                 if verbose: print("--- %s seconds ---" % runtime)
@@ -1113,6 +1120,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
                 else:
                     cur_node = cur_node.parent
         #DELETE MEpartitioning_tree.root.tree.taxon_namespace = self.taxon_namespace
+        if return_sim: return partitioning_tree.root.tree, self.similarity_matrix
         return partitioning_tree.root.tree
         
     def splitTaxa(self,node,num_gaps,min_split):
@@ -1158,6 +1166,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         else:
             sequences1 = self.sequences[node.bitmap,:]
             return self.reconstruction_alg(sequences1, taxa_metadata=metadata1, **kargs)
+        
     
 class MyNode(object):
     def __init__(self, data):
