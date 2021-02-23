@@ -1,3 +1,7 @@
+##########
+# This file has been replaced by test_spectral_tree_reconstruction.py
+##########
+
 import datetime
 import pickle
 import os.path

@@ -2,7 +2,7 @@ import numpy as np
 import dendropy
 from sklearn.decomposition import TruncatedSVD
 
-from reconstruct_tree import ReconstructionMethod, DistanceReconstructionMethod
+from .reconstruct_tree import ReconstructionMethod, DistanceReconstructionMethod
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
 def svd2(mat, normalized = False):

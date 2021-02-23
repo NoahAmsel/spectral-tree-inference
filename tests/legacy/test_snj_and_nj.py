@@ -1,3 +1,7 @@
+##########
+# This file has been replaced by test_nj_snj.py
+##########
+
 import datetime
 import pickle
 import os.path
