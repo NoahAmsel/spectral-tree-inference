@@ -5,6 +5,7 @@ from itertools import combinations
 import os, sys
 import numpy as np
 import scipy.spatial.distance
+import scipy.linalg
 from sklearn.decomposition import TruncatedSVD
 from itertools import product
 from itertools import combinations
@@ -1119,7 +1120,12 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
         laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity
-        _, V = np.linalg.eigh(laplacian)
+        # t= time.time()
+        e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+        # tt = time.time() - t
+        # t= time.time()
+        # _, V = np.linalg.eigh(laplacian)
+        # tt = time.time() - t
         bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
 
         """# %%
