@@ -3,10 +3,7 @@ figures
 matlab_tests
 *.DS_Store
 data/*
-scripts/slurm-*.out
-scripts/data
 .ipynb_checkpoints
-.ipynb_checkpoints/*
 experiments/log/*
 experiments/results/*
 tests/RAxML_bestTree.dendropy_raxml
@@ -14,7 +11,5 @@ tests/RAxML_info.dendropy_raxml
 tests/RAxML_log.dendropy_raxml
 tests/RAxML_parsimonyTree.dendropy_raxml
 tests/RAxML_result.dendropy_raxml
-.vscode/.ropeproject/objectdb
-.vscode/.ropeproject/config.py
-.vscode/launch.json
+.vscode
 *.pyc
