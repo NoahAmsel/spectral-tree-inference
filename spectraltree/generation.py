@@ -4,7 +4,7 @@ import scipy.linalg
 import scipy.spatial.distance
 import dendropy
 
-from utils import TaxaMetadata
+from .utils import TaxaMetadata
 
 def nchoose2(n):
     return int(n*(n-1)/2)

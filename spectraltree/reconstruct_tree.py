@@ -12,7 +12,7 @@ from itertools import combinations
 import dendropy     #should this library be independent of dendropy? is that even possible?
 from dendropy.interop import raxml
 import subprocess
-import utils
+from . import utils
 import time
 import os
 import psutil

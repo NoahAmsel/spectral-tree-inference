@@ -1,3 +1,7 @@
+##########
+# This file has been replaced by test_raxml.py
+##########
+
 """
 I downloaded using the instructions here and verified that it worked
 http://www.sfu.ca/biology2/staff/dc/raxml/
