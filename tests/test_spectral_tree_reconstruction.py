@@ -50,6 +50,39 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
         self.assertEqual(RF, 0)
         self.assertEqual(F1, 100)
 
+    def test_angle_least_square(self):
+        # copied from test_deep_spectral_tree_reonstruction
+        N = 1000
+        num_taxa = 128
+        jc = generation.Jukes_Cantor()
+        mutation_rate = [jc.p2t(0.95)]
+        num_itr = 2 #0
+        # reference_tree = utils.unrooted_birth_death_tree(num_taxa, birth_rate=1)
+        # for x in reference_tree.preorder_edge_iter():
+        #     x.length = 1
+        merging_method_list = ['least_square','angle']
+        RF = {'least_square': [], 'angle': []}
+        F1 = {'least_square': [], 'angle': []}
+        for merge_method in merging_method_list:
+            for i in range(num_itr):
+                #reference_tree = utils.balanced_binary(num_taxa)
+                reference_tree = utils.lopsided_tree(num_taxa)
+                observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate)
+                spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
+                tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix, 
+                    taxa_metadata = taxa_meta, threshhold = 16,merge_method = merge_method)
+                RF_i,F1_i = reconstruct_tree.compare_trees(tree_rec, reference_tree)
+                RF[merge_method].append(RF_i)
+                F1[merge_method].append(F1_i)
+
+        print("Angle RF: ",np.mean(RF['angle']))
+        #print("Angle RF: ",np.mean(RF['angle']), "Runtime: ", runtime)
+
+        print("LS RF: ",np.mean(RF['least_square']))
+
+        self.assertEqual(np.mean(RF['angle']), 0)
+        self.assertEqual(np.mean(RF['least_square']), 0)
+
 # There are currently two implementations of Spectral Tree Reconstruction -- this tests the second one:
 class TestSTR(unittest.TestCase):
     def setUp(self):
