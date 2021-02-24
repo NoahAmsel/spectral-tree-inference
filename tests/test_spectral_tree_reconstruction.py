@@ -83,6 +83,29 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
         self.assertEqual(np.mean(RF['angle']), 0)
         self.assertEqual(np.mean(RF['least_square']), 0)
 
+    def test_threshold_partition(self):
+        # copied from test_threshold_partition
+        N = 1000
+        num_taxa = 256
+        jc = generation.Jukes_Cantor()
+        mutation_rate = [jc.p2t(0.95)]
+
+        reference_tree = utils.balanced_binary(num_taxa)
+        observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate)
+
+        spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
+        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 4,threshhold = 35)
+        tree_rec_b = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 1,threshhold = 35)
+
+        RF,F1 = reconstruct_tree.compare_trees(tree_rec, reference_tree)
+        RF_b,F1_b = reconstruct_tree.compare_trees(tree_rec_b, reference_tree)
+        print("Spectral deep: ")
+        print("RF multi gaps= ",RF)
+        print("RF standard = ",RF_b)
+
+        self.assertEqual(RF, 0)
+        self.assertEqual(RF_b, 0)
+
 # There are currently two implementations of Spectral Tree Reconstruction -- this tests the second one:
 class TestSTR(unittest.TestCase):
     def setUp(self):

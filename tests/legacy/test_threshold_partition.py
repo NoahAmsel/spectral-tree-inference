@@ -1,3 +1,7 @@
+##########
+# This file has been replaced by test_spectral_tree_reconstruction.py
+##########
+
 import datetime
 import pickle
 import os.path
@@ -12,13 +16,14 @@ import dendropy
 import copy
 
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
-sys.path.append(os.path.join(sys.path[0],'spectraltree'))
+#sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
+#sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 
+from spectraltree import utils, generation, reconstruct_tree
 #import spectraltree
-import utils
-import generation
-import reconstruct_tree
+#import utils
+#import generation
+#import reconstruct_tree
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 
