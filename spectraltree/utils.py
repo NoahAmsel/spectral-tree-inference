@@ -293,7 +293,7 @@ def adjacency_matrix_to_tree(A,num_taxa,taxa_metadata):
     
     for p_idx in np.arange(num_taxa,m):        
         #child_idx = np.where(A[p_idx,active_nodes]>0)[0]  
-        a = np.array(A[p_idx,active_nodes])[0]
+        a = A[p_idx,active_nodes]
         child_idx = [i for i in range(len(a)) if a[i] > 0]            
         child_nodes = [nodes[i] for i in active_nodes[child_idx]]
         p_node = merge_children(child_nodes, edge_length=edge_length)    

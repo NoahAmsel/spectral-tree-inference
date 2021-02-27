@@ -21,8 +21,6 @@ from sklearn.utils.extmath import randomized_svd
 import multiprocessing as mp
 from joblib import Parallel, delayed
 num_cores = mp.cpu_count()
-#import oct2py
-#from oct2py import octave
 import scipy
 #from reconstruct_tree_par import join_trees_with_spectral_root_finding_par
 
@@ -921,10 +919,12 @@ class TreeSVD(ReconstructionMethod):
         return "TreeSVD"
     
 class RG(ReconstructionMethod):
-    
+
     def __call__(self, observations, taxa_metadata=None):        
         return self.estimate_tree_topology(observations, taxa_metadata)
     def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
+        import oct2py
+        from oct2py import octave
         octave.addpath('./spectraltree/ChoilatentTree/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
@@ -938,10 +938,13 @@ class RG(ReconstructionMethod):
         return "RG"
 
 class CLRG(ReconstructionMethod):
-    
+
     def __call__(self, observations, taxa_metadata=None):        
         return self.estimate_tree_topology(observations, taxa_metadata)
     def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
+        import oct2py
+        from oct2py import octave
+
         octave.addpath('./spectraltree/ChoilatentTree/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
@@ -953,10 +956,11 @@ class CLRG(ReconstructionMethod):
         return "CLRG"
 
 class Forrest(ReconstructionMethod):
-    
     def __call__(self, observations, taxa_metadata=None):        
         return self.estimate_tree_topology(observations, taxa_metadata)
     def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
+        import oct2py
+        from oct2py import octave
         octave.addpath('./spectraltree/ltt-1.4/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
