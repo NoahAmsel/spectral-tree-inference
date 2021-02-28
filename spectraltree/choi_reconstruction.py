@@ -25,7 +25,7 @@ class RG(ReconstructionMethod):
 
         D = JC_distance_matrix(observations)
         #adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/RGb.m",observations+1,0)
-        adj_mat = oc.feval(os.path.join(SPECTRALTREE_CHOI_PATH, "toolbox", "RGb.m"),D,1,observations.shape[1])
+        adj_mat = oc.feval(os.path.join(SPECTRALTREE_CHOI_PATH, "toolbox", "RGb.m"),D,1,observations.shape[1], verbose=False)
         adj_mat = np.array(scipy.sparse.csr_matrix.todense(adj_mat))
         tree_RG = utils.adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
         return tree_RG
@@ -43,7 +43,7 @@ class CLRG(ReconstructionMethod):
         octave.addpath('./spectraltree/ChoilatentTree/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
-        adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/CLRGb.m",observations+1,0)
+        adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/CLRGb.m",observations+1,0, verbose=False)
         adj_mat = np.array(scipy.sparse.csr_matrix.todense(adj_mat))
         tree_CLRG = utils.adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
         return tree_CLRG
