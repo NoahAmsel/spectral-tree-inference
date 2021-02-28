@@ -6,8 +6,9 @@ import platform
 from . import utils
 from .reconstruct_tree import ReconstructionMethod, JC_distance_matrix
 
-RECONSTRUCT_TREE_PATH = os.path.abspath(__file__)
-RECONSTRUCT_TREE_DIR_PATH = os.path.dirname(RECONSTRUCT_TREE_PATH)
+SPECTRALTREE_DIR_PATH = os.path.dirname(os.path.abspath(__file__))
+SPECTRALTREE_LIB_PATH = os.path.join(SPECTRALTREE_DIR_PATH, "libs")
+SPECTRALTREE_RAXML_PATH = os.path.join(SPECTRALTREE_LIB_PATH, "raxmlHPC_bin")
 
 class RAxML(ReconstructionMethod):
     def __call__(self, sequences, taxa_metadata=None, raxml_args = "-T 2 --JC69 -c 1"):
@@ -20,13 +21,13 @@ class RAxML(ReconstructionMethod):
             
         if platform.system() == 'Windows':
             # Windows version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE_DIR_PATH, 'raxmlHPC-SSE3.exe'))
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH, 'raxmlHPC-SSE3.exe'))
         elif platform.system() == 'Darwin':
             #MacOS version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE_DIR_PATH,'raxmlHPC-macOS'))
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-macOS'))
         elif platform.system() == 'Linux':
             #Linux version
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(RECONSTRUCT_TREE_DIR_PATH,'raxmlHPC-SSE3-linux'))
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-SSE3-linux'))
 
         tree = rx.estimate_tree(char_matrix=data, raxml_args=[raxml_args])
         tree.is_rooted = False
@@ -46,13 +47,13 @@ def raxml_gamma_corrected_distance_matrix(observations, taxa_metadata):
 
     if platform.system() == 'Windows':
         # Windows version:
-        raxml_path = os.path.join(RECONSTRUCT_TREE_DIR_PATH, 'raxmlHPC-SSE3.exe')
+        raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH, 'raxmlHPC-SSE3.exe')
     elif platform.system() == 'Darwin':
         #MacOS version:
-        raxml_path = os.path.join(RECONSTRUCT_TREE_DIR_PATH,'raxmlHPC-macOS')
+        raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-macOS')
     elif platform.system() == 'Linux':
         #Linux version
-        raxml_path = os.path.join(RECONSTRUCT_TREE_DIR_PATH,'raxmlHPC-SSE3-linux')
+        raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-SSE3-linux')
 
     subprocess.call([raxml_path, '-f', 'x', '-T', '4', '-p', '12345', '-s', tempfile_path, '-m', 'GTRGAMMA', '-n', outfile_path], stdout=subprocess.DEVNULL)
     distances_path = f"RAxML_distances.{outfile_path}"

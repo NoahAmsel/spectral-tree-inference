@@ -80,15 +80,16 @@ class TestRaxml(unittest.TestCase):
     def test_without_class(self):
         data = simulate_discrete_chars(1000, self.reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
         spectraltree_path = os.path.dirname(spectraltree.__file__)
+        raxml_path = os.path.join(spectraltree_path, "libs", "raxmlHPC_bin")
         if platform.system() == 'Windows':
             # Windows version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(spectraltree_path,r'\raxmlHPC-SSE3.exe'))
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(raxml_path,r'\raxmlHPC-SSE3.exe'))
         elif platform.system() == 'Darwin':
             #MacOS version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(spectraltree_path,'raxmlHPC-macOS'))
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(raxml_path,'raxmlHPC-macOS'))
         elif platform.system() == 'Linux':
             #Linux version
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(spectraltree_path,'raxmlHPC-SSE3-linux'))
+            rx = raxml.RaxmlRunner(raxml_path = os.path.join(raxml_path,'raxmlHPC-SSE3-linux'))
 
         tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
 
