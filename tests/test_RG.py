@@ -1,7 +1,7 @@
-import unittest
-import numpy as np
-
 import time
+import unittest
+
+import numpy as np
 
 import spectraltree
 

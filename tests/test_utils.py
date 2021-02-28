@@ -1,9 +1,9 @@
 import unittest
-import numpy as np
+
 import dendropy
+import numpy as np
 
 import spectraltree
-
 
 class TestTaxaMetadata(unittest.TestCase):
     def setUp(self):

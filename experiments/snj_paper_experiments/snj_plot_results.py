@@ -1,25 +1,11 @@
 # %%
-import datetime
-import pickle as pkl
-import os.path
-import time
-import numpy as np
-import scipy
-import pandas as pd
-import seaborn as sns
 import matplotlib.pylab as plt
 import matplotlib.ticker as ticker
-import dendropy
-import copy
-
-import sys, os
+import numpy as np
+import pickle as pkl
+import seaborn as sns
 
 import spectraltree.compare_methods as compare_methods
-from dendropy.model.discrete import simulate_discrete_chars, Jc69
-from dendropy.calculate.treecompare import symmetric_difference
-import cProfile
-
-
 
 def generate_figure(df,x='n',y='RF',hue="method", kind="point",xlabel = None,
         ylabel = None,save_plot_file = None,format = 'eps'):

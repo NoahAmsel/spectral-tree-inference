@@ -1,21 +1,6 @@
-import datetime
-import pickle
-import os.path
-import time
 import numpy as np
-import scipy
-import pandas as pd
-import seaborn as sns
-import matplotlib.pylab as plt
-import dendropy
-import copy
-
-import sys, os
 
 import spectraltree
-from dendropy.model.discrete import simulate_discrete_chars, Jc69
-from dendropy.calculate.treecompare import symmetric_difference
-import cProfile
 
 def cherry_count_for_tree(tree):
     cherry_count = 0

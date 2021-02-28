@@ -1,27 +1,13 @@
-import platform
 from abc import ABC, abstractmethod
-from functools import partial
-from itertools import combinations
-import os, sys
+from itertools import product, combinations
+
+import dendropy
+from dendropy.interop import raxml
 import numpy as np
 import scipy.spatial.distance
-import scipy.linalg
-from sklearn.decomposition import TruncatedSVD
-from itertools import product
-from itertools import combinations
-import dendropy     #should this library be independent of dendropy? is that even possible?
-from dendropy.interop import raxml
-import subprocess
-from . import utils
-import time
-import os
-import psutil
-from numba import jit
 from sklearn.utils.extmath import randomized_svd
-import multiprocessing as mp
-from joblib import Parallel, delayed
-num_cores = mp.cpu_count()
-import scipy
+
+from . import utils
 
 def sv2(A1, A2, M):
     """Second Singular Value"""

@@ -1,28 +1,14 @@
-import platform
-from abc import ABC, abstractmethod
-from functools import partial
-from itertools import combinations
-import os, sys
+import os
+from itertools import product
+import time
+
+import dendropy
+from numba import jit
 import numpy as np
-import scipy.spatial.distance
 import scipy.linalg
 from sklearn.decomposition import TruncatedSVD
-from itertools import product
-from itertools import combinations
-import dendropy     #should this library be independent of dendropy? is that even possible?
-from dendropy.interop import raxml
-import subprocess
-from . import utils
-import time
-import os
-import psutil
-from numba import jit
-from sklearn.utils.extmath import randomized_svd
-import multiprocessing as mp
-from joblib import Parallel, delayed
-num_cores = mp.cpu_count()
-import scipy
 
+from . import utils
 from .reconstruct_tree import ReconstructionMethod, DistanceReconstructionMethod
 
 def correlation_distance_matrix(observations):
@@ -30,9 +16,6 @@ def correlation_distance_matrix(observations):
     corr = np.abs(np.corrcoef(observations))
     corr = np.clip(corr, a_min=1e-16, a_max=None)
     return -np.log(corr)
-
-def raxml_reconstruct():
-    pass
 
 def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
     # partition_taxa2(v,similarity,num_gaps = 1, min_split = 1) partitions the vector vusing the threshold 0

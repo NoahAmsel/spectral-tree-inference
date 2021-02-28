@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
+
+import dendropy
 import numpy as np
 import scipy.linalg
 import scipy.spatial.distance
-import dendropy
 
 from .utils import TaxaMetadata
 

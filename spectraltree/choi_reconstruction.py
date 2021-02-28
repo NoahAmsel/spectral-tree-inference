@@ -1,7 +1,8 @@
-import numpy as np
 import os.path
-import oct2py
 import scipy.sparse
+
+import numpy as np
+import oct2py
 
 from . import utils
 from .reconstruct_tree import ReconstructionMethod, JC_distance_matrix

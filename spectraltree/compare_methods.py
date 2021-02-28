@@ -1,17 +1,15 @@
 import datetime
-import pickle
-import os.path
-import multiprocessing
 from itertools import product
+import multiprocessing
+import os.path
+import pickle
+import time
 
+import dendropy
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pylab as plt
-import dendropy
-import time
 
-import sys, os, platform
 from . import utils
 from . import generation
 from . import reconstruct_tree

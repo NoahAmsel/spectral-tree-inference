@@ -1,21 +1,12 @@
-import sys, os, platform
-
-import spectraltree
-import spectraltree.compare_methods as compare_methods
 import time
-from dendropy.interop import raxml
-from dendropy.model.discrete import simulate_discrete_chars, Jc69
-from dendropy.calculate.treecompare import symmetric_difference
-from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
-import igraph
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from itertools import combinations 
-from itertools import product
-import matplotlib.pyplot as plt
-from sklearn.decomposition import TruncatedSVD 
-from sklearn.utils.extmath import randomized_svd
+
+import spectraltree
+import spectraltree.compare_methods as compare_methods
 
 def cherry_count_for_tree(tree):
     cherry_count = 0

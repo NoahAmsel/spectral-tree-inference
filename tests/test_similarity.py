@@ -1,11 +1,10 @@
-import unittest
-
 import time
-
-import spectraltree
+import unittest
 
 from dendropy.model.discrete import simulate_discrete_chars, Jc69, Hky85
 from dendropy.model.discrete import simulate_discrete_chars
+
+import spectraltree
 
 N = 100000
 num_taxa = 16

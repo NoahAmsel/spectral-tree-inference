@@ -1,10 +1,11 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from itertools import combinations
-import scipy.spatial.distance
-import numpy as np
+
 import dendropy
 import igraph
+import numpy as np
+import scipy.spatial.distance
 
 def default_namespace(num_taxa, prefix="T"):
     return dendropy.TaxonNamespace([prefix+str(i) for i in range(1, num_taxa+1)])

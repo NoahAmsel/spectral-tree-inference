@@ -1,7 +1,8 @@
-import dendropy
-from dendropy.interop import raxml
 import os.path
 import platform
+
+import dendropy
+from dendropy.interop import raxml
 
 from . import utils
 from .reconstruct_tree import ReconstructionMethod, JC_distance_matrix
