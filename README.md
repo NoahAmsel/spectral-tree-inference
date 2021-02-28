@@ -1,3 +1,31 @@
+# Notes:
+
+To install, cd inside the `spectral-tree-inference` folder and run 
+```
+pip install -e .
+```
+Now if you want to import the spectraltree package, for example for an experiment, you can simply run
+```
+import spectraltree
+```
+without modifying your path or doing anything ugly. You should only have to run `pip install -e .` one time. If you move the location of `spectraltree` folder, then run `pip uninstall spectraltree` and install again.
+
+Note that if you are working inside the `spectraltree` directory itself, for example, modifying one of the reconstruction methods, and you need to access code from another file inside `spectraltree`, use a relative import:
+```
+from . import utils
+from .utils import TaxaMetadata
+```
+
+To run the test suite, cd to `spectral-tree-inference` and run
+```
+python -m unittest discover
+```
+To run a specific module:
+```
+python -m unittest tests.test_similarity
+```
+Some of the third party methods (Forrest and RG) are pretty unreliable and so those tests may not pass. Just make sure they PASS or FAIL instead of throwing an ERROR.
+
 # spectral-tree-inference
 =======
 Code for constructing phylogenetic trees from DNA sequence data. The file `reconstruct_tree.py` provides an alternative to the popular Neighbor Joining method of Saitou and Nei. This new method uses a criterion based on the second singular value of a specially constructed matrix that measures similarity between each pair of leaves in the tree. Several functions in that file construct such a matrix from a list of DNA sequences from a set of species. In general, the function `paralinear_distance` should be used for DNA data unless some stronger assumptions can be made. The function `estimate_tree_topology(distance_matrix)` takes such a matrix as input and outputs a tree describing the relationships between these species.

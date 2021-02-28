@@ -12,24 +12,18 @@ import dendropy
 import copy
 
 import sys, os
-sys.path.append(os.path.join(os.path.split(os.path.dirname(sys.path[0]))[0],'spectraltree'))
-sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
-sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 
-#import spectraltree
-import utils
-import generation
-import reconstruct_tree
-import compare_methods
+import spectraltree
+import spectraltree.compare_methods as compare_methods
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 import cProfile
 
-jc = generation.Jukes_Cantor()
+jc = spectraltree.Jukes_Cantor()
 sequence_model = jc
 mutation_rates = [jc.p2t(0.9),jc.p2t(0.95)]
 
-jc2 = generation.Jukes_Cantor(num_classes=2)
+jc2 = spectraltree.Jukes_Cantor(num_classes=2)
 sequence_model2 = jc2
 mutation_rates2 = [jc2.p2t(0.9),jc2.p2t(0.95)]
 #mutation_rates2 = [jc2.p2t(0.85)]
@@ -38,12 +32,12 @@ mutation_rates2 = [jc2.p2t(0.9),jc2.p2t(0.95)]
 def part11(num_taxa, Ns_bin):
     ##### Part 1: NJ vs SNJ
     print("Starting Part 11")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
     methods = [snj, nj]
 
     ## Part 1.1: different N    
-    bin_tree = utils.balanced_binary(num_taxa)
+    bin_tree = spectraltree.balanced_binary(num_taxa)
 
     res_bin11 = compare_methods.experiment(tree_list = [bin_tree], sequence_model = sequence_model, Ns = Ns_bin, methods = methods, mutation_rates=mutation_rates, reps_per_tree=5, verbose=True)
     return res_bin11
@@ -51,13 +45,13 @@ def part11(num_taxa, Ns_bin):
 def part11_cat(num_taxa, Ns_cat):
     ##### Part 1: NJ vs SNJ
     print("Starting Part 11")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
     methods = [snj, nj]
 
     ## Part 1.1: different N    
     #alphabet = "Binary"
-    cat_tree = utils.lopsided_tree(num_taxa)
+    cat_tree = spectraltree.lopsided_tree(num_taxa)
     res_cat11 = compare_methods.experiment(tree_list = [cat_tree], sequence_model =sequence_model, Ns = Ns_cat, 
         methods = methods, mutation_rates=mutation_rates, reps_per_tree=5, verbose=True,
         savepath = '20200821_res12_cat_SNJPAPER',folder = './experiments/snj_paper_experiments/results/')
@@ -68,12 +62,12 @@ def part11_cat(num_taxa, Ns_cat):
 def part12_bin(num_taxa_s_bin, Ns_bin):
     ##### Part 1: NJ vs SNJ
     print("Starting Part 12")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
     methods = [snj, nj]
 
     ## Part 1.2: different Taxa
-    bin_trees = [utils.balanced_binary(num_taxa) for num_taxa in num_taxa_s_bin]
+    bin_trees = [spectraltree.balanced_binary(num_taxa) for num_taxa in num_taxa_s_bin]
     res_bin12 = compare_methods.experiment(tree_list = bin_trees, sequence_model = sequence_model, Ns = Ns_bin, methods= methods, mutation_rates=mutation_rates, reps_per_tree=5, verbose=True)
     
     return res_bin12
@@ -81,12 +75,12 @@ def part12_bin(num_taxa_s_bin, Ns_bin):
 def part12_cat(num_taxa_s_cat, Ns_cat):
     ##### Part 1: NJ vs SNJ
     print("Starting Part 12")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
     methods = [snj, nj]
 
     ## Part 1.2: different Taxa
-    cat_trees = [utils.lopsided_tree(num_taxa) for num_taxa in num_taxa_s_cat]
+    cat_trees = [spectraltree.lopsided_tree(num_taxa) for num_taxa in num_taxa_s_cat]
     res_cat12 = compare_methods.experiment(tree_list = cat_trees, sequence_model = sequence_model, Ns = Ns_cat, methods = methods, 
         mutation_rates=mutation_rates, reps_per_tree=5, verbose=True)
     return res_cat12
@@ -95,45 +89,45 @@ def part12_cat(num_taxa_s_cat, Ns_cat):
 def part21_bin(num_taxa_bin, Ns_bin):
     ##### Part 2: NJ vs SNJ vs RG vs CLRG
     print("Starting Part 21 for binary tree")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    rg = reconstruct_tree.RG()
-    #clrg = reconstruct_tree.CLRG()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    rg = spectraltree.RG()
+    #clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
     alphabet = "DNA"
 
     ## Part 2.1: different N
-    bin_tree = utils.balanced_binary(num_taxa_bin)
+    bin_tree = spectraltree.balanced_binary(num_taxa_bin)
     res_bin21 = compare_methods.experiment(tree_list = [bin_tree], sequence_model = sequence_model, Ns = Ns_bin, methods = methods, mutation_rates=mutation_rates, reps_per_tree=5, alphabet=alphabet, verbose=True)    
     return res_bin21
 
 def part21_king(num_taxa_king, Ns_king):
     ##### Part 2: NJ vs SNJ vs RG vs CLRG
     print("Starting Part 21 for kingman tree")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    rg = reconstruct_tree.RG()
-    #clrg = reconstruct_tree.CLRG()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    rg = spectraltree.RG()
+    #clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
     alphabet = "DNA"
 
     ## Part 2.1: different N
-    king_tree = utils.unrooted_pure_kingman_tree(num_taxa_king)
+    king_tree = spectraltree.unrooted_pure_kingman_tree(num_taxa_king)
     res_king21 = compare_methods.experiment(tree_list = [king_tree], sequence_model = sequence_model, Ns = Ns_king, methods = methods, mutation_rates=mutation_rates, reps_per_tree=5, alphabet=alphabet, verbose=True)    
     return res_king21
 
 def part21_cat(num_taxa_cat, Ns_cat):
     ##### Part 2: NJ vs SNJ vs RG vs CLRG
     print("Starting Part 21 for caterpillar tree")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    rg = reconstruct_tree.RG()
-    #clrg = reconstruct_tree.CLRG()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    rg = spectraltree.RG()
+    #clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
     alphabet = "DNA"
 
     ## Part 2.1: different N
-    cat_tree = utils.lopsided_tree(num_taxa_cat)
+    cat_tree = spectraltree.lopsided_tree(num_taxa_cat)
     res_cat21 = compare_methods.experiment(tree_list = [cat_tree], sequence_model = sequence_model, Ns = Ns_cat, methods = methods, mutation_rates=mutation_rates, reps_per_tree=5, alphabet=alphabet, verbose=True)    
     return res_cat21
 
@@ -141,14 +135,14 @@ def part21_cat(num_taxa_cat, Ns_cat):
 def part22_bin(num_taxa_s_bin, Ns_bin):
     ## Part 2.2: different Taxa
     print("Starting Part 22 for binary trees")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    rg = reconstruct_tree.RG()
-    clrg = reconstruct_tree.CLRG()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    rg = spectraltree.RG()
+    clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
 
     alphabet = "DNA"    
-    bin_trees = [utils.balanced_binary(num_taxa) for num_taxa in num_taxa_s_bin]
+    bin_trees = [spectraltree.balanced_binary(num_taxa) for num_taxa in num_taxa_s_bin]
      
     res_bin22 = compare_methods.experiment(tree_list = bin_trees, sequence_model = sequence_model, Ns = Ns_bin, methods = methods, mutation_rates=mutation_rates, reps_per_tree=5, alphabet=alphabet , verbose=True)   
 
@@ -157,14 +151,14 @@ def part22_bin(num_taxa_s_bin, Ns_bin):
 def part22_king(num_taxa_s_king, Ns_king):
     ## Part 2.2: different Taxa
     print("Starting Part 22 for kingman trees")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    rg = reconstruct_tree.RG()
-    clrg = reconstruct_tree.CLRG()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    rg = spectraltree.RG()
+    clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
 
     alphabet = "DNA"    
-    king_trees = [utils.unrooted_pure_kingman_tree(num_taxa) for num_taxa in num_taxa_s_king]
+    king_trees = [spectraltree.unrooted_pure_kingman_tree(num_taxa) for num_taxa in num_taxa_s_king]
      
     res_king22 = compare_methods.experiment(tree_list = king_trees, sequence_model = sequence_model, Ns = Ns_king, methods = methods, mutation_rates=mutation_rates, reps_per_tree=5, alphabet=alphabet , verbose=True)   
 
@@ -175,14 +169,14 @@ def part22_king(num_taxa_s_king, Ns_king):
 def part22_cat(num_taxa_s_cat, Ns_cat):
     ## Part 2.2: different Taxa
     print("Starting Part 22 for caterpillar trees")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    rg = reconstruct_tree.RG()
-    clrg = reconstruct_tree.CLRG()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    rg = spectraltree.RG()
+    clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
 
     alphabet = "Binary"    
-    cat_trees = [utils.lopsided_tree(num_taxa) for num_taxa in num_taxa_s_cat]     
+    cat_trees = [spectraltree.lopsided_tree(num_taxa) for num_taxa in num_taxa_s_cat]     
     res_cat22 = compare_methods.experiment(tree_list = cat_trees, sequence_model = sequence_model, Ns = Ns_cat, methods = methods, mutation_rates=mutation_rates, reps_per_tree=5, alphabet=alphabet , verbose=True)   
 
     return res_cat22
@@ -190,12 +184,12 @@ def part22_cat(num_taxa_s_cat, Ns_cat):
 def part31_bin(num_taxa_bin, Ns_bin):
     ##### Part 3: NJ vs SNJ vs RG vs CLRG vs Forrest vs Tree_SVD
     print("Starting Part 31")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    #rg = reconstruct_tree.RG()
-    #clrg = reconstruct_tree.CLRG()
-    forrest = reconstruct_tree.Forrest()
-    tree_svd = reconstruct_tree.TreeSVD()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    #rg = spectraltree.RG()
+    #clrg = spectraltree.CLRG()
+    forrest = spectraltree.Forrest()
+    tree_svd = spectraltree.TreeSVD()
     #methods = [snj, nj,rg,clrg, forrest,tree_svd]
     methods = [snj, nj, forrest,tree_svd]
     #methods = [tree_svd]
@@ -204,7 +198,7 @@ def part31_bin(num_taxa_bin, Ns_bin):
 
     ## Part 3.1: different N
     
-    bin_tree = utils.balanced_binary(num_taxa_bin)
+    bin_tree = spectraltree.balanced_binary(num_taxa_bin)
 
     res_bin31  = compare_methods.experiment(tree_list = [bin_tree], sequence_model = sequence_model2, Ns = Ns_bin, methods  =methods, mutation_rates=mutation_rates2, reps_per_tree=5, alphabet=alphabet, verbose=True)    
     return res_bin31
@@ -212,12 +206,12 @@ def part31_bin(num_taxa_bin, Ns_bin):
 def part31_cat(num_taxa_cat, Ns_cat):
     ##### Part 3: NJ vs SNJ vs RG vs CLRG vs Forrest vs Tree_SVD
     print("Starting Part 31")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    #rg = reconstruct_tree.RG()
-    #clrg = reconstruct_tree.CLRG()
-    forrest = reconstruct_tree.Forrest()
-    tree_svd = reconstruct_tree.TreeSVD()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    #rg = spectraltree.RG()
+    #clrg = spectraltree.CLRG()
+    forrest = spectraltree.Forrest()
+    tree_svd = spectraltree.TreeSVD()
     #methods = [snj, nj,rg,clrg, forrest,tree_svd]
     methods = [snj, nj, forrest,tree_svd]
 
@@ -225,7 +219,7 @@ def part31_cat(num_taxa_cat, Ns_cat):
 
     ## Part 3.1: different N
     
-    cat_tree = utils.lopsided_tree(num_taxa_cat)
+    cat_tree = spectraltree.lopsided_tree(num_taxa_cat)
 
     res_cat31  = compare_methods.experiment(tree_list = [cat_tree], sequence_model = sequence_model2, Ns = Ns_cat, methods = methods, mutation_rates=mutation_rates2, reps_per_tree=5, alphabet=alphabet, verbose=True)
     return res_cat31
@@ -233,19 +227,19 @@ def part31_cat(num_taxa_cat, Ns_cat):
 def part31_king(num_taxa_king, Ns_king):
     ##### Part 3: NJ vs SNJ vs RG vs CLRG vs Forrest vs Tree_SVD
     print("Starting Part 31")
-    snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix)
-    #rg = reconstruct_tree.RG()
-    #clrg = reconstruct_tree.CLRG()
-    forrest = reconstruct_tree.Forrest()
-    tree_svd = reconstruct_tree.TreeSVD()
+    snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
+    nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+    #rg = spectraltree.RG()
+    #clrg = spectraltree.CLRG()
+    forrest = spectraltree.Forrest()
+    tree_svd = spectraltree.TreeSVD()
     #methods = [snj, nj,rg,clrg, forrest,tree_svd]
     methods = [snj, nj, forrest,tree_svd]
 
     alphabet = "Binary"
 
     ## Part 3.1: different N
-    kingman_tree = utils.unrooted_birth_death_tree(num_taxa_king, birth_rate=1)
+    kingman_tree = spectraltree.unrooted_birth_death_tree(num_taxa_king, birth_rate=1)
 
     res_king31 = compare_methods.experiment(tree_list = [kingman_tree], sequence_model = sequence_model2, Ns = Ns_king, methods = methods, mutation_rates=mutation_rates2, reps_per_tree=5, alphabet=alphabet, verbose=True)
     return res_king31
