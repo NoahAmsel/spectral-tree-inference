@@ -28,6 +28,8 @@ class TestForrest(unittest.TestCase):
         print("RF = ",RF, "    F1% = ",F1)
         print("")
 
+        self.assertEqual(RF, 0)
+
     def test_hky(self):
         hky = generation.HKY(kappa = 2)
         observationsHKY, metaHKY = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=hky, mutation_rate=self.mutation_rate, alphabet="DNA")
@@ -42,3 +44,5 @@ class TestForrest(unittest.TestCase):
         print("time:", t1 - t0)
         print("RF = ",RF, "    F1% = ",F1)
         print("")
+
+        self.assertEqual(RF, 0)
