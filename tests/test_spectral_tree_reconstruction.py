@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 import time
 
-from spectraltree import utils, generation, reconstruct_tree, str, raxml_reconstruction
+from spectraltree import utils, generation, reconstruct_tree, str, raxml_reconstruction, spectral_tree_reconstruction
 
 class TestSpectralTreeReconstruction(unittest.TestCase):
     def setUp(self):
@@ -25,8 +25,8 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
         t0 = time.time()
         observations,meta = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=jc, mutation_rate=self.mutation_rate, rng=self.rng, alphabet = 'DNA')
         print("gen time: ", time.time() - t0)
-        spectral_method = reconstruct_tree.SpectralTreeReconstruction(raxml_reconstruction.RAxML,reconstruct_tree.JC_similarity_matrix)   
-        #spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
+        spectral_method = spectral_tree_reconstruction.SpectralTreeReconstruction(raxml_reconstruction.RAxML,reconstruct_tree.JC_similarity_matrix)   
+        #spectral_method = spectral_tree_reconstruction.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
 
         t0 = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, 
@@ -68,7 +68,7 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
                 #reference_tree = utils.balanced_binary(num_taxa)
                 reference_tree = utils.lopsided_tree(num_taxa)
                 observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate)
-                spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
+                spectral_method = spectral_tree_reconstruction.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
                 tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix, 
                     taxa_metadata = taxa_meta, threshhold = 16,merge_method = merge_method)
                 RF_i,F1_i = reconstruct_tree.compare_trees(tree_rec, reference_tree)
@@ -93,7 +93,7 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
         reference_tree = utils.balanced_binary(num_taxa)
         observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, rng=self.rng)
 
-        spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
+        spectral_method = spectral_tree_reconstruction.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 4,threshhold = 35)
         tree_rec_b = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 1,threshhold = 35)
 
