@@ -1,5 +1,5 @@
 import unittest
-
+import numpy as np
 from time import time as _t
 
 from spectraltree import utils, generation, reconstruct_tree
@@ -10,6 +10,7 @@ class TestNJ(unittest.TestCase):
         self.N = 5000
         self.reference_tree = utils.lopsided_tree(self.num_taxa)
         self.mutation_rate = [0.1]
+        self.rng = np.random.default_rng(12345)
 
     def test_jukes_cantor(self):
         jc = generation.Jukes_Cantor()
@@ -33,7 +34,7 @@ class TestNJ(unittest.TestCase):
         hky_N = 20_000  # occassionally fails if lower
 
         hky = generation.HKY(kappa = 1.5)
-        observationsHKY, metaHKY = generation.simulate_sequences(hky_N, tree_model=self.reference_tree, seq_model=hky, mutation_rate=self.mutation_rate, alphabet="DNA")
+        observationsHKY, metaHKY = generation.simulate_sequences(hky_N, tree_model=self.reference_tree, seq_model=hky, mutation_rate=self.mutation_rate, alphabet="DNA", rng=self.rng)
 
         t0 = _t()
         nj = reconstruct_tree.NeighborJoining(reconstruct_tree.HKY_similarity_matrix)   

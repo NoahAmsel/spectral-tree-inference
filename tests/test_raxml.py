@@ -92,8 +92,8 @@ class TestRaxml(unittest.TestCase):
 
         tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
 
-        print("symmetric_difference: ",symmetric_difference(reference_tree, tree))
-        RF,F1 = reconstruct_tree.compare_trees(reference_tree, tree)
+        print("symmetric_difference: ",symmetric_difference(self.reference_tree, tree))
+        RF,F1 = reconstruct_tree.compare_trees(self.reference_tree, tree)
         print("raxml: ")
         print("RF = ",RF)
         print("F1% = ",F1)

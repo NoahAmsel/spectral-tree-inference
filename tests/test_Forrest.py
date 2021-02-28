@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 
 from time import time as _t
 
@@ -12,10 +13,11 @@ class TestForrest(unittest.TestCase):
         self.reference_tree = utils.unrooted_birth_death_tree(self.num_taxa, birth_rate=0.5)
         #reference_tree = utils.lopsided_tree(num_taxa)
         #reference_tree = utils.balanced_binary(num_taxa)
+        self.rng = np.random.default_rng(123)
 
     def test_jukes_cantor(self):
         jc = generation.Jukes_Cantor()
-        observationsJC, metaJC = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=jc, mutation_rate=self.mutation_rate, alphabet="DNA")
+        observationsJC, metaJC = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=jc, mutation_rate=self.mutation_rate, rng=self.rng, alphabet="DNA")
 
         t0 = _t()
         forrest = reconstruct_tree.Forrest()
@@ -32,7 +34,7 @@ class TestForrest(unittest.TestCase):
 
     def test_hky(self):
         hky = generation.HKY(kappa = 2)
-        observationsHKY, metaHKY = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=hky, mutation_rate=self.mutation_rate, alphabet="DNA")
+        observationsHKY, metaHKY = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=hky, mutation_rate=self.mutation_rate, rng=self.rng, alphabet="DNA")
 
         t0 = _t()
         forrest = reconstruct_tree.Forrest()

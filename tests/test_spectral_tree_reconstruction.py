@@ -91,7 +91,7 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
         mutation_rate = [jc.p2t(0.95)]
 
         reference_tree = utils.balanced_binary(num_taxa)
-        observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate)
+        observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, rng=self.rng)
 
         spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 4,threshhold = 35)
