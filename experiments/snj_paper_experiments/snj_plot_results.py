@@ -13,15 +13,8 @@ import dendropy
 import copy
 
 import sys, os
-sys.path.append(os.path.join(os.path.split(os.path.dirname(sys.path[0]))[0],'spectraltree'))
-sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
-sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 
-#import spectraltree
-import utils
-import generation
-import reconstruct_tree
-import compare_methods
+import spectraltree.compare_methods as compare_methods
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 import cProfile

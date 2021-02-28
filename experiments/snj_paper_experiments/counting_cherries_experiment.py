@@ -1,13 +1,8 @@
 import sys, os, platform
-sys.path.append(os.path.join(os.path.split(os.path.dirname(sys.path[0]))[0],'spectraltree'))
-sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
-sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 
-import reconstruct_tree
-import utils
+import spectraltree
+import spectraltree.compare_methods as compare_methods
 import time
-import generation
-import compare_methods
 from dendropy.interop import raxml
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
@@ -79,30 +74,30 @@ N = 200
 
 m_vec = np.arange(20,100,20)
 #m_vec = [20,40,60,80]
-#reference_tree = utils.balanced_binary(num_taxa)
-jc = generation.Jukes_Cantor()
+#reference_tree = spectraltree.balanced_binary(num_taxa)
+jc = spectraltree.Jukes_Cantor()
 
 mutation_rate = jc.p2t(0.85)
-snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix) 
-nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix) 
-treesvd = reconstruct_tree.TreeSVD()
+snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix) 
+nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix) 
+treesvd = spectraltree.TreeSVD()
 methods = [snj,nj]
-#results = compare_methods.experiment([reference_tree], jc, N_vec, methods=methods,\
+#results = spectraltree.experiment([reference_tree], jc, N_vec, methods=methods,\
 #     mutation_rates = [mutation_rate], reps_per_tree=num_reps)
 df = pd.DataFrame(columns=['method', 'runtime', 'RF','m','cherries_ref','cherries_res'])
 for i in np.arange(num_reps):
     print(i)   
     for m in m_vec:
-        #reference_tree = utils.unrooted_pure_kingman_tree(m)
-        reference_tree = utils.unrooted_birth_death_tree(m)
+        #reference_tree = spectraltree.unrooted_pure_kingman_tree(m)
+        reference_tree = spectraltree.unrooted_birth_death_tree(m)
         ch_ref = cherry_count_for_tree(reference_tree)
-        observations, taxa_meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
+        observations, taxa_meta = spectraltree.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
 
         # Tree svd
         #t_s = time.time()    
         #tree_svd_rec = treesvd(observations,taxa_meta)   
         #runtime_treesvd = time.time()-t_s
-        #RF_svd,F1 = reconstruct_tree.compare_trees(tree_svd_rec, reference_tree)
+        #RF_svd,F1 = spectraltree.compare_trees(tree_svd_rec, reference_tree)
         #ch_svd = cherry_count_for_tree(tree_svd_rec)
         #df = df.append({'method': 'treesvd', 'runtime': runtime_treesvd, 'RF': RF_svd,'n': n,'cherries_ref': ch_ref,'cherries_res':ch_svd}, ignore_index=True)
 
@@ -110,7 +105,7 @@ for i in np.arange(num_reps):
         t_s = time.time()    
         tree_snj = snj(observations, taxa_meta)
         runtime_snj = time.time()-t_s
-        RF_snj,F1 = reconstruct_tree.compare_trees(tree_snj, reference_tree)
+        RF_snj,F1 = spectraltree.compare_trees(tree_snj, reference_tree)
         ch_snj = cherry_count_for_tree(tree_snj)
         df = df.append({'method': 'SNJ', 'runtime': runtime_snj, 'RF': RF_snj,'m': m,'cherries_ref': ch_ref,'cherries_res':ch_snj}, ignore_index=True)
         
@@ -118,7 +113,7 @@ for i in np.arange(num_reps):
         t_s = time.time()    
         tree_nj = nj(observations, taxa_meta)
         runtime_nj = time.time()-t_s
-        RF_nj,F1 = reconstruct_tree.compare_trees(tree_nj, reference_tree)
+        RF_nj,F1 = spectraltree.compare_trees(tree_nj, reference_tree)
         ch_nj = cherry_count_for_tree(tree_nj)
         df = df.append({'method': 'NJ', 'runtime': runtime_nj, 'RF': RF_nj,'m': m,'cherries_ref': ch_ref,'cherries_res':ch_nj}, ignore_index=True)
 

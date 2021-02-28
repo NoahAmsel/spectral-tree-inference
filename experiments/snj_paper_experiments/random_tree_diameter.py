@@ -12,15 +12,9 @@ import dendropy
 import copy
 
 import sys, os
-sys.path.append(os.path.join(os.path.split(os.path.dirname(sys.path[0]))[0],'spectraltree'))
-sys.path.append(os.path.join(os.path.dirname(sys.path[0]),'spectraltree'))
-sys.path.append(os.path.join(sys.path[0],'spectraltree'))
 
-#import spectraltree
-import utils
-import generation
-import reconstruct_tree
-import compare_methods
+import spectraltree
+import spectraltree.compare_methods as compare_methods
 from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 import cProfile
@@ -50,8 +44,8 @@ df = pkl.load( open( folder + filename, "rb" ) )
 generate_plot(df)
 
 
-a = b
-jc = generation.Jukes_Cantor()
+
+jc = spectraltree.Jukes_Cantor()
 sequence_model = jc
 mutation_rates = [jc.p2t(0.9),jc.p2t(0.95)]
 
@@ -59,7 +53,7 @@ def generate_random_tree_diameter(m):
     # generate adjacency matrix
     A = np.zeros((2*m-2,2*m-2))
     active_set = range(m)
-    taxa_metadata = utils.TaxaMetadata.default(m)
+    taxa_metadata = spectraltree.TaxaMetadata.default(m)
     G = taxa_metadata.all_leaves(edge_length=1)
     #available_clades = set(range(len(G)))   # len(G) == m
     for i in np.arange(0,m-3):
@@ -72,7 +66,7 @@ def generate_random_tree_diameter(m):
         A[m+i,idx_vec[1]]=1
 
         # merge two nodes in trees
-        G.append(utils.merge_children((G[idx_vec[0]], G[idx_vec[1]]), edge_length=1))
+        G.append(spectraltree.merge_children((G[idx_vec[0]], G[idx_vec[1]]), edge_length=1))
         
         # update active set
         active_set = np.delete(active_set,active_set==idx_vec[0])
@@ -88,7 +82,7 @@ def generate_random_tree_diameter(m):
     A[2*m-3,active_set[1]]=1    
     A[active_set[2],2*m-3]=1    
     A[2*m-3,active_set[2]]=1    
-    return A,dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace, seed_node=utils.merge_children((G[i] for i in active_set)), is_rooted=False)
+    return A,dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace, seed_node=spectraltree.merge_children((G[i] for i in active_set)), is_rooted=False)
 
 
 df = pd.DataFrame(columns=['method', 'runtime', 'RF','m','diameter','N','delta'])
@@ -97,8 +91,8 @@ d = np.zeros(num_itr)
 m = 250
 delta_vec = [0.88,0.9,0.92,0.94]
 N_vec = [100,200,300,400]
-snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.JC_similarity_matrix) 
-nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix) 
+snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix) 
+nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix) 
 
 print(d.shape)
 for i in range(num_itr):
@@ -108,7 +102,7 @@ for i in range(num_itr):
     d = G.diameter(directed=False)
     for delta in delta_vec:        
         mutation_rate = jc.p2t(delta)
-        observations, taxa_meta = generation.simulate_sequences(max(N_vec), tree_model=reference_tree, 
+        observations, taxa_meta = spectraltree.simulate_sequences(max(N_vec), tree_model=reference_tree, 
             seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
         for N in N_vec:
 
@@ -116,7 +110,7 @@ for i in range(num_itr):
             t_s = time.time()    
             tree_snj = snj(observations[:,:N], taxa_meta)
             runtime_snj = time.time()-t_s
-            RF_snj,F1 = reconstruct_tree.compare_trees(tree_snj, reference_tree)    
+            RF_snj,F1 = spectraltree.compare_trees(tree_snj, reference_tree)    
             df = df.append({'method': 'SNJ', 'runtime': runtime_snj, 'RF': RF_snj,
                 'm': m,'diameter':d,'N':N,'delta':delta}, ignore_index=True)
         
@@ -124,7 +118,7 @@ for i in range(num_itr):
             t_s = time.time()    
             tree_nj = nj(observations[:,:N], taxa_meta)
             runtime_nj = time.time()-t_s
-            RF_nj,F1 = reconstruct_tree.compare_trees(tree_nj, reference_tree)    
+            RF_nj,F1 = spectraltree.compare_trees(tree_nj, reference_tree)    
             df = df.append({'method': 'NJ', 'runtime': runtime_nj, 'RF': RF_nj,
                 'm': m,'diameter':d,'N':N,'delta':delta}, ignore_index=True)
 
