@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 import time
 
-from spectraltree import utils, generation, reconstruct_tree, str
+from spectraltree import utils, generation, reconstruct_tree, str, raxml_reconstruction
 
 class TestSpectralTreeReconstruction(unittest.TestCase):
     def setUp(self):
@@ -25,7 +25,7 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
         t0 = time.time()
         observations,meta = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=jc, mutation_rate=self.mutation_rate, rng=self.rng, alphabet = 'DNA')
         print("gen time: ", time.time() - t0)
-        spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML,reconstruct_tree.JC_similarity_matrix)   
+        spectral_method = reconstruct_tree.SpectralTreeReconstruction(raxml_reconstruction.RAxML,reconstruct_tree.JC_similarity_matrix)   
         #spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining,reconstruct_tree.JC_similarity_matrix)   
 
         t0 = time.time()
@@ -128,7 +128,7 @@ class TestSTR(unittest.TestCase):
         t0 = time.time()
         observations,meta = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=hky, mutation_rate=self.mutation_rate, rng=self.rng, alphabet = 'DNA')
         print("gen time: ", time.time() - t0)
-        spectral_method = str.STR(reconstruct_tree.RAxML, reconstruct_tree.HKY_similarity_matrix, threshold = self.threshold, merge_method="least_square", num_gaps = 1, min_split = 5, verbose=False)   
+        spectral_method = str.STR(raxml_reconstruction.RAxML, reconstruct_tree.HKY_similarity_matrix, threshold = self.threshold, merge_method="least_square", num_gaps = 1, min_split = 5, verbose=False)   
 
         t0 = time.time()
         tree_rec = spectral_method(observations,  taxa_metadata= meta)

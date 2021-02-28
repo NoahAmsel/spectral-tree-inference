@@ -21,7 +21,7 @@ from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 
 import spectraltree
-from spectraltree import utils, generation, reconstruct_tree
+from spectraltree import utils, generation, reconstruct_tree, raxml_reconstruction
 
 class TestRaxml(unittest.TestCase):
     def setUp(self):
@@ -36,7 +36,7 @@ class TestRaxml(unittest.TestCase):
         print("")
         print("Time for data generation", time.time()-time_s)
         time_s = time.time()
-        raxml = reconstruct_tree.RAxML()
+        raxml = raxml_reconstruction.RAxML()
         tree = raxml(data)
         runtime = time.time()-time_s
 
@@ -62,7 +62,7 @@ class TestRaxml(unittest.TestCase):
         print("")
         print("Time for data generation", time.time()-time_s)
         time_s = time.time()
-        raxml = reconstruct_tree.RAxML()
+        raxml = raxml_reconstruction.RAxML()
         tree = raxml(observations, taxa_meta)
         runtime = time.time()-time_s
         print("Data in numpy array:")

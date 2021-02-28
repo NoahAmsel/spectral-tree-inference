@@ -3,7 +3,7 @@ import numpy as np
 
 import time
 
-from spectraltree import utils, generation, reconstruct_tree
+from spectraltree import utils, generation, reconstruct_tree, choi_reconstruction
 
 class TestRG(unittest.TestCase):
     def test_jukes_cantor(self):
@@ -19,7 +19,7 @@ class TestRG(unittest.TestCase):
         t0 = time.time()
         observations,meta = generation.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate,rng=rng, alphabet="Binary")
         print("gen time: ", time.time() - t0)
-        rg = reconstruct_tree.RG()
+        rg = choi_reconstruction.RG()
 
         t0 = time.time()
         tree_rec = rg(observations, taxa_metadata= meta)
