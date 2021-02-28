@@ -21,28 +21,27 @@ from dendropy.model.discrete import simulate_discrete_chars, Jc69
 from dendropy.calculate.treecompare import symmetric_difference
 
 import spectraltree
-from spectraltree import utils, generation, reconstruct_tree, raxml_reconstruction
 
 class TestRaxml(unittest.TestCase):
     def setUp(self):
         self.num_taxa = 32
         self.N = 1000
-        self.reference_tree = utils.balanced_binary(self.num_taxa)
+        self.reference_tree = spectraltree.balanced_binary(self.num_taxa)
 
     def test_dendropy_data(self):
         print("test dendropy data")
         time_s = time.time()
-        data = simulate_discrete_chars(self.N, self.reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
+        data = simulate_discrete_chars(self.N, self.reference_tree, Jc69(), mutation_rate=spectraltree.Jukes_Cantor().p2t(0.95), )
         print("")
         print("Time for data generation", time.time()-time_s)
         time_s = time.time()
-        raxml = raxml_reconstruction.RAxML()
+        raxml = spectraltree.RAxML()
         tree = raxml(data)
         runtime = time.time()-time_s
 
         print("Data in DNAcharacterMatrix:")
         print("symmetric_difference: ",symmetric_difference(self.reference_tree, tree))
-        RF,F1 = reconstruct_tree.compare_trees(self.reference_tree, tree)
+        RF,F1 = spectraltree.compare_trees(self.reference_tree, tree)
         print("raxml: ")
         print("RF = ",RF)
         print("F1% = ",F1)
@@ -53,21 +52,21 @@ class TestRaxml(unittest.TestCase):
         self.assertEqual(F1, 100)
 
     def test_numpy_data(self):
-        jc = generation.Jukes_Cantor()
+        jc = spectraltree.Jukes_Cantor()
         time_s = time.time()
         mutation_rate = [jc.p2t(0.95)]
 
         print("test numpy data")
-        observations, taxa_meta = generation.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
+        observations, taxa_meta = spectraltree.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
         print("")
         print("Time for data generation", time.time()-time_s)
         time_s = time.time()
-        raxml = raxml_reconstruction.RAxML()
+        raxml = spectraltree.RAxML()
         tree = raxml(observations, taxa_meta)
         runtime = time.time()-time_s
         print("Data in numpy array:")
         print("symmetric_difference: ",symmetric_difference(self.reference_tree, tree))
-        RF,F1 = reconstruct_tree.compare_trees(self.reference_tree, tree)
+        RF,F1 = spectraltree.compare_trees(self.reference_tree, tree)
         print("raxml: ")
         print("RF = ",RF)
         print("F1% = ",F1)
@@ -78,7 +77,7 @@ class TestRaxml(unittest.TestCase):
         self.assertEqual(F1, 100)
 
     def test_without_class(self):
-        data = simulate_discrete_chars(1000, self.reference_tree, Jc69(), mutation_rate=generation.Jukes_Cantor().p2t(0.95), )
+        data = simulate_discrete_chars(1000, self.reference_tree, Jc69(), mutation_rate=spectraltree.Jukes_Cantor().p2t(0.95), )
         spectraltree_path = os.path.dirname(spectraltree.__file__)
         raxml_path = os.path.join(spectraltree_path, "libs", "raxmlHPC_bin")
         if platform.system() == 'Windows':
@@ -94,7 +93,7 @@ class TestRaxml(unittest.TestCase):
         tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
 
         print("symmetric_difference: ",symmetric_difference(self.reference_tree, tree))
-        RF,F1 = reconstruct_tree.compare_trees(self.reference_tree, tree)
+        RF,F1 = spectraltree.compare_trees(self.reference_tree, tree)
         print("raxml: ")
         print("RF = ",RF)
         print("F1% = ",F1)

@@ -2,13 +2,13 @@ import unittest
 import numpy as np
 import dendropy
 
-from spectraltree import utils
+import spectraltree
 
 
 class TestTaxaMetadata(unittest.TestCase):
     def setUp(self):
         self.namespace1 = dendropy.TaxonNamespace(["dog", "cat", "snake", "fish", "tree"])
-        self.taxa1 = utils.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], "DNA")
+        self.taxa1 = spectraltree.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], "DNA")
         self.dog = self.namespace1.get_taxon("dog")
         self.snake = self.namespace1.get_taxon("snake")
 
@@ -37,12 +37,12 @@ class TestTaxaMetadata(unittest.TestCase):
         self.assertEqual(str(self.taxa1), str(['fish', 'snake', 'cat', 'dog']))
 
     def test_default(self):
-        self.assertListEqual([taxon.label for taxon in utils.TaxaMetadata.default(4)], ["T1", "T2", "T3", "T4"])
+        self.assertListEqual([taxon.label for taxon in spectraltree.TaxaMetadata.default(4)], ["T1", "T2", "T3", "T4"])
 
 class TestConversionFunctions(unittest.TestCase):
     def setUp(self):
         self.namespace1 = dendropy.TaxonNamespace(["dog", "cat", "snake", "fish", "tree"])
-        self.taxa1 = utils.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], "DNA")
+        self.taxa1 = spectraltree.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], "DNA")
         self.dog = self.namespace1.get_taxon("dog")
         self.snake = self.namespace1.get_taxon("snake")
 
@@ -68,18 +68,18 @@ class TestConversionFunctions(unittest.TestCase):
         }
         self.dna_charmatrix = dendropy.DnaCharacterMatrix.from_dict(d, taxon_namespace=self.namespace1)
 
-        tree = utils.lopsided_tree(4, self.taxa1)
+        tree = spectraltree.lopsided_tree(4, self.taxa1)
         self.dm = tree.phylogenetic_distance_matrix()
         
     def test_charmatrix2array(self):
-        array2, taxa2 = utils.charmatrix2array(self.dna_charmatrix)
+        array2, taxa2 = spectraltree.charmatrix2array(self.dna_charmatrix)
         self.assertTrue(self.taxa1.equals_unordered(taxa2))
         self.assertEqual(taxa2.alphabet, dendropy.DNA_STATE_ALPHABET)
         for tax in taxa2:
             self.assertTrue((array2[taxa2[tax], :] == self.tax2seq[tax.label]).all())
 
     def test_array2charmatrix(self):
-        charmatrix2 = utils.array2charmatrix(self.array1, self.taxa1)
+        charmatrix2 = spectraltree.array2charmatrix(self.array1, self.taxa1)
         self.assertEqual(charmatrix2.as_string("nexus"), self.dna_charmatrix.as_string("nexus"))
         self.assertTrue(isinstance(charmatrix2, dendropy.DnaCharacterMatrix))
 
@@ -91,15 +91,15 @@ class TestConversionFunctions(unittest.TestCase):
                 [4., 3., 2., 0.]
         ])
 
-        dm2 = utils.array2distance_matrix(distance_mat, self.taxa1)
+        dm2 = spectraltree.array2distance_matrix(distance_mat, self.taxa1)
         for taxon1 in self.taxa1:
             for taxon2 in self.taxa1:
                 self.assertEqual(dm2.distance(taxon1, taxon2), self.dm.distance(taxon1, taxon2))
 
     def test_distance_matrix2array(self):    
-        distance_mat, matrix_taxa = utils.distance_matrix2array(self.dm)
+        distance_mat, matrix_taxa = spectraltree.distance_matrix2array(self.dm)
         # in this test, the taxa meta of a distance matrix needs no alphabet
-        taxa_temp = utils.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], None)
+        taxa_temp = spectraltree.TaxaMetadata(self.namespace1, ["fish", "snake", "cat", "dog"], None)
         self.assertTrue(matrix_taxa.equals_unordered(taxa_temp))
         for taxon1 in self.taxa1:
             for taxon2 in self.taxa1:
