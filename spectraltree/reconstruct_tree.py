@@ -1051,25 +1051,28 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
 
 
 class SpectralTreeReconstruction(ReconstructionMethod):
-    def __init__(self, inner_method, similarity_metric):
+    def __init__(self, inner_method, similarity_metricx):
         self.inner_method = inner_method
-        self.similarity_metric = similarity_metric
+        self.similarity_metricx = similarity_metricx
         if issubclass(inner_method, DistanceReconstructionMethod):
-            self.reconstruction_alg = inner_method(similarity_metric)
+            self.reconstruction_alg = inner_method(similarity_metricx)
         else:
             self.reconstruction_alg = inner_method()
             
     def __call__(self, sequences, taxa_metadata=None):
-        return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxa_metadata=taxa_metadata, 
+        return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metricx, taxa_metadata=taxa_metadata, 
             reconstruction_alg = self.inner_method)
     def __repr__(self):
         return "spectralTree" + " + " + self.inner_method.__repr__(self.inner_method)
 
-    def deep_spectral_tree_reconstruction(self, sequences, similarity_metric, taxa_metadata = None, num_gaps =1,threshhold = 100, 
+    def deep_spectral_tree_reconstruction(self, sequences, similarity_metricx, taxa_metadata = None, num_gaps =1,threshhold = 100, 
         alpha = 1,min_split = 1,merge_method = "angle", verbose = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
-        self.similarity_matrix = similarity_metric(sequences, taxa_metadata = taxa_metadata)**alpha
+        if callable(similarity_metricx):
+            self.similarity_matrix = similarity_metricx(sequences, taxa_metadata = taxa_metadata)**alpha
+        else:
+            self.similarity_matrix =similarity_metricx
         m, m2 = self.similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         self.taxa_metadata = taxa_metadata
