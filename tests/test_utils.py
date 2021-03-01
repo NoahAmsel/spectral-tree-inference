@@ -68,8 +68,8 @@ class TestConversionFunctions(unittest.TestCase):
         }
         self.dna_charmatrix = dendropy.DnaCharacterMatrix.from_dict(d, taxon_namespace=self.namespace1)
 
-        tree = spectraltree.lopsided_tree(4, self.taxa1)
-        self.dm = tree.phylogenetic_distance_matrix()
+        self.tree = spectraltree.lopsided_tree(4, self.taxa1)
+        self.dm = self.tree.phylogenetic_distance_matrix()
         
     def test_charmatrix2array(self):
         array2, taxa2 = spectraltree.charmatrix2array(self.dna_charmatrix)
@@ -104,6 +104,22 @@ class TestConversionFunctions(unittest.TestCase):
         for taxon1 in self.taxa1:
             for taxon2 in self.taxa1:
                 self.assertEqual(distance_mat[matrix_taxa[taxon1], matrix_taxa[taxon2]], self.dm.distance(taxon1, taxon2))
+
+    def test_adjacency_matrix_to_tree(self):
+        adj_mat = np.array([
+            [0, 0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 0, 0, 1, 0],
+            [0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 1, 0, 0],
+            [0, 0, 1, 1, 0, 1, 0],
+            [0, 1, 0, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 1, 0],
+        ])
+
+        t = spectraltree.adjacency_matrix_to_tree(adj_mat, len(self.taxa1), self.taxa1)
+
+        RF, _ = spectraltree.compare_trees(self.tree, t)
+        self.assertEqual(RF, 0)
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,7 +5,8 @@ import dendropy
 from dendropy.interop import raxml
 
 from . import utils
-from .reconstruct_tree import ReconstructionMethod, JC_distance_matrix
+from .reconstruct_tree import ReconstructionMethod
+from .similarities import JC_distance_matrix
 
 SPECTRALTREE_DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 SPECTRALTREE_LIB_PATH = os.path.join(SPECTRALTREE_DIR_PATH, "libs")

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from collections.abc import Mapping
+from functools import reduce
 from itertools import combinations
 
 import dendropy
@@ -174,6 +175,10 @@ class TaxaMetadata(Mapping):
                 self.alphabet == other.alphabet) and (
                     set(self._taxa_list) == set(other._taxa_list))
 
+##########################################################
+##               Converters
+##########################################################
+
 def charmatrix2array(charmatrix):
     #charmatrix[taxon].values()
     alphabet = charmatrix.state_alphabets[0] # TODO: what if there are multiple different state_alphabets?
@@ -246,50 +251,15 @@ def distance_matrix2array(dm):
 def tree2distance_matrix(tree):
     return distance_matrix2array(tree.phylogenetic_distance_matrix())
 
-def merge_children(children, **kwargs):
-    node = dendropy.Node(**kwargs)
-    for child in children:
-        node.add_child(child)
-    if all(hasattr(child,'mask') for child in children):
-        node.mask = np.logical_or.reduce(tuple(child.mask for child in children))
-    return node
-
-def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
-    for e in tree.edges():
-        if value is not None:
-            assert fun is None and uniform_range is None
-            e.length = value
-        elif fun is not None:
-            assert uniform_range is None
-            e.length = fun(e.length)
-        else:
-            assert uniform_range is not None
-            e.length = np.random.uniform(*uniform_range)
-
-##########################################################
-##               Tree Generation
-##########################################################
-
-# Including these functions here for convenience
-from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
-
 def adjacency_matrix_to_tree_igraph(A,num_taxa,taxa_metadata):
-
-    
     G = igraph.Graph.Adjacency((A > 0).tolist())
     merges = [x.tuple for x in G.es]
     T = igraph.Dendrogram(merges)
 
-    
-
-    
-
 def adjacency_matrix_to_tree(A,num_taxa,taxa_metadata):
     m = A.shape[0]
     edge_length = 1
-    #taxa = TaxaMetadata.default(num_taxa)    
-    taxa = taxa_metadata
-    nodes = taxa.all_leaves(edge_length=edge_length)
+    nodes = taxa_metadata.all_leaves(edge_length=edge_length)
     active_nodes = np.arange(num_taxa)
     
     for p_idx in np.arange(num_taxa,m):        
@@ -302,12 +272,24 @@ def adjacency_matrix_to_tree(A,num_taxa,taxa_metadata):
         active_nodes = np.delete(active_nodes,child_idx)
         active_nodes = np.append(active_nodes,p_idx)
         
-    return dendropy.Tree(taxon_namespace=taxa.taxon_namespace, seed_node=nodes[-1], is_rooted=False)    
+    return dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace, seed_node=nodes[-1], is_rooted=False)    
 
-    #    A[n_idx,:]=[]
-    #    A[:,n_idx]=[]
+##########################################################
+##               Tree Generation
+##########################################################
 
+# Including these functions here for convenience
+from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
 
+def merge_children(children, **kwargs):
+    assert len(children) > 0
+    node = dendropy.Node(**kwargs)
+    for child in children:
+        node.add_child(child)
+    if all(hasattr(child,'mask') for child in children):
+        assert len(children) > 0
+        node.mask = reduce(np.logical_or, (child.mask for child in children))
+    return node
 
 def balanced_binary(num_taxa=None, taxa=None, edge_length=1.):
     if taxa is None:
@@ -371,66 +353,35 @@ def unrooted_mean_kingman_tree(taxon_namespace, pop_size=1, rng=None):
     tree.is_rooted = False
     return tree
 
-# %%
-if __name__ == "__main__":
+##########################################################
+##               Miscellaneous
+##########################################################
 
-    t = balanced_binary(4)
-    t.print_plot()
+def compare_trees(reference_tree, inferred_tree):
+    inferred_tree.update_bipartitions()
+    reference_tree.update_bipartitions()
+    false_positives, false_negatives = dendropy.calculate.treecompare.false_positives_and_negatives(reference_tree, inferred_tree, is_bipartitions_updated=True)
+    total_reference = len(reference_tree.bipartition_encoding)
+    total_inferred = len(inferred_tree.bipartition_encoding)
+    
+    true_positives = total_inferred - false_positives
+    precision = true_positives / total_inferred
+    recall = true_positives / total_reference
 
-    name = t.taxon_namespace
-    len(name)
-    mmm = np.array([[0,2,3,4],[2,0,7,8],[3,7,0,9],[4,8,9,0]])
-    distmat = array2distance_matrix(mmm, name)
-    dtable = distmat.as_data_table()
-    dtable.write_csv("stdout")
+    F1 = 100* 2*(precision * recall)/(precision + recall)
+    RF = false_positives + false_negatives
+    return RF, F1
 
-    trees = dendropy.TreeList([t])
-    trees
-    trees.extend([t, t])
-    trees.taxon_namespace is trees[0].taxon_namespace
-    trees.taxon_namespace is trees[-1].taxon_namespace
-
-    trees.taxon_namespace[2]
-
-    all_data = temp_dataset_maker(trees, 1000, 1)
-    t0_data = all_data[0]
-    observations, alpha = charmatrix2array(t0_data)
-
-    observations
-    list(alpha)
-
-    """model = dendropy.model.discrete.Jc69() #
-    model = dendropy.model.discrete.DiscreteCharacterEvolver()
-    mat = dendropy.model.discrete.simulate_discrete_chars(100, t, model)
-    hh = mat[0]
-    hh.symbols_as_string()"""
-
-    pdm = dendropy.PhylogeneticDistanceMatrix(t)
-    print(pdm)
-    tt = pdm.as_data_table()
-
-if __name__ == "__main__":
-    tree = treesim.birth_death_tree(birth_rate=1., death_rate=0., num_total_tips=len(taxa), taxon_namespace=taxa)
-
-
-    tree = treesim.birth_death_tree(birth_rate=1., death_rate=2., is_retain_extinct_tips=True, num_total_tips=len(taxa), taxon_namespace=taxa)
-
-    tree.minmax_leaf_distance_from_root()
-
-    print(tree.as_python_source())
-
-    print(tree.as_ascii_plot())
-
-
-    for e in tree.edges():
-        print(e.length)
-
-    for n in tree.nodes():
-        print(n.edge_length)
-
-    e = tree.edges()[5]
-    e.length
-
-
-    n0 = tree.nodes()[0]
-    n0.branch
+def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
+    if value is not None:
+        assert fun is None and uniform_range is None
+        for e in tree.edges():
+            e.length = value
+    elif fun is not None:
+        assert uniform_range is None
+        for e in tree.edges():
+            e.length = fun(e.length)
+    else:
+        assert uniform_range is not None
+        for e in tree.edges():
+            e.length = np.random.uniform(*uniform_range)

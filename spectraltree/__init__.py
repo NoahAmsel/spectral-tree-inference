@@ -20,19 +20,19 @@ from .generation import (
     Jukes_Cantor)
 
 from .reconstruct_tree import (
-    sv2, 
-    sum_squared_quartets, 
-    paralinear_distance,
-    JC_similarity_matrix, 
-    JC_distance_matrix,
-    HKY_similarity_matrix,
-    compare_trees,
-    check_partition_in_tree,
     ReconstructionMethod,
     TreeSVD,
     DistanceReconstructionMethod,
     NeighborJoining,
     SpectralNeighborJoining)
+
+from .similarities import (
+    sv2, 
+    sum_squared_quartets, 
+    paralinear_distance,
+    JC_similarity_matrix, 
+    JC_distance_matrix,
+    HKY_similarity_matrix)
 
 from .spectral_tree_reconstruction import (
     correlation_distance_matrix,

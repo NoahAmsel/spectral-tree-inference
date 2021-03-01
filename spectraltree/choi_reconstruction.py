@@ -5,8 +5,9 @@ import numpy as np
 import oct2py
 
 from . import utils
-from .reconstruct_tree import ReconstructionMethod, JC_distance_matrix
+from .reconstruct_tree import ReconstructionMethod
 from .raxml_reconstruction import SPECTRALTREE_LIB_PATH
+from .similarities import JC_distance_matrix
 
 SPECTRALTREE_CHOI_PATH = os.path.join(SPECTRALTREE_LIB_PATH, "ChoilatentTree")
 

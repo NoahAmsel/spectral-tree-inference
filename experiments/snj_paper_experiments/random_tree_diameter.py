@@ -71,7 +71,7 @@ def generate_random_tree_diameter(m):
     A[2*m-3,active_set[1]]=1    
     A[active_set[2],2*m-3]=1    
     A[2*m-3,active_set[2]]=1    
-    return A,dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace, seed_node=spectraltree.merge_children((G[i] for i in active_set)), is_rooted=False)
+    return A,dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace, seed_node=spectraltree.merge_children(tuple(G[i] for i in active_set)), is_rooted=False)
 
 
 df = pd.DataFrame(columns=['method', 'runtime', 'RF','m','diameter','N','delta'])
