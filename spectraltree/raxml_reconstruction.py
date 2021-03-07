@@ -22,7 +22,7 @@ class RAxML(ReconstructionMethod):
     """
 
     def __init__(self, raxml_args="-T 2 --JC69 -c 1"):
-        self.raxml_args = raxml_args
+        self.raxml_args = [raxml_args]
 
     def __call__(self, sequences, taxa_metadata=None):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
@@ -42,7 +42,7 @@ class RAxML(ReconstructionMethod):
             #Linux version
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-SSE3-linux'))
 
-        tree = rx.estimate_tree(char_matrix=data, raxml_args=[self.raxml_args])
+        tree = rx.estimate_tree(data, raxml_args=self.raxml_args)
         tree.is_rooted = False
         if taxa_metadata != None:
             tree.taxon_namespace = taxa_metadata.taxon_namespace

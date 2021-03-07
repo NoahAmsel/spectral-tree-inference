@@ -1,3 +1,7 @@
+# Questions:
+- Why do the Choi methods work so badly? Are we using them wrong?
+- For RAxML, we've been using the default argument "-T 2" which sets the number of threads to 2. But isn't this only for the multithreaded version `raxmlHPC­PTHREADS`? If it isn't, then why are we only using 2 threads?
+
 # Notes:
 
 To install, cd inside the `spectral-tree-inference` folder and run 

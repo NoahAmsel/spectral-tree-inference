@@ -372,6 +372,9 @@ def compare_trees(reference_tree, inferred_tree):
     RF = false_positives + false_negatives
     return RF, F1
 
+def topos_equal(reference_tree, inferred_tree):
+    return dendropy.calculate.treecompare.symmetric_difference(reference_tree, inferred_tree) == 0
+
 def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
     if value is not None:
         assert fun is None and uniform_range is None

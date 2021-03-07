@@ -32,13 +32,10 @@ class STR(ReconstructionMethod):
         self.min_split = min_split
         self.verbose = verbose
 
-    def __call__(self, sequences, taxa_metadata=None):
-        return self.deep_spectral_tree_reconstruction(sequences, taxa_metadata=taxa_metadata)
-
     def __repr__():
         return "spectralTreeReconstruction"
 
-    def deep_spectral_tree_reconstruction(self, sequences, taxa_metadata=None):
+    def __call__(self, sequences, taxa_metadata=None):
         num_taxa = sequences.shape[0]
         similarity_matrix = self.similarity_metric(sequences)
 
@@ -62,26 +59,6 @@ class STR(ReconstructionMethod):
 
             left_mask = metadata.taxa2mask(left_sub_meta)
             right_mask = metadata.taxa2mask(right_sub_meta)
-
-            """
-            1 2 3 4 5 6
-            1 1 1 1 1 1
-
-                3 4 5 6
-            0 0 1 1 1 1 
-
-                3     6
-                1 0 0 1
-
-            0 0 1 0 0 1
-            
-
-                        A
-                    /   \       /
-                    B        C   /  => 0   0   0    0      1     1
-                /   |      |   \
-                F    G      D    E
-            """
 
             left_child = self.__reconstruction_helper(left_mask, similarity, sequences, metadata)
             right_child = self.__reconstruction_helper(right_mask, similarity, sequences, metadata)

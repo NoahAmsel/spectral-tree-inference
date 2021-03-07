@@ -1,51 +1,33 @@
-from time import time as _t
 import unittest
 
-import numpy as np
+from numpy.random import default_rng
 
 import spectraltree
 
 class TestNJ(unittest.TestCase):
     def setUp(self):
-        self.num_taxa = 32
-        self.N = 5000
-        self.reference_tree = spectraltree.lopsided_tree(self.num_taxa)
-        self.mutation_rate = [0.1]
-        self.rng = np.random.default_rng(12345)
+        self.reference_tree = spectraltree.lopsided_tree(32)
 
-    def test_jukes_cantor(self):
-        jc = spectraltree.Jukes_Cantor()
-        observationsJC, metaJC = spectraltree.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=jc, mutation_rate=self.mutation_rate, alphabet="DNA")    
+    def test_jukes_cantor_similarity(self):
+        observationsJC, metaJC = spectraltree.simulate_sequences(
+            seq_len=400,
+            tree_model=self.reference_tree,
+            seq_model=spectraltree.Jukes_Cantor(),
+            mutation_rate=0.1,
+            rng=default_rng(345),
+            alphabet="DNA")
 
-        t0 = _t()
-        nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)   
-        tree_rec = nj(observationsJC, metaJC)
-        RF,F1 = spectraltree.compare_trees(tree_rec, self.reference_tree)
+        nj_jc = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
+        self.assertTrue(spectraltree.topos_equal(self.reference_tree, nj_jc(observationsJC, metaJC)))  
 
-        print("###################")
-        print("NJ - Jukes_Cantor:")
-        print("time:", _t() - t0)
-        print("RF = ",RF, "    F1% = ",F1)
-        print("")
+    def test_hky_similarity(self):
+        observationsHKY, metaHKY = spectraltree.simulate_sequences(
+            seq_len=2_000,
+            tree_model=self.reference_tree, 
+            seq_model=spectraltree.HKY(kappa=1.5), 
+            mutation_rate=0.1,
+            rng=default_rng(543),
+            alphabet="DNA")
 
-        self.assertEqual(RF, 0)
-        self.assertEqual(F1, 100)
-
-    def test_hky(self):
-        hky_N = 20_000  # occassionally fails if lower
-
-        hky = spectraltree.HKY(kappa = 1.5)
-        observationsHKY, metaHKY = spectraltree.simulate_sequences(hky_N, tree_model=self.reference_tree, seq_model=hky, mutation_rate=self.mutation_rate, alphabet="DNA", rng=self.rng)
-
-        t0 = _t()
-        nj = spectraltree.NeighborJoining(spectraltree.HKY_similarity_matrix(metaHKY))   
-        tree_rec = nj(observationsHKY, metaHKY)
-        RF,F1 = spectraltree.compare_trees(tree_rec, self.reference_tree)
-        print("###################")
-        print("NJ - HKY:")
-        print("time:", _t() - t0)
-        print("RF = ",RF, "    F1% = ",F1)
-        print("")
-
-        self.assertEqual(RF, 0)
-        self.assertEqual(F1, 100)
+        nj_hky = spectraltree.NeighborJoining(spectraltree.HKY_similarity_matrix(metaHKY))
+        self.assertTrue(spectraltree.topos_equal(self.reference_tree, nj_hky(observationsHKY, metaHKY)))
