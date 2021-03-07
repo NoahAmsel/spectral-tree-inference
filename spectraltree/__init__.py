@@ -40,7 +40,7 @@ from .spectral_tree_reconstruction import (
     correlation_distance_matrix,
     SpectralTreeReconstruction)
 
-from .str import STR
+from .recursive_str import STR
 from .raxml_reconstruction import RAxML
 from .choi_reconstruction import RG, CLRG
 from .forrest_reconstruction import Forrest
