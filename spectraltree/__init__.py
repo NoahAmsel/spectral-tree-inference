@@ -23,16 +23,18 @@ from .reconstruct_tree import (
     ReconstructionMethod,
     TreeSVD,
     DistanceReconstructionMethod,
-    NeighborJoining,
-    SpectralNeighborJoining)
+    NeighborJoining)
 
 from .similarities import (
-    sv2, 
-    sum_squared_quartets, 
     paralinear_distance,
     JC_similarity_matrix, 
     JC_distance_matrix,
     HKY_similarity_matrix)
+
+from .snj import (
+    SpectralNeighborJoining,
+    sv2, 
+    sum_squared_quartets)
 
 from .spectral_tree_reconstruction import (
     correlation_distance_matrix,

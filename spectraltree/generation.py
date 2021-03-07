@@ -317,30 +317,3 @@ def simulate_sequences_gamma(seq_len, tree_model, seq_model, base_rate, gamma_sh
     seq_model.rng = model_rng
 
     return char_matrix, meta
-
-"""
-if __name__ == "__main__":
-    from utils import balanced_binary
-
-    TT = np.array([[0.9, 0.1], [0.4, 0.6]])
-    my_trans = FixedDiscreteTransition(np.array([0,1]), TT)
-    my_tree = balanced_binary(4)
-    my_tree.edges()[-1].seq_model = FixedDiscreteTransition(np.array([0,1]), np.array([[1,0],[1,0]]))
-    matrix, taxa = simulate_sequences(1000, my_tree, my_trans, retain_sequences_on_tree=True)
-    print(matrix.mean(axis=1))
-"""
-
-if __name__ == "__main__":
-    from utils import balanced_binary
-
-    jc = Jukes_Cantor(rng=np.random.default_rng(42))
-    my_tree = balanced_binary(4)
-    # seq, meta = simulate_sequences(seq_len=6, tree_model=my_tree, seq_model=jc, )
-    seq, meta = simulate_sequences_gamma(seq_len=2000, tree_model=my_tree, seq_model=jc, base_rate=1, gamma_shape=1, block_size=10)
-
-    print(seq)
-
-    #print(0.25 + 0.75 * np.exp(-4.*ttt/3.))
-    #print(jc.pmatrix(2,2))
-    #jc.paralinear_distance(2,2)
-    #print(jc.p2t(jc.t2p(0.03, 2.), 2.))

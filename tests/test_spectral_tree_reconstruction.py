@@ -129,7 +129,7 @@ class TestSTR(unittest.TestCase):
         t0 = time.time()
         observations,meta = spectraltree.simulate_sequences(self.N, tree_model=self.reference_tree, seq_model=hky, mutation_rate=self.mutation_rate, rng=self.rng, alphabet = 'DNA')
         print("gen time: ", time.time() - t0)
-        spectral_method = spectraltree.STR(spectraltree.RAxML, spectraltree.HKY_similarity_matrix, threshold = self.threshold, merge_method="least_square", num_gaps = 1, min_split = 5, verbose=False)   
+        spectral_method = spectraltree.STR(spectraltree.RAxML, spectraltree.HKY_similarity_matrix(meta), threshold = self.threshold, merge_method="least_square", num_gaps = 1, min_split = 5, verbose=False)   
 
         t0 = time.time()
         tree_rec = spectral_method(observations,  taxa_metadata= meta)

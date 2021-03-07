@@ -40,7 +40,7 @@ class STR(ReconstructionMethod):
 
     def deep_spectral_tree_reconstruction(self, sequences, taxa_metadata=None):
         num_taxa = sequences.shape[0]
-        similarity_matrix = self.similarity_metric(sequences, taxa_metadata)
+        similarity_matrix = self.similarity_metric(sequences)
 
         return self.__reconstruction_helper(np.ones(num_taxa, dtype=bool), similarity_matrix, sequences, taxa_metadata)
 

@@ -445,7 +445,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         alpha = 1,min_split = 1,merge_method = "angle", verbose = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
-        self.similarity_matrix = similarity_metric(sequences, taxa_metadata = taxa_metadata)**alpha
+        self.similarity_matrix = similarity_metric(sequences)**alpha
         m, m2 = self.similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         self.taxa_metadata = taxa_metadata

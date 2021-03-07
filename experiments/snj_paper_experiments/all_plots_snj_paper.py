@@ -74,7 +74,7 @@ def part21_bin(num_taxa_bin, Ns_bin):
     print("Starting Part 21 for binary tree")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    rg = spectraltree.RG()
+    rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     #clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
     alphabet = "DNA"
@@ -89,7 +89,7 @@ def part21_king(num_taxa_king, Ns_king):
     print("Starting Part 21 for kingman tree")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    rg = spectraltree.RG()
+    rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     #clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
     alphabet = "DNA"
@@ -104,7 +104,7 @@ def part21_cat(num_taxa_cat, Ns_cat):
     print("Starting Part 21 for caterpillar tree")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    rg = spectraltree.RG()
+    rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     #clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
     alphabet = "DNA"
@@ -120,7 +120,7 @@ def part22_bin(num_taxa_s_bin, Ns_bin):
     print("Starting Part 22 for binary trees")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    rg = spectraltree.RG()
+    rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
 
@@ -136,7 +136,7 @@ def part22_king(num_taxa_s_king, Ns_king):
     print("Starting Part 22 for kingman trees")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    rg = spectraltree.RG()
+    rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
 
@@ -154,7 +154,7 @@ def part22_cat(num_taxa_s_cat, Ns_cat):
     print("Starting Part 22 for caterpillar trees")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    rg = spectraltree.RG()
+    rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     clrg = spectraltree.CLRG()
     methods = [snj, nj,rg]
 
@@ -169,7 +169,7 @@ def part31_bin(num_taxa_bin, Ns_bin):
     print("Starting Part 31")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    #rg = spectraltree.RG()
+    #rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     #clrg = spectraltree.CLRG()
     forrest = spectraltree.Forrest()
     tree_svd = spectraltree.TreeSVD()
@@ -191,7 +191,7 @@ def part31_cat(num_taxa_cat, Ns_cat):
     print("Starting Part 31")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    #rg = spectraltree.RG()
+    #rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     #clrg = spectraltree.CLRG()
     forrest = spectraltree.Forrest()
     tree_svd = spectraltree.TreeSVD()
@@ -212,7 +212,7 @@ def part31_king(num_taxa_king, Ns_king):
     print("Starting Part 31")
     snj = spectraltree.SpectralNeighborJoining(spectraltree.JC_similarity_matrix)
     nj = spectraltree.NeighborJoining(spectraltree.JC_similarity_matrix)
-    #rg = spectraltree.RG()
+    #rg = spectraltree.RG(spectraltree.JC_distance_matrix)
     #clrg = spectraltree.CLRG()
     forrest = spectraltree.Forrest()
     tree_svd = spectraltree.TreeSVD()

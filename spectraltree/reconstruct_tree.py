@@ -6,25 +6,37 @@ import numpy as np
 from sklearn.utils.extmath import randomized_svd
 
 from . import utils
-from . import similarities
 
 ##########################################################
 ##               Reconstruction methods
 ##########################################################
 
 class ReconstructionMethod(ABC):
+    """
+    Method for reconstructing a binary tree from observations of the leaf nodes.
+    """
+
     @abstractmethod
-    def __call__(self, sequences, taxon_namespace=None):
+    def __call__(self, sequences, taxon_metadata=None):
+        """Reconstruct a binary tree from sequence data.
+
+        Args:
+            sequences: An m x n matrix, where m is the number of leaf nodes (observed variables) and n 
+                is the number of samples. Entries should be integers, with each integer corresponding to
+                some state of the random variable. For example, 0,1,2, and 3 could represent the characters
+                A, C, G, and T of a DNA sequence.
+            taxon_metadata: A TaxaMetadata object describing the observed nodes. The first element should
+                correspond to the first row of `sequences`, and so on. If omitted, the default TaxonMetadata
+                of size m is used. 
+
+        Returns:
+            dendropy.Tree: The reconstructed tree.
+        """
         pass
 
 class TreeSVD(ReconstructionMethod):
-    
-    def __call__(self, observations, taxa_metadata=None):        
-        return self.estimate_tree_topology(observations, taxa_metadata)
-
-    #def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
-    #    return self.estimate_tree_topology(similarity_matrix, taxa_metadata)
-    #change to spectral_neighbor_joining
+    def __init__(self, bifurcating=False):
+        self.bifurcating = bifurcating
 
     def compute_cnt_matrix(self,data,d):
         m = data.shape[0]
@@ -58,7 +70,7 @@ class TreeSVD(ReconstructionMethod):
         score = (np.linalg.norm(flattened_mtx)**2) - (np.linalg.norm(sig)**2)
         return score
 
-    def estimate_tree_topology(self, observations, taxa_metadata=None,bifurcating=False):
+    def __call__(self, observations, taxa_metadata=None):
         self.observations = observations
         d = len(np.unique(observations))
         m = observations.shape[0]
@@ -86,7 +98,7 @@ class TreeSVD(ReconstructionMethod):
             Score[j,i] = Score[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
 
         # merge
-        while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
+        while len(available_clades) > (2 if self.bifurcating else 3): # this used to be 1
             left, right = min(combinations(available_clades, 2), key=lambda pair: Score[pair])
             G.append(utils.merge_children((G[left], G[right])))
             new_ix = len(G) - 1
@@ -113,80 +125,53 @@ class TreeSVD(ReconstructionMethod):
         return "TreeSVD"
 
 class DistanceReconstructionMethod(ReconstructionMethod):
+    """Method for reconstructing a binary tree that uses a matrix of similarities of the leaf nodes.
+
+    The similarity matrix is calculated from the input sequence data using a function provided by the caller.
+
+    Attributes:
+        similarity_metric: A function that takes a matrix m x n matrix of sequence data and returns
+            an m x m matrix of similarities scores in the range [0, 1].
+    """
+
     def __init__(self, similarity_metric):
         self.similarity_metric = similarity_metric
 
-    def __call__(self, sequences, taxa_metadata=None,params = None):
-        # params are other needed parameters. i.e. params.spectral_criterion = 'similarities.sv2', params.alpha = 1
-        similarity_matrix = self.similarity_metric(sequences, taxa_metadata,params)
-        return self.reconstruct_from_similarity(similarity_matrix, taxa_metadata, params=params)
+    def __call__(self, sequences, taxa_metadata=None):
+        similarity_matrix = self.similarity_metric(sequences)
+        return self.reconstruct_from_similarity(similarity_matrix, taxa_metadata)
 
     @abstractmethod
-    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None, params = None):
+    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
+        """Reconstruct the tree from the similarity matrix.
+
+        Args:
+            similarity_matrix: An m x m matrix of similarity scores in the range [0, 1], where m is the number of leaf nodes
+            taxon_metadata: A TaxaMetadata object describing the observed nodes. The first element should
+                correspond to the first row/column of `taxon_metadata`, and so on. If omitted, the default TaxonMetadata
+                of size m is used.
+
+        Returns:
+            dendropy.Tree: The reconstructed tree.
+        """
         pass
 
 class NeighborJoining(DistanceReconstructionMethod):
-    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None, params = None):
-        return self.neighbor_joining(similarity_matrix, taxa_metadata)
-    
-    def neighbor_joining(self, similarity_matrix, taxa_metadata=None):
+    """Reconstructs a binary tree using the Neighbor Joining method.
+
+    The distance matrix is calculated from the input sequence data using a similarity function provided by the caller
+    and the formula `distance = - log(similarity)`
+
+    Attributes:
+        similarity_metric: A function that takes a matrix m x n matrix of sequence data and returns
+            and m x m matrix of similarities scores in the range [0, 1].
+    """
+
+    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
         similarity_matrix = np.clip(similarity_matrix, a_min=1e-20, a_max=None)
         distance_matrix = -np.log(similarity_matrix)
         T = utils.array2distance_matrix(distance_matrix, taxa_metadata).nj_tree()
         return T
+
     def __repr__(self):
         return "NJ"
-        
-class SpectralNeighborJoining(DistanceReconstructionMethod):    
-    def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None, params = None):
-        return self.estimate_tree_topology(similarity_matrix, taxa_metadata, params = params)
-    #change to spectral_neighbor_joining
-
-    def estimate_tree_topology(self, similarity_matrix, taxa_metadata=None, scorer=similarities.sv2, scaler=1.0, bifurcating=False, params = None):
-        if hasattr(params,'alpha'):
-            similarity_matrix = similarity_matrix**params.alpha
-        m, m2 = similarity_matrix.shape
-        assert m == m2, "Distance matrix must be square"
-        if taxa_metadata is None:
-            taxa_metadata = utils.TaxaMetadata.default(m)
-        else:
-            assert len(taxa_metadata) >= m, "Namespace too small for distance matrix"
-        
-        # initialize leaf nodes
-        G = taxa_metadata.all_leaves()
-
-        available_clades = set(range(len(G)))   # len(G) == m
-        
-        # choose spectral score function
-        if hasattr(params,'score_func'):
-            scorer = params.score_func
-        else:
-            scorer = similarities.sv2
-
-        # initialize Sigma
-        Sigma = np.full((2*m,2*m), np.nan)  # we should only use entries that we set later; init to nan so they'll throw an error if we do
-        sv1 = np.full((2*m,2*m), np.nan)
-        for i,j in combinations(available_clades, 2):
-            Sigma[i,j] = scorer(G[i].mask, G[j].mask, similarity_matrix)
-            Sigma[j,i] = Sigma[i,j]    # necessary b/c sets have unstable order, so `combinations' could return either one
-
-        # merge
-        while len(available_clades) > (2 if bifurcating else 3): # this used to be 1
-            left, right = min(combinations(available_clades, 2), key=lambda pair: Sigma[pair])
-            G.append(utils.merge_children((G[left], G[right])))
-            new_ix = len(G) - 1
-            available_clades.remove(left)
-            available_clades.remove(right)
-            for other_ix in available_clades:
-                Sigma[other_ix, new_ix] = scorer(G[other_ix].mask, G[new_ix].mask, similarity_matrix)
-                Sigma[new_ix, other_ix] = Sigma[other_ix, new_ix]    # necessary b/c sets have unstable order, so `combinations' could return either one
-            available_clades.add(new_ix)
-
-        # for a bifurcating tree we're combining the last two available clades
-        # for an unrooted one it's the last three because
-        # if we're making unrooted comparisons it doesn't really matter which order we attach the last three
-        return dendropy.Tree(taxon_namespace=taxa_metadata.taxon_namespace, seed_node=utils.merge_children(tuple(G[i] for i in available_clades)), is_rooted=False)
-
-    def __repr__(self):
-        return "SNJ"
-

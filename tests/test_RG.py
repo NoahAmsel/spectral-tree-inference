@@ -19,7 +19,7 @@ class TestRG(unittest.TestCase):
         t0 = time.time()
         observations,meta = spectraltree.simulate_sequences(N, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate,rng=rng, alphabet="Binary")
         print("gen time: ", time.time() - t0)
-        rg = spectraltree.RG()
+        rg = spectraltree.RG(spectraltree.JC_distance_matrix)
 
         t0 = time.time()
         tree_rec = rg(observations, taxa_metadata= meta)

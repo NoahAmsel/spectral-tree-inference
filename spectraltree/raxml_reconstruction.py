@@ -13,7 +13,18 @@ SPECTRALTREE_LIB_PATH = os.path.join(SPECTRALTREE_DIR_PATH, "libs")
 SPECTRALTREE_RAXML_PATH = os.path.join(SPECTRALTREE_LIB_PATH, "raxmlHPC_bin")
 
 class RAxML(ReconstructionMethod):
-    def __call__(self, sequences, taxa_metadata=None, raxml_args = "-T 2 --JC69 -c 1"):
+    """Reconstructs a binary tree using the RAxML program.
+
+    See here https://cme.h-its.org/exelixis/web/software/raxml/.
+
+    Args:
+        raxml_args: string of command line arguments to pass to the RAxML executable.
+    """
+
+    def __init__(self, raxml_args="-T 2 --JC69 -c 1"):
+        self.raxml_args = raxml_args
+
+    def __call__(self, sequences, taxa_metadata=None):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
             # data = FastCharacterMatrix(sequences, taxon_namespace=taxon_namespace).to_dendropy()
             data = utils.array2charmatrix(sequences, taxa_metadata=taxa_metadata) 
@@ -31,7 +42,7 @@ class RAxML(ReconstructionMethod):
             #Linux version
             rx = raxml.RaxmlRunner(raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-SSE3-linux'))
 
-        tree = rx.estimate_tree(char_matrix=data, raxml_args=[raxml_args])
+        tree = rx.estimate_tree(char_matrix=data, raxml_args=[self.raxml_args])
         tree.is_rooted = False
         if taxa_metadata != None:
             tree.taxon_namespace = taxa_metadata.taxon_namespace
@@ -39,7 +50,6 @@ class RAxML(ReconstructionMethod):
 
     def __repr__(self):
         return "RAxML"
-
 
 def raxml_gamma_corrected_distance_matrix(observations, taxa_metadata):
     charmatrix = utils.array2charmatrix(observations, taxa_metadata)
