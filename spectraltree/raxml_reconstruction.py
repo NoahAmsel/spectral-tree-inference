@@ -1,8 +1,10 @@
 import os.path
 import platform
+import subprocess
 
 import dendropy
 from dendropy.interop import raxml
+import numpy as np
 
 from . import utils
 from .reconstruct_tree import ReconstructionMethod

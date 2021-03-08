@@ -31,10 +31,10 @@ class RG(ReconstructionMethod):
 
 class CLRG(ReconstructionMethod):
     def __call__(self, observations, taxa_metadata=None):        
-        octave.addpath('./spectraltree/ChoilatentTree/')
+        oct2py.octave.addpath('./spectraltree/ChoilatentTree/')
         oc = oct2py.Oct2Py()
         num_taxa = observations.shape[0]
-        adj_mat = oc.feval("./spectraltree/ChoilatentTree/toolbox/CLRGb.m",observations+1,0, verbose=False)
+        adj_mat = oc.feval(os.path.join(SPECTRALTREE_CHOI_PATH, "toolbox", "CLRGb.m"),observations+1,0, verbose=False)
         adj_mat = np.array(scipy.sparse.csr_matrix.todense(adj_mat))
         tree_CLRG = adjacency_matrix_to_tree(adj_mat,num_taxa,taxa_metadata)
         return tree_CLRG
