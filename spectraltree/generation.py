@@ -238,9 +238,9 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
 
     seq_len       : int
         Length of sequence (number of characters).
-    tree_model    : |Tree|
+    tree_model    : Tree
         Tree on which to simulate.
-    seq_model     : |Transition|
+    seq_model     : Transition
         The character substitution model under which to to evolve the
         characters.
     mutation_rate : float
@@ -249,8 +249,8 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
     root_states   : list
         Vector of root states (length must equal ``seq_len``).
     retain_sequences_on_tree : bool
-        If |False|, sequence annotations will be cleared from tree after
-        simulation. Set to |True| if you want to, e.g., evolve and accumulate
+        If False, sequence annotations will be cleared from tree after
+        simulation. Set to True if you want to, e.g., evolve and accumulate
         different sequences on tree, or retain information for other purposes.
     rng           : random number generator
         If not given, 'GLOBAL_RNG' will be used.
@@ -259,7 +259,7 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
     Returns
     -------
 
-    char_matrix :  |numpy.array|
+    char_matrix :  numpy.array
         Matrix where each row is the sequence generated for a given leaf.
 
     """

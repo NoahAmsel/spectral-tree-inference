@@ -12,6 +12,7 @@
 .ipynb_checkpoints
 figures
 matlab_tests
+docs/_build
 data
 experiments/log/*
 experiments/results/*
