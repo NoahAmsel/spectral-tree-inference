@@ -34,7 +34,7 @@ class RAxML(ReconstructionMethod):
             #Linux version
             raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-SSE3-linux')
         else:
-            assert False
+            raise OSError(f"Cannot identify operating system {platform.system()}.")
 
         self._rx = raxml.RaxmlRunner(raxml_path=raxml_path)
 

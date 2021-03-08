@@ -17,7 +17,8 @@ from . import reconstruct_tree
 class Experiment_Datum:
     def __init__(self, sequence_model, n, method, mutation_rate, inferred_tree, reference_tree, run_time):
         inferred_tree.update_bipartitions()
-        assert inferred_tree.is_rooted == reference_tree.is_rooted, "Cannot compare rooted to unrooted tree"
+        if inferred_tree.is_rooted != reference_tree.is_rooted:
+            raise ValueError("Cannot compare rooted to unrooted tree.")
         self.sequence_model = sequence_model
         self.n = n
         self.method = method

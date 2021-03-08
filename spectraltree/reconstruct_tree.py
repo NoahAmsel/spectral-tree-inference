@@ -78,7 +78,8 @@ class TreeSVD(ReconstructionMethod):
         if taxa_metadata is None:
             taxa_metadata = utils.TaxaMetadata.default(m)
         else:
-            assert len(taxa_metadata) >= m, "Namespace too small for distance matrix"
+            if len(taxa_metadata) < m:
+                raise ValueError(f"Not enough taxa provided for distance matrix (provided {len(taxa_metadata)}, should be {m}).")
         
         # initialize leaf nodes
         G = taxa_metadata.all_leaves()

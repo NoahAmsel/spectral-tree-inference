@@ -43,8 +43,7 @@ class TaxaMetadata(Mapping):
                 self._taxa_list.append(taxon)
             else:
                 # not in namespace, or wrong type
-                # TODO: throw a real error
-                assert False, "Each taxon must be included in the given taxon namespace."
+                raise ValueError(f"Each taxon must be included in the given taxon namespace, but {taxon} isn't.")
 
         self._taxa_list = np.array(self._taxa_list)
 
@@ -136,7 +135,8 @@ class TaxaMetadata(Mapping):
     def invert_mask_in_tree(self, tree, mask):
         tree_mask = self.tree2mask(tree)
         # assure mask is a subset of the nodes in the tree
-        assert not np.logical_and(np.logical_not(tree_mask), mask).any()
+        if np.logical_and(np.logical_not(tree_mask), mask).any():
+            raise ValueError("Provided mask includes nodes that are not in the tree.")
         return tree_mask ^ mask
 
     def invert_bipartition_in_tree(self, tree, bipartition):
@@ -144,7 +144,8 @@ class TaxaMetadata(Mapping):
 
     def leaf(self, taxon, **kwargs):
         taxon = self._convert_label(taxon)
-        assert taxon in self, "Must supply taxon in the taxa map to produce a leaf."
+        if taxon not in self:
+            raise ValueError("Given taxon must be in the TaxaMetadata object")
 
         kwargs['taxon'] = taxon
         node = dendropy.Node(**kwargs)
@@ -156,7 +157,8 @@ class TaxaMetadata(Mapping):
         
     def reindex_matrix(self, matrix, old_taxa, axes=[0]):
         assert False
-        assert self.equals_unordered(old_taxa), "Old and new taxa maps must have the same set of taxa."
+        if not self.equals_unordered(old_taxa):
+            raise ValueError("Old and new taxa maps must contain the same set of taxa.")
         new_matrix = np.zeros_like(matrix)
         # how do we generalize this for different numbers of axes?
 
@@ -194,7 +196,8 @@ def array2charmatrix(matrix, taxa_metadata=None):
     if taxa_metadata is None:
         taxa_metadata = TaxaMetadata.default(matrix.shape[0])
     else:
-        assert len(taxa_metadata) == matrix.shape[0], "Taxon-Index map does not match size of matrix."
+        if len(taxa_metadata) != matrix.shape[0]:
+            raise ValueError(f"Size of TaxaMetadata ({len(taxa_metadata)}) does not match size of matrix ({matrix.shape[0]}).")
     
     alphabet = taxa_metadata.alphabet
     # TODO: add support for DNACharacterMatrix and others
@@ -226,11 +229,13 @@ def array2charmatrix(matrix, taxa_metadata=None):
 
 def array2distance_matrix(matrix, taxa_metadata=None):
     m, m2 = matrix.shape
-    assert m == m2, "Distance matrix must be square"
+    if m != m2:
+        raise ValueError(f"Distance matrix should be square but has dimensions {m} x {m2}.")
     if taxa_metadata is None:
         taxa_metadata = TaxaMetadata.default(m)
     else:
-        assert len(taxa_metadata) == m, "Taxon-Index map does not match size of matrix."
+        if len(taxa_metadata) != m:
+            raise ValueError(f"Namespace size ({len(taxa_metadata)}) should match distance matrix dimension ({m}).")
 
     dict_form = defaultdict(dict)
     for row_taxon in taxa_metadata:
@@ -282,12 +287,12 @@ def adjacency_matrix_to_tree(A,num_taxa,taxa_metadata):
 from dendropy.simulate.treesim import birth_death_tree, pure_kingman_tree, mean_kingman_tree 
 
 def merge_children(children, **kwargs):
-    assert len(children) > 0
+    if len(children) == 0:
+        raise ValueError
     node = dendropy.Node(**kwargs)
     for child in children:
         node.add_child(child)
     if all(hasattr(child,'mask') for child in children):
-        assert len(children) > 0
         node.mask = reduce(np.logical_or, (child.mask for child in children))
     return node
 
@@ -296,14 +301,16 @@ def balanced_binary(num_taxa=None, taxa=None, edge_length=1.):
         if num_taxa:
             taxa = TaxaMetadata.default(num_taxa)
         else:
-            assert False, "Must provide either the number of leaves or a TaxaMetadata"
+            raise TypeError("Must provide either the number of leaves or a TaxaMetadata")
 
     if num_taxa:
-        assert num_taxa == len(taxa), "The number of leaves must match the number of taxa given."
+        if num_taxa != len(taxa):
+            raise ValueError(f"The desired number of leaves {num_taxa} must match the number of taxa given {len(taxa)}.")
     else:
         num_taxa = len(taxa)
 
-    assert num_taxa == 2**int(np.log2(num_taxa)), "The number of leaves in a balanced binary tree must be a power of 2."
+    if num_taxa != 2**int(np.log2(num_taxa)):
+        raise ValueError(f"The number of leaves in a balanced binary tree must be a power of 2, not {num_taxa}.")
 
     nodes = taxa.all_leaves(edge_length=edge_length)
     while len(nodes) > 1:
@@ -317,10 +324,11 @@ def lopsided_tree(num_taxa, taxa=None, edge_length=1.):
         if num_taxa:
             taxa = TaxaMetadata.default(num_taxa)
         else:
-            assert False, "Must provide either the number of leaves or a TaxaMetadata"
+            raise TypeError("Must provide either the number of leaves or a TaxaMetadata")
 
     if num_taxa:
-        assert num_taxa == len(taxa), "The number of leaves must match the number of taxa given."
+        if num_taxa != len(taxa):
+            raise ValueError(f"The desired number of leaves {num_taxa} must match the number of taxa given {len(taxa)}.")
     else:
         num_taxa = len(taxa)
 

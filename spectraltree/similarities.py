@@ -87,7 +87,8 @@ class HKY_similarity_matrix:
     def __call__(self, observations):
         m, N = observations.shape
 
-        assert self.taxa_metadata.alphabet in [dendropy.DNA_STATE_ALPHABET, dendropy.RNA_STATE_ALPHABET]
+        if not self.taxa_metadata.alphabet in [dendropy.DNA_STATE_ALPHABET, dendropy.RNA_STATE_ALPHABET]:
+            raise ValueError("Only DNA and RNA alphabets supported.")
 
         if self.verbose: print("Computing the average base frequency for each pair of sequences...")
         g = {}

@@ -51,11 +51,13 @@ class SpectralNeighborJoining(DistanceReconstructionMethod):
     def reconstruct_from_similarity(self, similarity_matrix, taxa_metadata=None):
         # TODO: should all distance methods do these steps
         m, m2 = similarity_matrix.shape
-        assert m == m2, "Distance matrix must be square"
+        if m != m2:
+            raise ValueError(f"Distance matrix should be square but has dimensions {m} x {m2}.")
         if taxa_metadata is None:
             taxa_metadata = utils.TaxaMetadata.default(m)
         else:
-            assert len(taxa_metadata) == m, "Namespace wrong size for distance matrix"
+            if len(taxa_metadata) != m:
+                raise ValueError(f"Namespace size ({len(taxa_metadata)}) should match distance matrix dimension ({m}).")
 
         if self.alpha != 1.0:
             similarity_matrix = similarity_matrix ** self.alpha

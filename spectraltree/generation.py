@@ -91,8 +91,12 @@ class DiscreteTransition(Transition):
 
 class FixedDiscreteTransition(DiscreteTransition):
     def __init__(self, stationary_freqs, pmatrix, rng=None):
-        assert pmatrix.shape[0] == pmatrix.shape[1] == len(stationary_freqs)
-        assert np.all(pmatrix >= 0)
+        if pmatrix.shape[0] != pmatrix.shape[1]:
+            raise ValueError(f"pmatrix must be square not {pmatrix.shape[0]} x {pmatrix.shape[1]}.")
+        if pmatrix.shape[0] != len(stationary_freqs):
+            raise ValueError(f"pmatrix must have same dimensions as number of states ({len(stationary_freqs)} not {pmatrix.shape[0]}).")
+        if not np.all(pmatrix >= 0):
+            raise ValueError("pmatrix must be non-negative.") 
         super().__init__(stationary_freqs, rng=rng)
         self._pmatrix = pmatrix
 
@@ -104,9 +108,13 @@ class FixedDiscreteTransition(DiscreteTransition):
 
 class ContinuousTimeDiscreteTransition(DiscreteTransition):
     def __init__(self, stationary_freqs, Q, rng=None):
-        assert Q.shape[0] == Q.shape[1] == len(stationary_freqs)
+        if Q.shape[0] != Q.shape[1]:
+            raise ValueError(f"Q matrix must be square, not {Q.shape[0]} by {Q.shape[0]}.")
+        if Q.shape[0] != len(stationary_freqs):
+            raise ValueError(f"Q must have same dimensions as number of states ({len(stationary_freqs)} not {Q.shape[0]}).")
         super().__init__(stationary_freqs, rng=rng)
-        assert np.allclose(Q.sum(axis=1), np.zeros(self.k))
+        if not np.allclose(Q.sum(axis=1), np.zeros(self.k)):
+            raise ValueError("Rows of Q must sum to 0")
         self._Q = self.scale_rate_matrix(Q, self.stationary_freqs)
 
     @property
@@ -150,7 +158,8 @@ class ContinuousTimeDiscreteTransition(DiscreteTransition):
 
 class GTR(ContinuousTimeDiscreteTransition):
     def __init__(self, stationary_freqs, transition_rates, rng=None):
-        assert len(transition_rates) == nchoose2(len(stationary_freqs))
+        if len(transition_rates) != nchoose2(len(stationary_freqs)):
+            raise ValueError(f"Must supply one transition rate for each pair of states ({nchoose2(len(stationary_freqs))}, not {len(transition_rates)}).") 
         # save this in case we can use seqgen
         Q = scipy.spatial.distance.squareform(transition_rates)
         Q *= stationary_freqs
@@ -161,10 +170,11 @@ class GTR(ContinuousTimeDiscreteTransition):
 
 class TN93(GTR):
     def __init__(self, stationary_freqs, kappa1, kappa2, rng=None):
-        #  we could allow for more than for classes
+        #  we could allow for more than four classes
         # assume the first half are of one type ("pyramidines") and the second half is of the other type ("purines")
         # but right now we don't
-        assert len(stationary_freqs) == 4
+        if len(stationary_freqs) != 4:
+            raise ValueError(f"Only 4 states supported, provided {len(stationary_freqs)}.")
         transition_rates = np.array([kappa1, 1, 1, 1, 1, kappa2]).astype(float)
         super().__init__(stationary_freqs, transition_rates, rng=rng)
 
@@ -174,7 +184,8 @@ class T92(TN93):
         #  we could allow for more than for classes
         # assume the first half are of one type ("pyramidines") and the second half is of the other type ("purines")
         # but right now we don't
-        assert 0. <= theta <= 1.
+        if not (0. <= theta <= 1.):
+            raise ValueError(f"Theta must lie in [0, 1]; cannot be {theta}.")
         GC = theta / 2.
         AT = (1. - theta) / 2.
         super().__init__(np.array([AT, GC, GC, AT]), kappa1, kappa2, rng=rng)
