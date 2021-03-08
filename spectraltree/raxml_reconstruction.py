@@ -24,6 +24,20 @@ class RAxML(ReconstructionMethod):
     def __init__(self, raxml_args="-T 2 --JC69 -c 1"):
         self.raxml_args = [raxml_args]
 
+        if platform.system() == 'Windows':
+            # Windows version:
+            raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH, 'raxmlHPC-SSE3.exe')
+        elif platform.system() == 'Darwin':
+            #MacOS version:
+            raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-macOS')
+        elif platform.system() == 'Linux':
+            #Linux version
+            raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-SSE3-linux')
+        else:
+            assert False
+
+        self._rx = raxml.RaxmlRunner(raxml_path=raxml_path)
+
     def __call__(self, sequences, taxa_metadata=None):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
             # data = FastCharacterMatrix(sequences, taxon_namespace=taxon_namespace).to_dendropy()
@@ -31,18 +45,8 @@ class RAxML(ReconstructionMethod):
             data.taxon_namespace = dendropy.TaxonNamespace(taxa_metadata)
         else:
             data = sequences
-            
-        if platform.system() == 'Windows':
-            # Windows version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH, 'raxmlHPC-SSE3.exe'))
-        elif platform.system() == 'Darwin':
-            #MacOS version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-macOS'))
-        elif platform.system() == 'Linux':
-            #Linux version
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(SPECTRALTREE_RAXML_PATH,'raxmlHPC-SSE3-linux'))
 
-        tree = rx.estimate_tree(data, raxml_args=self.raxml_args)
+        tree = self._rx.estimate_tree(data, raxml_args=self.raxml_args)
         tree.is_rooted = False
         if taxa_metadata != None:
             tree.taxon_namespace = taxa_metadata.taxon_namespace

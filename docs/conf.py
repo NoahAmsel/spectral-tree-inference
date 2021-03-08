@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'spectral-tree-inference'
-copyright = '2021, Ariel Jaffe, Noah Amsel, Yariv Aizenbud, Mamie Wang, Amber Hu'
-author = 'Ariel Jaffe, Noah Amsel, Yariv Aizenbud, Mamie Wang, Amber Hu'
+copyright = '2021, Yariv Aizenbud, Noah Amsel, Ariel Jaffe, Amber Hu, Mamie Wang'
+author = 'Yariv Aizenbud, Noah Amsel, Ariel Jaffe, Amber Hu, Mamie Wang'
 
 # The full version, including alpha/beta/rc tags
 release = '0.1'

@@ -8,6 +8,8 @@ To install, cd inside the `spectral-tree-inference` folder and run
 ```
 pip install -e .
 ```
+This installs all the Python ´dependencies of spectraltree, including oct2py. However it does not install octave itself. The easiest way to do that, is to run `conda install -c conda-forge octave`; for more see here <https://blink1073.github.io/oct2py/source/installation.html#gnu-octave-installation>.
+
 Now if you want to import the spectraltree package, for example for an experiment, you can simply run
 ```
 import spectraltree

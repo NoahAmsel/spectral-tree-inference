@@ -3,7 +3,9 @@ from itertools import product
 import time
 
 import dendropy
-from numba import jit
+# Having trouble installing numba (https://github.com/numba/llvmlite/issues/527)
+# Omitting for now since we aren't currently using it
+# from numba import jit
 import numpy as np
 import scipy.linalg
 from sklearn.decomposition import TruncatedSVD
