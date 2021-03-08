@@ -1,0 +1,8 @@
+type	method	nrun	size	path	threshold	m	kappa	mutation_rate	verbose
+kingman	STDR+RAxML	5	2000	None	128	2000	2	0.4	True
+kingman	STDR+RAxML	5	2000	None	128	3000	2	0.4	True
+kingman	STDR+RAxML	5	2000	None	128	4000	2	0.4	True
+kingman	STDR+RAxML	5	2000	None	128	5000	2	0.4	True
+kingman	STDR+RAxML	5	2000	None	128	6000	2	0.4	True
+kingman	STDR+RAxML	5	2000	None	128	7000	2	0.4	True
+kingman	STDR+RAxML	5	2000	None	128	8000	2	0.4	True

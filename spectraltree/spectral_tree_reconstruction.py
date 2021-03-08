@@ -443,11 +443,14 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def __repr__(self):
         return "spectralTree" + " + " + self.inner_method.__repr__(self.inner_method)
 
-    def deep_spectral_tree_reconstruction(self, sequences, similarity_metric, taxa_metadata = None, num_gaps =1,threshhold = 100, 
+    def deep_spectral_tree_reconstruction(self, sequences, similarity_metricx, taxa_metadata = None, num_gaps =1,threshhold = 100, 
         alpha = 1,min_split = 1,merge_method = "angle", verbose = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
-        self.similarity_matrix = similarity_metric(sequences)**alpha
+        if callable(similarity_metricx):
+            self.similarity_matrix = similarity_metricx(sequences)**alpha
+        else:
+            self.similarity_matrix =similarity_metricx
         m, m2 = self.similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         self.taxa_metadata = taxa_metadata
