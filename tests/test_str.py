@@ -104,3 +104,6 @@ class TestSTR(unittest.TestCase):
     def test_hky(self):
         spectral_method = spectraltree.STR(spectraltree.RAxML, spectraltree.HKY_similarity_matrix(self.meta_hky), threshold=32, merge_method="least_square", num_gaps=1, min_split=5, verbose=False)   
         self.assertTrue(spectraltree.topos_equal(self.reference_tree, spectral_method(self.observations_hky, self.meta_hky)))
+
+if __name__ == "__main__":
+    unittest.main()

@@ -21,4 +21,10 @@ class TestRG(unittest.TestCase):
             alphabet="Binary")
 
         rg = spectraltree.RG(spectraltree.JC_distance_matrix)
-        self.assertTrue(spectraltree.topos_equal(reference_tree, rg(observations, meta)))  # this doesn't work very well
+        recoverd_tree = rg(observations, meta)
+        print("(RF distance,F1 score):",spectraltree.compare_trees(reference_tree,recoverd_tree))
+        self.assertTrue(spectraltree.topos_equal(reference_tree, recoverd_tree))  # this doesn't work very well
+
+
+if __name__ == "__main__":
+    unittest.main()

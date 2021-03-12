@@ -31,3 +31,6 @@ class TestNJ(unittest.TestCase):
 
         nj_hky = spectraltree.NeighborJoining(spectraltree.HKY_similarity_matrix(metaHKY))
         self.assertTrue(spectraltree.topos_equal(self.reference_tree, nj_hky(observationsHKY, metaHKY)))
+
+if __name__ == "__main__":
+    unittest.main()

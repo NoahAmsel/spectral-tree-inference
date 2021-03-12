@@ -73,3 +73,6 @@ class TestRaxml(unittest.TestCase):
         tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
         RF = symmetric_difference(self.reference_tree, tree)
         self.assertEqual(RF, 0)
+
+if __name__ == "__main__":
+    unittest.main()
