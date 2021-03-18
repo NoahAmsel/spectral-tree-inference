@@ -28,19 +28,22 @@ class TestRaxml(unittest.TestCase):
 
     def test_dendropy_data(self):
         data = simulate_discrete_chars(
-            seq_len=500,
+            seq_len=2000,
             tree_model=self.reference_tree, 
             seq_model=Jc69(), 
             mutation_rate=spectraltree.Jukes_Cantor().p2t(0.95),
             rng=default_rng(123))
 
         raxml = spectraltree.RAxML()
-        self.assertTrue(spectraltree.topos_equal(self.reference_tree, raxml(data)))  
+        tree = raxml(data)
+        RF = spectraltree.compare_trees(self.reference_tree, tree)
+        print("RF (test_without_class):", RF[0])
+        self.assertEqual(RF[0], 0)
 
     def test_numpy_data(self):
         jc = spectraltree.Jukes_Cantor()
         observations, taxa_meta = spectraltree.simulate_sequences(
-            seq_len=500, 
+            seq_len=2000, 
             tree_model=self.reference_tree, 
             seq_model=jc, 
             mutation_rate=jc.p2t(0.95),
@@ -48,31 +51,10 @@ class TestRaxml(unittest.TestCase):
             alphabet="DNA")
 
         raxml = spectraltree.RAxML()
-        self.assertTrue(spectraltree.topos_equal(self.reference_tree, raxml(observations, taxa_meta)))  
-
-    def test_without_class(self):
-        data = simulate_discrete_chars(
-            seq_len=500, 
-            tree_model=self.reference_tree, 
-            seq_model=Jc69(), 
-            mutation_rate=spectraltree.Jukes_Cantor().p2t(0.95),
-            rng=default_rng(123))
-
-        spectraltree_path = os.path.dirname(spectraltree.__file__)
-        raxml_path = os.path.join(spectraltree_path, "libs", "raxmlHPC_bin")
-        if platform.system() == 'Windows':
-            # Windows version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(raxml_path,r'\raxmlHPC-SSE3.exe'))
-        elif platform.system() == 'Darwin':
-            #MacOS version:
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(raxml_path,'raxmlHPC-macOS'))
-        elif platform.system() == 'Linux':
-            #Linux version
-            rx = raxml.RaxmlRunner(raxml_path = os.path.join(raxml_path,'raxmlHPC-SSE3-linux'))
-
-        tree = rx.estimate_tree(char_matrix=data, raxml_args=["-T 2"])
-        RF = symmetric_difference(self.reference_tree, tree)
-        self.assertEqual(RF, 0)
+        tree = raxml(observations, taxa_meta)
+        RF = spectraltree.compare_trees(self.reference_tree, tree)
+        print("RF (test_without_class):", RF[0])
+        self.assertEqual(RF[0], 0)
 
 if __name__ == "__main__":
     unittest.main()
