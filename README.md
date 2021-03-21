@@ -17,7 +17,7 @@ Now if you want to import the spectraltree package, for example for an experimen
 ```
 import spectraltree
 ```
-without modifying your path or doing anything ugly. You should only have to run `pip install -e .` one time. If you move the location of `spectraltree` folder, then run `pip uninstall spectraltree` and install again.
+without modifying your path or doing anything ugly. You should only have to run `pip install -e .` one time. If you move the location of `spectraltree` folder, then run `pip uninstall spectral-tree-inference` and install again.
 
 This also installs all the Python dependencies of spectraltree, including oct2py. However it does not install octave itself. The easiest way to do that is to run `conda install -c conda-forge octave`; for more see here <https://blink1073.github.io/oct2py/source/installation.html#gnu-octave-installation>.
 
