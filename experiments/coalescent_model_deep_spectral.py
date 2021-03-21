@@ -36,7 +36,7 @@ num_reps = 5
 # set methods
 nj = reconstruct_tree.NeighborJoining(reconstruct_tree.JC_similarity_matrix) 
 raxml = reconstruct_tree.RAxML()
-spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML,reconstruct_tree.JC_similarity_matrix)
+spectral_method = reconstruct_tree.STDR(reconstruct_tree.RAxML,reconstruct_tree.JC_similarity_matrix)
 
 
 df = pd.DataFrame(columns=['method', 'runtime', 'RF','n'])

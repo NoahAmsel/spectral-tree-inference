@@ -33,7 +33,7 @@ class STR(ReconstructionMethod):
         self.verbose = verbose
 
     def __repr__():
-        return "spectralTreeReconstruction"
+        return "STDR - Recursive"
 
     def __call__(self, sequences, taxa_metadata=None):
         num_taxa = sequences.shape[0]

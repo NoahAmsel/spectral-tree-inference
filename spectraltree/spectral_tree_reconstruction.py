@@ -428,7 +428,7 @@ def join_trees_with_spectral_root_finding_par(similarity_matrix, T1, T2, merge_m
     T.seed_node.set_child_nodes([T1.seed_node,T2.seed_node])
     return T
 
-class SpectralTreeReconstruction(ReconstructionMethod):
+class STDR(ReconstructionMethod):
     def __init__(self, inner_method, similarity_metric):
         self.inner_method = inner_method
         self.similarity_metric = similarity_metric
@@ -441,7 +441,7 @@ class SpectralTreeReconstruction(ReconstructionMethod):
         return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxa_metadata=taxa_metadata, 
             reconstruction_alg = self.inner_method)
     def __repr__(self):
-        return "spectralTree" + " + " + self.inner_method.__repr__(self.inner_method)
+        return "STDR" + " + " + self.inner_method.__repr__(self.inner_method)
 
     def deep_spectral_tree_reconstruction(self, sequences, similarity_metricx, taxa_metadata = None, num_gaps =1,threshhold = 100, 
         alpha = 1,min_split = 1,merge_method = "angle", verbose = False, **kargs):

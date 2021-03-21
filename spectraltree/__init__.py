@@ -38,7 +38,7 @@ from .snj import (
 
 from .spectral_tree_reconstruction import (
     correlation_distance_matrix,
-    SpectralTreeReconstruction)
+    STDR)
 
 from .recursive_str import STR
 from .raxml_reconstruction import RAxML

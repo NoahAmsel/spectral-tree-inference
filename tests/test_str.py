@@ -5,7 +5,7 @@ import numpy as np
 
 import spectraltree
 
-class TestSpectralTreeReconstruction(unittest.TestCase):
+class TestSTDR(unittest.TestCase):
     def setUp(self):
         self.N = 500
         self.threshold = 16
@@ -25,8 +25,8 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
             rng=np.random.default_rng(12345),
             alphabet='DNA')
 
-        spectral_method = spectraltree.SpectralTreeReconstruction(spectraltree.RAxML,spectraltree.JC_similarity_matrix)   
-        #spectral_method = spectraltree.SpectralTreeReconstruction(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix)   
+        spectral_method = spectraltree.STDR(spectraltree.RAxML,spectraltree.JC_similarity_matrix)   
+        #spectral_method = spectraltree.STDR(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix)   
 
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, 
             spectraltree.JC_similarity_matrix,
@@ -56,7 +56,7 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
             for i in range(num_itr):
 
                 observations, taxa_meta = spectraltree.simulate_sequences(seq_len=N, tree_model=lopsided_reference_tree, seq_model=jc, mutation_rate=mutation_rate, rng=np.random.default_rng(789))
-                spectral_method = spectraltree.SpectralTreeReconstruction(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix)   
+                spectral_method = spectraltree.STDR(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix)   
                 tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, spectraltree.JC_similarity_matrix, 
                     taxa_metadata = taxa_meta, threshhold = 16,merge_method = merge_method)
                 RF_i,F1_i = spectraltree.compare_trees(tree_rec, lopsided_reference_tree)
@@ -75,7 +75,7 @@ class TestSpectralTreeReconstruction(unittest.TestCase):
             mutation_rate=jc.p2t(0.95),
             rng=np.random.default_rng(321))
 
-        spectral_method = spectraltree.SpectralTreeReconstruction(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix)   
+        spectral_method = spectraltree.STDR(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix)   
 
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, spectraltree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 4,threshhold = 35)
         RF, _ = spectraltree.compare_trees(tree_rec, self.reference_tree)

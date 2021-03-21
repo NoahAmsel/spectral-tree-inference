@@ -29,7 +29,7 @@ mutation_rate = jc.p2t(0.9)
 n = 1000
 num_reps = 5
 
-spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML,reconstruct_tree.JC_similarity_matrix)
+spectral_method = reconstruct_tree.STDR(reconstruct_tree.RAxML,reconstruct_tree.JC_similarity_matrix)
 observations, taxa_meta = generation.simulate_sequences(n, tree_model=reference_tree, seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
 
 f = open("delete_me.pkl",'wb')
