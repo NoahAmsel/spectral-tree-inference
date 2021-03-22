@@ -50,8 +50,8 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
                 if s2<smin:
                     partition_min = bool_bipartition
                     smin = s2
-    if smin == np.inf:
-        raise Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
+        if smin == np.inf:
+            raise Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
     return partition_min
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
@@ -437,13 +437,13 @@ class STDR(ReconstructionMethod):
         else:
             self.reconstruction_alg = inner_method()
             
-    def __call__(self, sequences, taxa_metadata=None):
+    def __call__(self, sequences, taxa_metadata=None, num_gaps =1,threshold = 100,min_split = 1,merge_method = "angle",verbose = False):
         return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxa_metadata=taxa_metadata, 
-            reconstruction_alg = self.inner_method)
+             num_gaps = num_gaps,threshold = threshold, merge_method = merge_method, min_split = min_split, verbose = verbose)
     def __repr__(self):
         return "STDR" + " + " + self.inner_method.__repr__(self.inner_method)
 
-    def deep_spectral_tree_reconstruction(self, sequences, similarity_metricx, taxa_metadata = None, num_gaps =1,threshhold = 100, 
+    def deep_spectral_tree_reconstruction(self, sequences, similarity_metricx, taxa_metadata = None, num_gaps =1,threshold = 100, 
         alpha = 1,min_split = 1,merge_method = "angle", verbose = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
@@ -474,7 +474,7 @@ class STDR(ReconstructionMethod):
                     cur_node = cur_node.parent.left
                 else:
                     cur_node = cur_node.parent
-            elif np.sum(cur_node.bitmap) > threshhold:
+            elif np.sum(cur_node.bitmap) > threshold:
                 L1,L2 = self.splitTaxa(cur_node,num_gaps,min_split)
                 if verbose: print("partition")
                 if verbose: print("L1 size: ", np.sum(L1))
