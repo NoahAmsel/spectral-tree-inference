@@ -1,8 +1,8 @@
 
 # New repositories for STDR and SNJ
-We created a new repository, with simple examples, for the code of the STDR algorithm (https://arxiv.org/abs/2102.13276), please visit: https://github.com/aizeny/stdr
+We created a new repository, with simple examples, for the code of the STDR algorithm (https://arxiv.org/abs/2102.13276). Please visit: https://github.com/aizeny/stdr
 
-We created a new repository, with simple examples, for the code of the SNJ algorithm (https://arxiv.org/abs/2002.12547), please visit: https://github.com/aizeny/snj
+We created a new repository, with simple examples, for the code of the SNJ algorithm (https://epubs.siam.org/doi/abs/10.1137/20M1365715 or https://arxiv.org/abs/2002.12547). Please visit: https://github.com/aizeny/snj
 
 
 # Update of March 8th 2021:
