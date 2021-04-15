@@ -1,4 +1,9 @@
 
+# New repositories for STDR and SNJ
+We created a new repository, with simple examples, for the code of the STDR algorithm (https://arxiv.org/abs/2102.13276), please visit: https://github.com/aizeny/stdr
+
+We created a new repository, with simple examples, for the code of the SNJ algorithm (https://arxiv.org/abs/2002.12547), please visit: https://github.com/aizeny/snj
+
 
 # Update of March 8th 2021:
 This update cleans up the repository significantly and implements best practices like unit testing, documentation, avoiding assertions,  and packaging and listing dependincies using setuptools. It fixes the problems we were having with imports, and it standardizes the interfaces of many functions and classes (the exception is spectral tree reconstruction -- I put it into a separate file but left its interface alone). These changes, especially the last two, break some of the existing experiment scripts. I have fixed all the experiments in `snj_paper_experiments` already, and the rest should be easy enough to fix as we need them. Use the unit tests in the `tests` folder and the scripts in `snj_paper_experiments` as guides. There are two main steps:
