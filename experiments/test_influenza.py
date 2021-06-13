@@ -34,7 +34,7 @@ identical = np.array([np.mean(a == b) for a, b in product(ch_arr, repeat = 2)])
 #print("--- %s seconds ---" % compute_s_time)
 threshold = 128
 t1 = time.time()
-spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML,
+spectral_method = reconstruct_tree.STDR(reconstruct_tree.RAxML,
                                                               reconstruct_tree.HKY_similarity_matrix)
 tree_rec = spectral_method.deep_spectral_tree_reconstruction(ch_arr, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxon_namespace = H3N2_tree.taxon_namespace, 

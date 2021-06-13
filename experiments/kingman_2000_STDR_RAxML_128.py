@@ -23,7 +23,7 @@ def run_method(method, size, run_num, tree, m = 300, kappa = 2, mutation_rate=0.
     runtime = time.time() - start_time
     print("Simulation took %s seconds" % runtime)
     
-    spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML, reconstruct_tree.JC_similarity_matrix)
+    spectral_method = reconstruct_tree.STDR(reconstruct_tree.RAxML, reconstruct_tree.JC_similarity_matrix)
     start_time = time.time()
     tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.JC_similarity_matrix, 
                                                             taxa_metadata = taxa_meta, 

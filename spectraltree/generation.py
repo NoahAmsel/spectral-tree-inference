@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
+
+import dendropy
 import numpy as np
 import scipy.linalg
 import scipy.spatial.distance
-import dendropy
 
-from utils import TaxaMetadata
+from .utils import TaxaMetadata
 
 def nchoose2(n):
     return int(n*(n-1)/2)
@@ -90,8 +91,12 @@ class DiscreteTransition(Transition):
 
 class FixedDiscreteTransition(DiscreteTransition):
     def __init__(self, stationary_freqs, pmatrix, rng=None):
-        assert pmatrix.shape[0] == pmatrix.shape[1] == len(stationary_freqs)
-        assert np.all(pmatrix >= 0)
+        if pmatrix.shape[0] != pmatrix.shape[1]:
+            raise ValueError(f"pmatrix must be square not {pmatrix.shape[0]} x {pmatrix.shape[1]}.")
+        if pmatrix.shape[0] != len(stationary_freqs):
+            raise ValueError(f"pmatrix must have same dimensions as number of states ({len(stationary_freqs)} not {pmatrix.shape[0]}).")
+        if not np.all(pmatrix >= 0):
+            raise ValueError("pmatrix must be non-negative.") 
         super().__init__(stationary_freqs, rng=rng)
         self._pmatrix = pmatrix
 
@@ -103,9 +108,13 @@ class FixedDiscreteTransition(DiscreteTransition):
 
 class ContinuousTimeDiscreteTransition(DiscreteTransition):
     def __init__(self, stationary_freqs, Q, rng=None):
-        assert Q.shape[0] == Q.shape[1] == len(stationary_freqs)
+        if Q.shape[0] != Q.shape[1]:
+            raise ValueError(f"Q matrix must be square, not {Q.shape[0]} by {Q.shape[0]}.")
+        if Q.shape[0] != len(stationary_freqs):
+            raise ValueError(f"Q must have same dimensions as number of states ({len(stationary_freqs)} not {Q.shape[0]}).")
         super().__init__(stationary_freqs, rng=rng)
-        assert np.allclose(Q.sum(axis=1), np.zeros(self.k))
+        if not np.allclose(Q.sum(axis=1), np.zeros(self.k)):
+            raise ValueError("Rows of Q must sum to 0")
         self._Q = self.scale_rate_matrix(Q, self.stationary_freqs)
 
     @property
@@ -149,7 +158,8 @@ class ContinuousTimeDiscreteTransition(DiscreteTransition):
 
 class GTR(ContinuousTimeDiscreteTransition):
     def __init__(self, stationary_freqs, transition_rates, rng=None):
-        assert len(transition_rates) == nchoose2(len(stationary_freqs))
+        if len(transition_rates) != nchoose2(len(stationary_freqs)):
+            raise ValueError(f"Must supply one transition rate for each pair of states ({nchoose2(len(stationary_freqs))}, not {len(transition_rates)}).") 
         # save this in case we can use seqgen
         Q = scipy.spatial.distance.squareform(transition_rates)
         Q *= stationary_freqs
@@ -160,10 +170,11 @@ class GTR(ContinuousTimeDiscreteTransition):
 
 class TN93(GTR):
     def __init__(self, stationary_freqs, kappa1, kappa2, rng=None):
-        #  we could allow for more than for classes
+        #  we could allow for more than four classes
         # assume the first half are of one type ("pyramidines") and the second half is of the other type ("purines")
         # but right now we don't
-        assert len(stationary_freqs) == 4
+        if len(stationary_freqs) != 4:
+            raise ValueError(f"Only 4 states supported, provided {len(stationary_freqs)}.")
         transition_rates = np.array([kappa1, 1, 1, 1, 1, kappa2]).astype(float)
         super().__init__(stationary_freqs, transition_rates, rng=rng)
 
@@ -173,7 +184,8 @@ class T92(TN93):
         #  we could allow for more than for classes
         # assume the first half are of one type ("pyramidines") and the second half is of the other type ("purines")
         # but right now we don't
-        assert 0. <= theta <= 1.
+        if not (0. <= theta <= 1.):
+            raise ValueError(f"Theta must lie in [0, 1]; cannot be {theta}.")
         GC = theta / 2.
         AT = (1. - theta) / 2.
         super().__init__(np.array([AT, GC, GC, AT]), kappa1, kappa2, rng=rng)
@@ -237,9 +249,9 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
 
     seq_len       : int
         Length of sequence (number of characters).
-    tree_model    : |Tree|
+    tree_model    : Tree
         Tree on which to simulate.
-    seq_model     : |Transition|
+    seq_model     : Transition
         The character substitution model under which to to evolve the
         characters.
     mutation_rate : float
@@ -248,8 +260,8 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
     root_states   : list
         Vector of root states (length must equal ``seq_len``).
     retain_sequences_on_tree : bool
-        If |False|, sequence annotations will be cleared from tree after
-        simulation. Set to |True| if you want to, e.g., evolve and accumulate
+        If False, sequence annotations will be cleared from tree after
+        simulation. Set to True if you want to, e.g., evolve and accumulate
         different sequences on tree, or retain information for other purposes.
     rng           : random number generator
         If not given, 'GLOBAL_RNG' will be used.
@@ -258,7 +270,7 @@ def simulate_sequences(seq_len, tree_model, seq_model, mutation_rate=1.0, root_s
     Returns
     -------
 
-    char_matrix :  |numpy.array|
+    char_matrix :  numpy.array
         Matrix where each row is the sequence generated for a given leaf.
 
     """
@@ -316,30 +328,3 @@ def simulate_sequences_gamma(seq_len, tree_model, seq_model, base_rate, gamma_sh
     seq_model.rng = model_rng
 
     return char_matrix, meta
-
-"""
-if __name__ == "__main__":
-    from utils import balanced_binary
-
-    TT = np.array([[0.9, 0.1], [0.4, 0.6]])
-    my_trans = FixedDiscreteTransition(np.array([0,1]), TT)
-    my_tree = balanced_binary(4)
-    my_tree.edges()[-1].seq_model = FixedDiscreteTransition(np.array([0,1]), np.array([[1,0],[1,0]]))
-    matrix, taxa = simulate_sequences(1000, my_tree, my_trans, retain_sequences_on_tree=True)
-    print(matrix.mean(axis=1))
-"""
-
-if __name__ == "__main__":
-    from utils import balanced_binary
-
-    jc = Jukes_Cantor(rng=np.random.default_rng(42))
-    my_tree = balanced_binary(4)
-    # seq, meta = simulate_sequences(seq_len=6, tree_model=my_tree, seq_model=jc, )
-    seq, meta = simulate_sequences_gamma(seq_len=2000, tree_model=my_tree, seq_model=jc, base_rate=1, gamma_shape=1, block_size=10)
-
-    print(seq)
-
-    #print(0.25 + 0.75 * np.exp(-4.*ttt/3.))
-    #print(jc.pmatrix(2,2))
-    #jc.paralinear_distance(2,2)
-    #print(jc.p2t(jc.t2p(0.03, 2.), 2.))

@@ -29,19 +29,19 @@ def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold =
         start_time = time.time()
         tree_rec = nj(observations, taxa_meta)
     if method == "STDR+NJ":
-        spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.NeighborJoining, reconstruct_tree.HKY_similarity_matrix)
+        spectral_method = reconstruct_tree.STDR(reconstruct_tree.NeighborJoining, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxa_metadata = taxa_meta,
                                                             threshhold = threshold, min_split = 5, verbose = verbose)
     if method == "STDR+SNJ":
-        spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.SpectralNeighborJoining, reconstruct_tree.HKY_similarity_matrix)
+        spectral_method = reconstruct_tree.STDR(reconstruct_tree.SpectralNeighborJoining, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxa_metadata = taxa_meta, 
                                                             threshhold = threshold, min_split = 5, verbose = verbose)
     if method == "STDR+RAxML":
-        spectral_method = reconstruct_tree.SpectralTreeReconstruction(reconstruct_tree.RAxML, reconstruct_tree.HKY_similarity_matrix)
+        spectral_method = reconstruct_tree.STDR(reconstruct_tree.RAxML, reconstruct_tree.HKY_similarity_matrix)
         start_time = time.time()
         tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
                                                             taxa_metadata = taxa_meta, 

@@ -1,27 +1,24 @@
 import datetime
-import pickle
-import os.path
-import multiprocessing
 from itertools import product
+import multiprocessing
+import os.path
+import pickle
+import time
 
+import dendropy
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pylab as plt
-import dendropy
-import time
 
-#import spectraltree
-import sys, os, platform
-sys.path.append(os.path.join(sys.path[0],'spectraltree'))
-import utils
-import generation
-import reconstruct_tree
+from . import utils
+from . import generation
+from . import reconstruct_tree
 
 class Experiment_Datum:
     def __init__(self, sequence_model, n, method, mutation_rate, inferred_tree, reference_tree, run_time):
         inferred_tree.update_bipartitions()
-        assert inferred_tree.is_rooted == reference_tree.is_rooted, "Cannot compare rooted to unrooted tree"
+        if inferred_tree.is_rooted != reference_tree.is_rooted:
+            raise ValueError("Cannot compare rooted to unrooted tree.")
         self.sequence_model = sequence_model
         self.n = n
         self.method = method
