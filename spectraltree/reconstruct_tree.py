@@ -227,19 +227,22 @@ def HKY_similarity_matrix(observations, taxa_metadata, verbose = False):
     P_2 = np.zeros((m,m))
 
     A = hamming_dist_missing_values(observations, missing_val = 4)
+    A[np.isnan(A)] = 1 # when non-missing values do not overlap
 
     for i in range(m):
         for j in range(i + 1, m):
             neither_missing = np.logical_and(not_missing[i,:], not_missing[j,:])
-            a = observations[i,:][neither_missing]
-            b = observations[j,:][neither_missing]
+            if np.sum(neither_missing) == 0: continue
+            else:
+                a = observations[i,:][neither_missing]
+                b = observations[j,:][neither_missing]
             
-            # in DNA_STATE_ALPHABET, 0 => A, 1 => C, 2 => G, 3 => T (or U in RNA)
-            A_G = np.mean(np.logical_and(a == 0, b == 2) + np.logical_and(a == 2, b == 0))
-            P_1[i, j] = P_1[j, i] = A_G
+                # in DNA_STATE_ALPHABET, 0 => A, 1 => C, 2 => G, 3 => T (or U in RNA)
+                A_G = np.mean(np.logical_and(a == 0, b == 2) + np.logical_and(a == 2, b == 0))
+                P_1[i, j] = P_1[j, i] = A_G
             
-            C_T = np.mean(np.logical_and(a == 1, b == 3) + np.logical_and(a == 3, b == 1))
-            P_2[i, j] = P_2[j, i] = C_T
+                C_T = np.mean(np.logical_and(a == 1, b == 3) + np.logical_and(a == 3, b == 1))
+                P_2[i, j] = P_2[j, i] = C_T
             
     Q = A - P_1 - P_2
     
@@ -366,8 +369,8 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
                 if s2<smin:
                     partition_min = bool_bipartition
                     smin = s2
-    if smin == np.inf:
-        raise Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
+        if smin == np.inf:
+            raise Exception("Error: partition smaller than min_split. Increase num_gaps, or decrese min_split")
     return partition_min
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
@@ -1122,9 +1125,13 @@ class SpectralTreeReconstruction(ReconstructionMethod):
     def splitTaxa(self,node,num_gaps,min_split):
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
-        laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity
+        #laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity
+        laplacian = np.diag(1/np.sum(cur_similarity, axis = 0)) @ cur_similarity
         # t= time.time()
-        e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+        #e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+        e, V = np.linalg.eig(laplacian)
+        V = V[:, np.argsort(e)][:,::-1]
+        
         # tt = time.time() - t
         # t= time.time()
         # _, V = np.linalg.eigh(laplacian)
