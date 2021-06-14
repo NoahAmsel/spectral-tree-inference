@@ -1,54 +1,51 @@
-import sys, os
-
-sys.path.append("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/spectraltree")
-
-import generation
-import reconstruct_tree
+import spectraltree
 import time
-import utils
 import pandas as pd
 import argparse
 
 #@profile
 def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold = None, verbose = False):
     start_time = time.time()
-    observations, taxa_meta = generation.simulate_sequences(m, tree_model=tree, seq_model=generation.HKY(kappa = kappa), mutation_rate=mutation_rate, alphabet="DNA")
+    observations, taxa_meta = spectraltree.simulate_sequences(m, tree_model=tree, seq_model=spectraltree.HKY(kappa = kappa), mutation_rate=mutation_rate, alphabet="DNA")
+    HKY_sim = spectraltree.HKY_similarity_matrix(taxa_meta)
     runtime = time.time() - start_time
     print("Simulation took %s seconds" % runtime)
     
     if method == "RAxML":
-        raxml_HKY = reconstruct_tree.RAxML()
+        raxml_HKY = spectraltree.RAxML()
         start_time = time.time()
         tree_rec = raxml_HKY(observations, taxa_meta, raxml_args="-T 2 --HKY85 -c 1")      
     if method == "SNJ":
-        snj = reconstruct_tree.SpectralNeighborJoining(reconstruct_tree.HKY_similarity_matrix)
+        snj = spectraltree.SpectralNeighborJoining(HKY_sim)
         start_time = time.time()
         tree_rec = snj(observations, taxa_meta)
     if method == "NJ":
-        nj = reconstruct_tree.NeighborJoining(reconstruct_tree.HKY_similarity_matrix)
+        nj = spectraltree.NeighborJoining(HKY_sim)
         start_time = time.time()
         tree_rec = nj(observations, taxa_meta)
     if method == "STDR+NJ":
-        spectral_method = reconstruct_tree.STDR(reconstruct_tree.NeighborJoining, reconstruct_tree.HKY_similarity_matrix)
+        spectral_method = spectraltree.STDR(spectraltree.NeighborJoining, HKY_sim)
         start_time = time.time()
-        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
+        tree_rec = spectral_method(observations, merge_method="global_diff",
                                                             taxa_metadata = taxa_meta,
-                                                            threshhold = threshold, min_split = 5, verbose = verbose)
+                                                            threshold = threshold, min_split = 5, verbose = verbose)
     if method == "STDR+SNJ":
-        spectral_method = reconstruct_tree.STDR(reconstruct_tree.SpectralNeighborJoining, reconstruct_tree.HKY_similarity_matrix)
+        spectral_method = spectraltree.STDR(spectraltree.SpectralNeighborJoining, HKY_sim)
         start_time = time.time()
-        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
+        tree_rec = spectral_method(observations,
+                                   merge_method="global_diff",
                                                             taxa_metadata = taxa_meta, 
-                                                            threshhold = threshold, min_split = 5, verbose = verbose)
+                                                            threshold = threshold, min_split = 5, verbose = verbose)
     if method == "STDR+RAxML":
-        spectral_method = reconstruct_tree.STDR(reconstruct_tree.RAxML, reconstruct_tree.HKY_similarity_matrix)
+        raxml = spectraltree.RAxML(raxml_args = "-T 2 --HKY85 -c 1")
+        spectral_method = spectraltree.STDR(raxml, HKY_sim)
         start_time = time.time()
-        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, reconstruct_tree.HKY_similarity_matrix, 
+        tree_rec = spectral_method(observations, merge_method="global_diff",
                                                             taxa_metadata = taxa_meta, 
-                                                            threshhold = threshold,
-                                                            raxml_args = "-T 2 --HKY85 -c 1", min_split = 5, verbose = verbose)
+                                                            threshold = threshold,
+                                                            min_split = 5, verbose = verbose)
     runtime = time.time() - start_time
-    RF,F1 = reconstruct_tree.compare_trees(tree_rec, tree)
+    RF,F1 = spectraltree.compare_trees(tree_rec, tree)
     print(method)
     if threshold is not None: print(threshold)
     print("--- %s seconds ---" % runtime)
@@ -59,13 +56,13 @@ def run_method(method, tree, m = 300, kappa = 2, mutation_rate=0.05, threshold =
 #@profile
 def get_trees(tree_type, tree_size, tree_path):
     if tree_type == "binary":
-        tree = utils.balanced_binary(tree_size)
+        tree = spectraltree.balanced_binary(tree_size)
     elif tree_type == "catepillar":
-        tree = utils.lopsided_tree(tree_size)
+        tree = spectraltree.lopsided_tree(tree_size)
     elif tree_type == "birthdeath":
-        tree = utils.unrooted_birth_death_tree(tree_size)
+        tree = spectraltree.unrooted_birth_death_tree(tree_size)
     elif tree_type == "kingman":
-        tree = utils.unrooted_pure_kingman_tree(tree_size)
+        tree = spectraltree.unrooted_pure_kingman_tree(tree_size)
     elif tree_type == "path":
         tree = dendropy.Tree.get(path=args.path, schema="newick")
     return tree
@@ -111,4 +108,4 @@ if __name__ == "__main__":
         f1s.append(res[4])
 
     perf_metrics = pd.DataFrame({'method': ms, "m": m, "mut_rate": mutation_rate, 'threshold': ts, 'runtime': rts, 'RF': rfs, "F1": f1s})
-    perf_metrics.to_csv("/home/mw957/project/repos/spectral-tree-inference/experiments/results/birthdeath_rw_m" + str(m) + "_" + str(method) + "_" + str(threshold) + ".csv", index=False)
+    perf_metrics.to_csv("/gpfs/ysm/project/kleinstein/mw957/repos/spectral-tree-inference/experiments/results/birthdeath_global_diff_m" + str(m) + "_" + str(method) + "_" + str(threshold) + ".csv", index=False)
