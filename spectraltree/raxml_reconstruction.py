@@ -5,6 +5,8 @@ import subprocess
 import dendropy
 from dendropy.interop import raxml
 import numpy as np
+import shutil
+import glob
 
 from . import utils
 from .reconstruct_tree import ReconstructionMethod
@@ -13,6 +15,13 @@ from .similarities import JC_distance_matrix
 SPECTRALTREE_DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 SPECTRALTREE_LIB_PATH = os.path.join(SPECTRALTREE_DIR_PATH, "libs")
 SPECTRALTREE_RAXML_PATH = os.path.join(SPECTRALTREE_LIB_PATH, "raxmlHPC_bin")
+
+# def remove_raxml_temp_files():
+#     dir_name = 'C:/Users/aj547/AppData/Local/Temp/'
+#     list_of_dirs = filter( os.path.isdir, glob.glob(dir_name + '*') )
+#     list_of_dirs = sorted( list_of_dirs, key = os.path.getmtime)
+#     rm_dir = list_of_dirs[-1]
+#     shutil.rmtree(rm_dir)
 
 class RAxML(ReconstructionMethod):
     """Reconstructs a binary tree using the RAxML program.
@@ -38,7 +47,7 @@ class RAxML(ReconstructionMethod):
         else:
             raise OSError(f"Cannot identify operating system {platform.system()}.")
 
-        self._rx = raxml.RaxmlRunner(raxml_path=raxml_path)
+        self._rx = raxml.RaxmlRunner(raxml_path=raxml_path, replace=True)
 
     def __call__(self, sequences, taxa_metadata=None):
         if not isinstance(sequences, dendropy.DnaCharacterMatrix):
@@ -52,6 +61,7 @@ class RAxML(ReconstructionMethod):
         tree.is_rooted = False
         if taxa_metadata != None:
             tree.taxon_namespace = taxa_metadata.taxon_namespace
+#        remove_raxml_temp_files()
         return tree
 
     def __repr__(self):
