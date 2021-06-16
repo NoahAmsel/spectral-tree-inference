@@ -396,3 +396,7 @@ def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
         assert uniform_range is not None
         for e in tree.edges():
             e.length = np.random.uniform(*uniform_range)
+
+def check_is_bipartition(tree, partition_mask, meta):
+    return (meta.mask2bipartition(partition_mask).split_bitmask in tree.split_bitmask_edge_map) or \
+            (meta.mask2bipartition(~partition_mask).split_bitmask in tree.split_bitmask_edge_map)
