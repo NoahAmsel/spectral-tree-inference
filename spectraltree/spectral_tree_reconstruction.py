@@ -520,7 +520,7 @@ class STDR(ReconstructionMethod):
         else:
             self.reconstruction_alg = inner_method()
             
-    def __call__(self, sequences, taxa_metadata=None, num_gaps =1,threshold = 100,min_split = 1,merge_method = "angle",verbose = False):
+    def __call__(self, sequences, taxa_metadata=None, num_gaps =1,threshold = 100,min_split = 1,merge_method = "angle",verbose = False, **kargs):
         return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxa_metadata=taxa_metadata, 
              num_gaps = num_gaps,threshold = threshold, merge_method = merge_method, min_split = min_split, verbose = verbose)
     def __repr__(self):
