@@ -400,3 +400,14 @@ def set_edge_lengths(tree, value=None, fun=None, uniform_range=None):
 def check_is_bipartition(tree, partition_mask, meta):
     return (meta.mask2bipartition(partition_mask).split_bitmask in tree.split_bitmask_edge_map) or \
             (meta.mask2bipartition(~partition_mask).split_bitmask in tree.split_bitmask_edge_map)
+
+# def check_is_bipartition_in_subtree(tree, mask_of_subtree, partition_in_subtree_mask, meta):
+#     small_meta = TaxaMetadata(meta.taxon_namespace, meta.mask2taxa(mask_of_subtree), meta.alphabet)
+#     subtree = tree.extract_tree_with_taxa(list(small_meta))
+#     return check_is_bipartition(subtree,partition_in_subtree_mask, small_meta)
+
+def check_is_bipartition_in_subtree(tree, mask_of_subtree, partition_in_tree_mask, meta):
+    partition_in_subtree_mask = partition_in_tree_mask[mask_of_subtree]
+    small_meta = TaxaMetadata(meta.taxon_namespace, meta.mask2taxa(mask_of_subtree), meta.alphabet)
+    subtree = tree.extract_tree_with_taxa(list(small_meta))
+    return check_is_bipartition(subtree,partition_in_subtree_mask, small_meta)

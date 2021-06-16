@@ -512,9 +512,10 @@ def join_trees_with_spectral_root_finding_par(similarity_matrix, T1, T2, merge_m
     return T
 
 class STDR(ReconstructionMethod):
-    def __init__(self, inner_method, similarity_metric):
+    def __init__(self, inner_method, similarity_metric, groudtruth_tree= None):
         self.inner_method = inner_method
         self.similarity_metric = similarity_metric
+        self.groundtruth_tree = groudtruth_tree
         if issubclass(inner_method, DistanceReconstructionMethod):
             self.reconstruction_alg = inner_method(similarity_metric)
         else:
@@ -562,6 +563,8 @@ class STDR(ReconstructionMethod):
                 if verbose: print("partition")
                 if verbose: print("L1 size: ", np.sum(L1))
                 if verbose: print("L2 size: ", np.sum(L2))
+                if verbose and self.groundtruth_tree is not None: 
+                    print("Partition is:", utils.check_is_bipartition_in_subtree(self.groundtruth_tree,np.array(cur_node.bitmap),np.array(L1), self.taxa_metadata))
                 cur_node.setLeft(MyNode(L1))
                 cur_node.setRight(MyNode(L2))
                 cur_node = cur_node.right
