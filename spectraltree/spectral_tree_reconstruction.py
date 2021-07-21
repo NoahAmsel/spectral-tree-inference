@@ -19,6 +19,24 @@ def correlation_distance_matrix(observations):
     corr = np.clip(corr, a_min=1e-16, a_max=None)
     return -np.log(corr)
 
+def partition_taxa_rw(similarity,min_split = 1):
+    m = similarity.shape[0]
+    D = np.diag(np.sum(similarity,axis = 1)**-1)
+    P = D@similarity
+    lmbda, V = np.linalg.eig(P)
+    idx = np.argsort(lmbda)[::-1]
+    lmbda = lmbda[idx]    
+    V = V[:,idx]    
+    v = V[:,1]
+    v_sort = np.sort(v)
+    #gaps = v_sort[1:]-v_sort[0:-1]
+    gaps = v_sort[min_split:(m-min_split+1)]-v_sort[min_split-1:m-min_split]
+    sort_idx = np.argsort(gaps)[::-1]    
+    #threshold = (v_sort[sort_idx[0]]+v_sort[sort_idx[0]+1])/2
+    threshold = (v_sort[sort_idx[0]+min_split-1]+v_sort[sort_idx[0]+min_split])/2
+    bool_bipartition = v<threshold
+    return bool_bipartition
+
 def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
     # partition_taxa2(v,similarity,num_gaps = 1, min_split = 1) partitions the vector vusing the threshold 0
     # or the best threshold (out of num_gaps posibbilitys, picked by the gaps in v) according to 
@@ -105,7 +123,7 @@ def compute_alpha(similarity_matrix,u_12,sigma_12, v_12):
 
 
 #@jit(nopython=True)
-def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12, v_12, O, alpha_s = 0,merge_method= 'angle'):
+def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12, v_12, O, partition_vector,alpha_s = 0,merge_method= 'angle'):
     
     mask1 = np.logical_or(mask1A, mask1B)
     
@@ -214,12 +232,14 @@ def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12,
 
         # 3. Compute the correlation between mask A and boolean vector as score 
         score = len(bool_merge)-max(np.sum(mask1A[mask1] ==bool_merge),np.sum(mask1B[mask1]==bool_merge))
-
+    if merge_method == 'partition':
+        score = len(partition_vector)-max(np.sum(mask1A[mask1] ==partition_vector),np.sum(mask1B[mask1]==partition_vector))    
     else:
         Exception("Illigal method: choose least_square, normalized_least_square, angle or tensor")
     return score
 
-def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_method, taxa_metadata, verbose = False):
+
+def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_method, taxa_metadata, laplacian_type = 'standard',verbose = False):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
     assert T1.taxon_namespace == T2.taxon_namespace == taxa_metadata.taxon_namespace
@@ -259,7 +279,8 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     T2.is_rooted = True
 
     S_12 = similarity_matrix[np.ix_(T1_mask, T2_mask)]
-
+    S_11 = similarity_matrix[np.ix_(T1_mask, T1_mask)]
+    S_22 = similarity_matrix[np.ix_(T2_mask, T2_mask)]
     # TODO: truncated svd?
     # u_12 is matrix
     [u_12,sigma_12,v_12] = np.linalg.svd(S_12)
@@ -269,17 +290,32 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     # find root of half 1
     bipartitions1 = T1.bipartition_edge_map.keys()
 
+### variables for merging methods 'global diff' and 'partition'
+    alpha_s = 0
+    beta_s = 0
+    if merge_method=='global_diff':
+        d_vec,alpha_s = compute_alpha(similarity_matrix[np.ix_(T1_mask, T1_mask)],u_12[:,0],sigma_12[0], v_12[0,:])
+        d_vec,beta_s = compute_alpha(similarity_matrix[np.ix_(T2_mask, T2_mask)],v_12[0,:],sigma_12[0], v_12[0,:])
+    bool_bipartition_1 = True    
+    bool_bipartition_2 = True
+    if merge_method == 'partition':
+        if laplacian_type == 'standard':
+            laplacian = np.diag(np.sum(S_11, axis = 0)) - S_11            
+            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            bool_bipartition_1 = partition_taxa(V[:,1],S_11,0,1)
+            laplacian = np.diag(np.sum(S_22, axis = 0)) - S_22            
+            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            bool_bipartition_2 = partition_taxa(V[:,1],S_22,0,1)
+        if laplacian_type == 'rw':
+            bool_bipartition_1 = partition_taxa_rw(S_11,min_split)
+            bool_bipartition_2 = partition_taxa_rw(S_22,min_split)
+    
     if verbose: print("len(bipartitions1)", len(bipartitions1))
 
     if len(bipartitions1) ==2:
         print("NOOOOO")
-    if len(bipartitions1) > 1:
-        
-        alpha_s = 0
-        beta_s = 0
-        if merge_method=='global_diff':
-            d_vec,alpha_s = compute_alpha(similarity_matrix[np.ix_(T1_mask, T1_mask)],u_12[:,0],sigma_12[0], v_12[0,:])
-            d_vec,beta_s = compute_alpha(similarity_matrix[np.ix_(T2_mask, T2_mask)],v_12[0,:],sigma_12[0], v_12[0,:])
+    if len(bipartitions1) > 1:        
+         ### compute score for every edge     
         min_score = float("inf")
         results = {'sizeA': [], 'sizeB': [], 'score': []}
 
@@ -287,7 +323,7 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
             mask1A = taxa_metadata.bipartition2mask(bp)
             mask1B = (T1.mask ^ mask1A)
 
-            score = compute_merge_score(mask1A, mask1B, T2_mask, similarity_matrix, u_12[:,0],sigma_12[0], v_12[0,:], O1, alpha_s, merge_method)
+            score = compute_merge_score(mask1A, mask1B, T2_mask, similarity_matrix, u_12[:,0],sigma_12[0], v_12[0,:], O1, bool_bipartition_1,alpha_s, merge_method)
             # DELETE ME bool_array = taxa_metadata.bipartition2mask(bp)
             #DELETE ME score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O1,merge_method)
             
@@ -324,7 +360,7 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
             mask2A = taxa_metadata.bipartition2mask(bp)
             mask2B = (T2.mask ^ mask2A)
 
-            score = compute_merge_score(mask2A, mask2B, T1_mask, similarity_matrix, v_12[0,:],sigma_12[0], u_12[:,0], O2,beta_s,merge_method)
+            score = compute_merge_score(mask2A, mask2B, T1_mask, similarity_matrix, v_12[0,:],sigma_12[0], u_12[:,0], O2,bool_bipartition_2,beta_s,merge_method)
             # DELETE ME bool_array = taxa_metadata.bipartition2mask(bp)
             #DELETE ME score = compute_merge_score(bool_array,S_11,S_12,u_12[:,0],sigma_12[0],v_12[0,:],O1,merge_method)
             
@@ -521,20 +557,20 @@ class STDR(ReconstructionMethod):
         else:
             self.reconstruction_alg = inner_method()
             
-    def __call__(self, sequences, taxa_metadata=None, num_gaps =1,threshold = 100,min_split = 1,merge_method = "angle",verbose = False, **kargs):
+    def __call__(self, sequences, taxa_metadata=None, num_gaps =1,threshold = 100,min_split = 1,merge_method = "angle", laplacian_type='standard',verbose = False, **kargs):
         return self.deep_spectral_tree_reconstruction(sequences, self.similarity_metric, taxa_metadata=taxa_metadata, 
-             num_gaps = num_gaps,threshold = threshold, merge_method = merge_method, min_split = min_split, verbose = verbose)
+             num_gaps = num_gaps,threshold = threshold, merge_method = merge_method, laplacian_type = laplacian_type,min_split = min_split, verbose = verbose)
     def __repr__(self):
         return "STDR" + " + " + self.inner_method.__repr__(self.inner_method)
 
     def deep_spectral_tree_reconstruction(self, sequences, similarity_metricx, taxa_metadata = None, num_gaps =1,threshold = 100, 
-        alpha = 1,min_split = 1,merge_method = "angle", verbose = False, **kargs):
+        alpha = 1,min_split = 1,merge_method = "angle", laplacian_type='standard',verbose = False, **kargs):
         self.verbose = verbose
         self.sequences = sequences
         if callable(similarity_metricx):
             self.similarity_matrix = similarity_metricx(sequences)**alpha
         else:
-            self.similarity_matrix =similarity_metricx
+            self.similarity_matrix =similarity_metricx**alpha
         m, m2 = self.similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         self.taxa_metadata = taxa_metadata
@@ -559,7 +595,7 @@ class STDR(ReconstructionMethod):
                 else:
                     cur_node = cur_node.parent
             elif np.sum(cur_node.bitmap) > threshold:
-                L1,L2 = self.splitTaxa(cur_node,num_gaps,min_split)
+                L1,L2 = self.splitTaxa(cur_node,num_gaps,min_split,laplacian_type)
                 if verbose: print("partition")
                 if verbose: print("L1 size: ", np.sum(L1))
                 if verbose: print("L2 size: ", np.sum(L2))
@@ -583,7 +619,7 @@ class STDR(ReconstructionMethod):
         #DELETE MEpartitioning_tree.root.tree.taxon_namespace = self.taxon_namespace
         return partitioning_tree.root.tree
         
-    def splitTaxa(self,node,num_gaps,min_split):
+    def splitTaxa(self,node,num_gaps,min_split,laplacian_type):
         cur_similarity = self.similarity_matrix[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
 
@@ -600,15 +636,13 @@ class STDR(ReconstructionMethod):
         ######################
         ### Our version
         #####################
-        laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity
-        # t= time.time()
-        e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
-        # tt = time.time() - t
-        # t= time.time()
-        # _, V = np.linalg.eigh(laplacian)
-        # tt = time.time() - t
-        bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
-
+        if laplacian_type == 'standard':
+            laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity            
+            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
+        if laplacian_type == 'rw':
+            bool_bipartition = partition_taxa_rw(cur_similarity,min_split)
+       
         """# %%
         if np.minimum(sum(bool_bipartition),sum(~bool_bipartition))<min_split:
             print("????")

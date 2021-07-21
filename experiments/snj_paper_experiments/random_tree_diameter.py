@@ -112,8 +112,7 @@ for i in range(num_itr):
             RF_nj,F1 = spectraltree.compare_trees(tree_nj, reference_tree)    
             df = df.append({'method': 'NJ', 'runtime': runtime_nj, 'RF': RF_nj,
                 'm': m,'diameter':d,'N':N,'delta':delta}, ignore_index=True)
-
-    compare_methods.save_results(df,'20201206_diameter_c',folder)
+    
 
     #T.print_plot(width=50)
 #print(d)
