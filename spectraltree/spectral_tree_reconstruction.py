@@ -239,7 +239,7 @@ def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12,
     return score
 
 
-def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_method, taxa_metadata, laplacian_type = 'standard',verbose = False):
+def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_method, taxa_metadata, laplacian_type = 'standard',similarity_threshold = 0, verbose = False):
     m, m2 = similarity_matrix.shape
     assert m == m2, "Distance matrix must be square"
     assert T1.taxon_namespace == T2.taxon_namespace == taxa_metadata.taxon_namespace
@@ -281,8 +281,10 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     S_12 = similarity_matrix[np.ix_(T1_mask, T2_mask)]
     S_11 = similarity_matrix[np.ix_(T1_mask, T1_mask)]
     S_22 = similarity_matrix[np.ix_(T2_mask, T2_mask)]
+    
     # TODO: truncated svd?
     # u_12 is matrix
+    S_12 = S_12 * (S_12>similarity_threshold)
     [u_12,sigma_12,v_12] = np.linalg.svd(S_12)
     O1 = np.outer(u_12[:,0],u_12[:,0])
     O2 = np.outer(v_12[0,:],v_12[0,:])
@@ -290,7 +292,7 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     # find root of half 1
     bipartitions1 = T1.bipartition_edge_map.keys()
 
-### variables for merging methods 'global diff' and 'partition'
+    ### variables for merging methods 'global diff' and 'partition'
     alpha_s = 0
     beta_s = 0
     if merge_method=='global_diff':
@@ -548,10 +550,11 @@ def join_trees_with_spectral_root_finding_par(similarity_matrix, T1, T2, merge_m
     return T
 
 class STDR(ReconstructionMethod):
-    def __init__(self, inner_method, similarity_metric, groudtruth_tree= None):
+    def __init__(self, inner_method, similarity_metric, groudtruth_tree= None, similarity_threshold = 0):
         self.inner_method = inner_method
         self.similarity_metric = similarity_metric
         self.groundtruth_tree = groudtruth_tree
+        self.similarity_threshold = similarity_threshold
         if issubclass(inner_method, DistanceReconstructionMethod):
             self.reconstruction_alg = inner_method(similarity_metric)
         else:
@@ -570,7 +573,8 @@ class STDR(ReconstructionMethod):
         if callable(similarity_metricx):
             self.similarity_matrix = similarity_metricx(sequences)**alpha
         else:
-            self.similarity_matrix =similarity_metricx**alpha
+            self.similarity_matrix = similarity_metricx**alpha
+        self.similarity_matrix_thresholded = self.similarity_matrix * (self.similarity_matrix>self.similarity_threshold)
         m, m2 = self.similarity_matrix.shape
         assert m == m2, "Distance matrix must be square"
         self.taxa_metadata = taxa_metadata
@@ -620,7 +624,10 @@ class STDR(ReconstructionMethod):
         return partitioning_tree.root.tree
         
     def splitTaxa(self,node,num_gaps,min_split,laplacian_type):
-        cur_similarity = self.similarity_matrix[node.bitmap,:]
+        if self.similarity_threshold == 0:
+            cur_similarity = self.similarity_matrix[node.bitmap,:]
+        else:
+            cur_similarity = self.similarity_matrix_thresholded[node.bitmap,:]
         cur_similarity = cur_similarity[:,node.bitmap]
 
         # #####################
@@ -665,7 +672,11 @@ class STDR(ReconstructionMethod):
 
         # cur_similarity = self.similarity_matrix[node.bitmap,:]
         # cur_similarity = cur_similarity[:,node.bitmap]
-        return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
+    
+        if self.similarity_threshold == 0:
+            return join_trees_with_spectral_root_finding_ls(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
+        else:
+            return join_trees_with_spectral_root_finding_ls(self.similarity_matrix_thresholded, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
         #return join_trees_with_spectral_root_finding_par(self.similarity_matrix, node.left.tree, node.right.tree, merge_method, self.taxa_metadata, verbose=self.verbose)
     
     def reconstruct_alg_wrapper(self, node, **kargs):

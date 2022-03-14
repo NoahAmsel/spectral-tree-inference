@@ -7,12 +7,12 @@ import spectraltree
 
 class TestSTDR(unittest.TestCase):
     def setUp(self):
-        self.N = 500
+        self.N = 1500
         self.threshold = 16
-        self.num_taxa = 64
+        self.num_taxa = 64 # Number of leafs of the tree
         # self.reference_tree = spectraltree.unrooted_birth_death_tree(self.num_taxa, birth_rate=1)
         self.reference_tree = spectraltree.lopsided_tree(self.num_taxa)
-        #self.reference_tree = spectraltree.balanced_binary(64)
+        #self.reference_tree = spectraltree.balanced_binary(self.num_taxa)
         # self.reference_tree = spectraltree.unrooted_pure_kingman_tree(self.num_taxa)
 
     def test_jc(self):
@@ -34,7 +34,7 @@ class TestSTDR(unittest.TestCase):
             threshold = self.threshold,
             min_split = 5,
             merge_method = "least_square", 
-            verbose=True)
+            verbose=False)
 
         self.assertTrue(spectraltree.topos_equal(self.reference_tree, tree_rec))  
 
@@ -56,7 +56,7 @@ class TestSTDR(unittest.TestCase):
                 observations, taxa_meta = spectraltree.simulate_sequences(seq_len=self.N, tree_model=self.reference_tree , seq_model=jc, mutation_rate=mutation_rate, rng=np.random.default_rng(789))
                 spectral_method = spectraltree.STDR(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix,groudtruth_tree=self.reference_tree)   
                 tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, spectraltree.JC_similarity_matrix, 
-                    taxa_metadata = taxa_meta, threshold = self.threshold,merge_method = merge_method, verbose=True)
+                    taxa_metadata = taxa_meta, threshold = self.threshold,merge_method = merge_method, verbose=False)
                 RF_i,F1_i = spectraltree.compare_trees(tree_rec, self.reference_tree )
                 RF[merge_method].append(RF_i)
                 F1[merge_method].append(F1_i)
@@ -75,11 +75,11 @@ class TestSTDR(unittest.TestCase):
 
         spectral_method = spectraltree.STDR(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix, groudtruth_tree=self.reference_tree)   
 
-        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, spectraltree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 4,threshhold = 35, verbose=True)
+        tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, spectraltree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 4,threshhold = 35, verbose=False)
         RF, _ = spectraltree.compare_trees(tree_rec, self.reference_tree)
         self.assertEqual(RF, 0)
 
-        tree_rec_b = spectral_method.deep_spectral_tree_reconstruction(observations, spectraltree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 1,threshhold = 35,  verbose=True)
+        tree_rec_b = spectral_method.deep_spectral_tree_reconstruction(observations, spectraltree.JC_similarity_matrix, taxa_metadata = taxa_meta, num_gaps = 1,threshhold = 35,  verbose=False)
         RF_b, _ = spectraltree.compare_trees(tree_rec_b, self.reference_tree)
         self.assertEqual(RF_b, 0)
 

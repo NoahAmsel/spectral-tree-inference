@@ -168,6 +168,18 @@ def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12,
     S_11_AB = np.reshape(S_11_AB,(-1,1))        
     O_AB = np.reshape(O_AB,(-1,1))
 
+    if merge_method=='closest_triplet':
+        n=100
+        idx_G_A = np.where(mask1A)[0]
+        idx_G_B = np.where(mask1A)[0]
+        
+        # select n pairs of idx_A and idx_B
+        P_A_list = np.random.choice(idx_G_A,n)
+        P_B_list = np.random.choice(idx_G_B,n)
+
+        d_vec = [(sigma_12**2)*u_12[p_A]*u_12[p_B]/similarity_matrix[p_A,p_B] for p_A, p_B in zip(P_A_list, P_B_list)]
+        score = -1*np.min(d_vec)            
+
     if merge_method=='least_square':
         # merge_method 0 is least square alpha        
         alpha = np.linalg.lstsq(O_AB,S_11_AB,rcond=None)

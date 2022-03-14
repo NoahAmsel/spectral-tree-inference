@@ -63,12 +63,23 @@ def GriffingPartitioning(S):
     return v_g[:,-1], v_s[:,1]
 
 
-def check_is_bipartition(tree, bool_partition):
+# def check_is_bipartition(tree, bool_partition):
+#     bipartitions = [str(x)[::-1] for x in tree.encode_bipartitions()]
+#     partition_1 = "".join(list(bool_partition.astype('int').astype('str')))
+#     partition_2 = "".join(list((1 - bool_partition).astype('int').astype('str')))
+#     is_bipartition = (partition_1 in bipartitions) or (partition_2 in bipartitions)
+#     return is_bipartition
+
+def check_is_bipartition(tree, partition_mask, meta):
+    return (meta.mask2bipartition(partition_mask).split_bitmask in tree.split_bitmask_edge_map) or \
+            (meta.mask2bipartition(~partition_mask).split_bitmask in tree.split_bitmask_edge_map)
+
     bipartitions = [str(x)[::-1] for x in tree.encode_bipartitions()]
-    partition_1 = "".join(list(bool_partition.astype('int').astype('str')))
-    partition_2 = "".join(list((1 - bool_partition).astype('int').astype('str')))
+    partition_1 = "".join(list(partition_mask.astype('int').astype('str')))
+    partition_2 = "".join(list((1 - partition_mask).astype('int').astype('str')))
     is_bipartition = (partition_1 in bipartitions) or (partition_2 in bipartitions)
     return is_bipartition
+
 
 # def check_is_bipartition(tree, parent_split,bool_partition):
 #     if sum(bool_partition) == 0:
@@ -120,45 +131,74 @@ def check_is_bipartition(tree, bool_partition):
 # plt.plot([0,num_taxa],[0 ,0],'--')
 # plt.show()
 
+
 #STARTING LOOP
 
 
-df = pd.DataFrame(columns=['method', 'is_correct','m','diameter','N','delta'])
-num_itr = 100
+df = pd.DataFrame(columns=['Method', 'is_correct','m','diameter','N','delta'])
+num_itr = 200
 d = np.zeros(num_itr)
-m = 10
-delta_vec = [0.94]#[0.88,0.9,0.92,0.94]
-N_vec = [1000]#[100,200,300,400]
+m = 128
+delta_vec = [0.84,0.86, 0.88,0.9, 0.92] #[0.9]
+delta_vec = [0.9]
+N_vec = [100]#[75,100,150,200]
+N_vec = [75,100,150,200]
 jc = spectraltree.Jukes_Cantor() 
+
+#################################
+### Trying full recovery
+##################################
+# delta = delta_vec[-1]
+
+# reference_tree = spectraltree.unrooted_birth_death_tree(m,birth_rate=1)
+# mutation_rate = jc.p2t(delta)
+# observations, taxa_meta = spectraltree.simulate_sequences(max(N_vec), tree_model=reference_tree, 
+#                                                 seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
+# spectral_method = spectraltree.STDR(spectraltree.RAxML,spectraltree.JC_similarity_matrix)   
+#spectral_method = spectraltree.STDR(spectraltree.NeighborJoining,spectraltree.JC_similarity_matrix)   
+
+# tree_rec = spectral_method.deep_spectral_tree_reconstruction(observations, 
+#     spectraltree.JC_similarity_matrix,
+#     taxa_metadata= taxa_meta, 
+#     threshold = 32,
+#     min_split = 5,
+#     merge_method = "least_square", 
+#     verbose=False)
+# RF, _ = spectraltree.compare_trees(tree_rec, reference_tree)
+# print ("Trying to recover the whole tree. RF = ",RF)
+
+
+
 
 for i in range(num_itr):
     print(i)
     
     #reference_tree = spectraltree.balanced_binary(m)
-    reference_tree = spectraltree.unrooted_birth_death_tree(m,birth_rate=1)
-    for x in reference_tree.preorder_edge_iter():
-        x.length = 1
-    #reference_tree = spectraltree.unrooted_pure_kingman_tree(m)
+    #reference_tree = spectraltree.lopsided_tree(m)
+    #reference_tree = spectraltree.unrooted_birth_death_tree(m,birth_rate=1)
+    # for x in reference_tree.preorder_edge_iter():
+    #     x.length = 1
+    reference_tree = spectraltree.unrooted_pure_kingman_tree(m)
     d = 1
     for delta in delta_vec:        
         mutation_rate = jc.p2t(delta)
         observations, taxa_meta = spectraltree.simulate_sequences(max(N_vec), tree_model=reference_tree, 
             seq_model=jc, mutation_rate=mutation_rate, alphabet="DNA")
         
-        observations = observations[taxa_meta._taxa_list.argsort(),:]
-        # taxa_metadata = taxa_meta # should be removed if generate_random_tree_w_adj is used
-        # taxa_perm = [taxa_meta[taxa_metadata._taxa_list[i]] for i in range(len(taxa_metadata._taxa_list))]
+        #observations = observations[taxa_meta._taxa_list.argsort(),:]
+        # taxa_metadata = taxa_meta # should be removed if generate_random_tree_w_adj is not used
+        # taxa_perm = [taxa_meta[taxa_metadata._taxa_list[i]] for i in range(len(taxa_metadata._taxa_list))]  # should be removed if generate_random_tree_w_adj is not used
         for N in N_vec:
             S = spectraltree.JC_similarity_matrix(observations[:,:N])
             v_g, v_s = GriffingPartitioning(S)
             # v_s = v_s[taxa_perm]
             # v_g = v_g[taxa_perm]
-            print("Griffing correct: ", check_is_bipartition(reference_tree,v_g>0) )
-            print("Spectral correct: ", check_is_bipartition(reference_tree,v_s>0) )
+            print("Griffing correct: ", check_is_bipartition(reference_tree,v_g>0, taxa_meta) )
+            print("Spectral correct: ", check_is_bipartition(reference_tree,v_s>0, taxa_meta) )
             
-            df = df.append({'method': 'Griffing', 'is_correct': check_is_bipartition(reference_tree,v_g>0),
+            df = df.append({'Method': 'Distance based', 'is_correct': check_is_bipartition(reference_tree,v_g>0, taxa_meta),
                 'm': m,'diameter':d,'N':N,'delta':delta}, ignore_index=True)
-            df = df.append({'method': 'Spectral', 'is_correct': check_is_bipartition(reference_tree,v_s>0),
+            df = df.append({'Method': 'Similarity based', 'is_correct': check_is_bipartition(reference_tree,v_s>0, taxa_meta),
                 'm': m,'diameter':d,'N':N,'delta':delta}, ignore_index=True)
 
     #compare_methods.save_results(df,'20201206_diameter_c',folder)
@@ -166,32 +206,51 @@ for i in range(num_itr):
 
 
 print(df)
-print("Griffing correct:", sum(df[(df['method'] == 'Griffing')]['is_correct']))
-print("Spectral correct:", sum(df[(df['method'] == 'Spectral')]['is_correct']))
+print("Griffing correct:", sum(df[(df['Method'] == 'Distance based')]['is_correct']))
+print("Spectral correct:", sum(df[(df['Method'] == 'Similarity based')]['is_correct']))
 
 #Diameter plot
 # max_daim = max(df['diameter'])
-# total_in_each_diam = [len(df[(df['method'] == 'Griffing') & (df['diameter'] ==  i)]) for i in range(1,max_daim)]
-# g_t_d = [sum(df[(df['method'] == 'Griffing') & (df['diameter'] ==  i)]['is_correct']) for i in range(1,max_daim)]
-# s_t_d = [sum(df[(df['method'] == 'Spectral') & (df['diameter'] ==  i)]['is_correct']) for i in range(1,max_daim)]
+# total_in_each_diam = [len(df[(df['Method'] == 'Distance based') & (df['diameter'] ==  i)]) for i in range(1,max_daim)]
+# g_t_d = [sum(df[(df['Method'] == 'Distance based') & (df['diameter'] ==  i)]['is_correct']) for i in range(1,max_daim)]
+# s_t_d = [sum(df[(df['Method'] == 'Similarity based') & (df['diameter'] ==  i)]['is_correct']) for i in range(1,max_daim)]
 # g_t_d_normlized = [0 if total_in_each_diam[i]==0 else g_t_d[i]/total_in_each_diam[i] for i in range(len(g_t_d))]
 # s_t_d_normlized = [0 if total_in_each_diam[i]==0 else s_t_d[i]/total_in_each_diam[i] for i in range(len(s_t_d))]
 # plt.plot(g_t_d_normlized)
 # plt.plot(s_t_d_normlized)
-# plt.legend(['Griffing','Spectral'])
+# plt.legend(['Distance based','Similarity based'])
 # #plt.plot(total_in_each_diam,'--')
 # plt.show()
 
 #Delta plot
-g_t_d = [sum(df[(df['method'] == 'Griffing') & (df['delta'] ==  delta_vec[i])]['is_correct']) for i in range(len(delta_vec))]
-s_t_d = [sum(df[(df['method'] == 'Spectral') & (df['delta'] ==  delta_vec[i])]['is_correct']) for i in range(len(delta_vec))]
-plt.plot(delta_vec, g_t_d)
-plt.plot(delta_vec, s_t_d)
-plt.title('Delta plot')
-plt.legend(['Griffing','Spectral'])
+sns.catplot(data=df, x='delta', y='is_correct', kind="point", hue='Method', 
+       markers=["o", "s"], linestyles=["-", "--"],legend=True,legend_out=False)    
+plt.ylabel( "Correct ratio")
+plt.xlabel('$\delta$')
+plt.show()
+# g_t_d = [sum(df[(df['Method'] == 'Distance based') & (df['delta'] ==  delta_vec[i])]['is_correct']) for i in range(len(delta_vec))]
+# s_t_d = [sum(df[(df['Method'] == 'Similarity based') & (df['delta'] ==  delta_vec[i])]['is_correct']) for i in range(len(delta_vec))]
+# plt.plot(delta_vec, g_t_d)
+# plt.plot(delta_vec, s_t_d)
+# plt.title('Delta plot')
+# plt.legend(['Distance based','Similarity based'])
+#plt.plot(total_in_each_diam,'--')
+# plt.show()
+
+
+#N plot
+
+sns.catplot(data=df, x='N', y='is_correct', kind="point", hue='Method', 
+       markers=["o", "s"], linestyles=["-", "--"],legend=True,legend_out=False)    
+plt.ylabel( "Correct ratio")
+# g_t_d = [sum(df[(df['Method'] == 'Distance based') & (df['N'] ==  N_vec[i])]['is_correct']) for i in range(len(N_vec))]
+# s_t_d = [sum(df[(df['Method'] == 'Similarity based') & (df['N'] ==  N_vec[i])]['is_correct']) for i in range(len(N_vec))]
+# plt.plot(N_vec, g_t_d)
+# plt.plot(N_vec, s_t_d)
+# plt.title('N plot')
+# plt.legend(['Distance based','Similarity based'])
 #plt.plot(total_in_each_diam,'--')
 plt.show()
-
 
 
 
