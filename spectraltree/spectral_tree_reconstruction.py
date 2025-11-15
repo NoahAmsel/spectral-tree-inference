@@ -219,7 +219,7 @@ def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12,
         
         # 1. compute three eigenvectors of Laplacian matrix
         laplacian = np.diag(np.sum(similarity_matrix, axis = 0)) - similarity_matrix
-        e,V = scipy.linalg.eigh(laplacian, eigvals = (0,2))
+        e,V = scipy.linalg.eigh(laplacian, subset_by_index=(0,2))
                 
         # 2. Find largest gap in third eigenvector and compute boolearn vector  
         v_sort = np.sort(V[:,2])
@@ -303,10 +303,10 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     if merge_method == 'partition':
         if laplacian_type == 'standard':
             laplacian = np.diag(np.sum(S_11, axis = 0)) - S_11            
-            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            e,V = scipy.linalg.eigh(laplacian, subset_by_index=(0,1))
             bool_bipartition_1 = partition_taxa(V[:,1],S_11,0,1)
             laplacian = np.diag(np.sum(S_22, axis = 0)) - S_22            
-            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            e,V = scipy.linalg.eigh(laplacian, subset_by_index=(0,1))
             bool_bipartition_2 = partition_taxa(V[:,1],S_22,0,1)
         if laplacian_type == 'rw':
             bool_bipartition_1 = partition_taxa_rw(S_11,min_split)
@@ -645,7 +645,7 @@ class STDR(ReconstructionMethod):
         #####################
         if laplacian_type == 'standard':
             laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity            
-            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            e,V = scipy.linalg.eigh(laplacian, subset_by_index=(0,1))
             bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
         if laplacian_type == 'rw':
             bool_bipartition = partition_taxa_rw(cur_similarity,min_split)

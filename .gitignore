@@ -1,5 +1,6 @@
 # Compiled python modules.
 *.pyc
+__pycache__/
 
 # Setuptools distribution folder.
 /dist/
@@ -21,3 +22,26 @@ tests/RAxML_info.dendropy_raxml
 tests/RAxML_log.dendropy_raxml
 tests/RAxML_parsimonyTree.dendropy_raxml
 tests/RAxML_result.dendropy_raxml
+
+# Sub-sampled STDR experimental results and generated data
+sub_sampled_fielder_vec/results/
+sub_sampled_fielder_vec/**/*.png
+sub_sampled_fielder_vec/.claude/
+
+# Personal IDE configuration
+WARP.md
+.claude/
+
+# Virtual environments
+venv/
+env/
+
+# Test and demo files (local development)
+*.ipynb
+test*.py
+comparing.py
+requirements.txt
+eigenvalue*.png
+eigenvector*.png
+second_vs_third_eigenvector.png
+spectraltree/my_similarity.py
