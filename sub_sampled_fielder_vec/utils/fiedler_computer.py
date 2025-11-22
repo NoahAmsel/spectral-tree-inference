@@ -100,10 +100,10 @@ class FiedlerVectorComputer:
             try:
                 # First attempt: Use sigma=0 to find eigenvalues near zero (more stable for Laplacian)
                 # Increase maxiter and adjust tolerance for better convergence
-                eigvals, eigvecs = eigsh(laplacian, k=2, sigma=0, which='LM', 
+                eigvals, eigvecs = eigsh(laplacian, k=2,  sigma=1e-10, ncv=50, which='LM', 
                                         maxiter=laplacian.shape[0] * 10, tol=1e-6)
             except Exception as e:
-                log_warning('fiedler', f"Sparse eigsh with sigma=0 failed: {str(e)}, trying without sigma...")
+                log_warning('fiedler', f"Sparse eigsh with sigma=1e-10 failed: {str(e)}, trying without sigma...")
                 try:
                     # Second attempt: Standard approach with increased iterations
                     eigvals, eigvecs = eigsh(laplacian, k=2, which='SM', 

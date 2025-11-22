@@ -4,42 +4,73 @@ This directory contains a comprehensive 3-phase analysis framework for understan
 
 ## Overview
 
-The analysis investigates why sign agreement jumps sharply from ~50% (failure) to 100% (success) as sampling probability increases, and why **"bigger matrices need less sampling"**.
+The analysis investigates why partition agreement jumps sharply from ~50% (failure) to 100% (success) as sampling probability increases, and why **"bigger matrices need less sampling"**.
+
+**Note**: The analysis uses **partition agreement** as the primary metric, which measures whether the actual STDR partitioning algorithm produces the same tree splits, not just whether vector elements have matching signs.
 
 ## Directory Structure
 
 ```
 analysis/
-├── README.md                           # This file
-├── utils.py                            # Shared utilities
-├── phase1_diagnostic_metrics.py        # Phase 1: Identify key predictive metrics
-├── phase2_scaling_laws.py              # Phase 2: Quantify scaling relationships
-├── phase3_theoretical_connection.py    # Phase 3: Theoretical interpretation
-└── run_all_phases.py                   # Main runner script
+├── README.md                              # This file
+├── run_all.py                             # Main entry point - runs all analyses
+│
+├── shared/                                # Shared utilities (all analyses)
+│   ├── __init__.py
+│   ├── data_loading.py                    # Load results_grid.json
+│   ├── transition_detection.py            # Find transition points
+│   ├── plotting_helpers.py                # Reusable plotting functions
+│   └── report_writing.py                  # Markdown report generation
+│
+├── metrics_analysis/                      # Phase 1: What predicts transition?
+│   ├── __init__.py
+│   ├── run.py                             # Orchestrator for this analysis
+│   ├── spectral_gap.py                    # Spectral gap ratio analysis
+│   ├── rank_recovery.py                   # Rank preservation analysis
+│   ├── frobenius_error.py                 # Frobenius error analysis
+│   ├── quality_gap.py                     # Partition M vs S gap
+│   ├── transition_table.py                # Create transition threshold table
+│   └── write_report.py                    # Generate summary report
+│
+├── scaling_laws/                          # Phase 2: How do requirements scale?
+│   ├── __init__.py
+│   ├── run.py                             # Orchestrator for this analysis
+│   ├── power_law_fitting.py               # Fit p_crit ~ L^b
+│   ├── sample_requirements.py             # Effective sample analysis
+│   ├── phase_diagrams.py                  # Create heatmap visualizations
+│   └── write_report.py                    # Generate summary report
+│
+└── theoretical_interpretation/            # Phase 3: Why does it work?
+    ├── __init__.py
+    ├── run.py                             # Orchestrator for this analysis
+    ├── eigenvalue_statistics.py           # Spectral gap evolution
+    ├── coherence_analysis.py              # Eigenvector coherence
+    ├── theoretical_bounds.py              # Davis-Kahan bounds
+    └── write_report.py                    # Generate summary report
+```
 
+**Output structure**:
+```
 ../results/combined_grid_search_results/
-├── results_grid.json                   # Input data
-└── analysis_outputs/                   # Generated outputs
-    ├── phase1/                         # Phase 1 outputs
+├── results_grid.json                      # Input data
+└── analysis_results/                      # Generated outputs
+    ├── metrics_analysis/
     │   ├── spectral_gap_ratio_vs_p.png
     │   ├── rank_ratio_L_S_vs_p.png
     │   ├── frobenius_error_vs_p.png
-    │   ├── pre_vs_post_transition_n8192_L10000.png
+    │   ├── partition_M_vs_S_gap.png
     │   ├── transition_thresholds.csv
-    │   └── phase1_summary.md           # Phase 1 report
-    ├── phase2/                         # Phase 2 outputs
-    │   ├── transition_p_scaling.png
-    │   ├── effective_samples_vs_size.png
-    │   ├── phase_diagram.png
-    │   ├── scaling_coefficients.json
-    │   └── phase2_summary.md           # Phase 2 report
-    └── phase3/                         # Phase 3 outputs
-        ├── eigenvalue_statistics.png
-        ├── information_bottleneck.png
-        ├── coherence_analysis.png
-        ├── theoretical_bounds_comparison.png
-        ├── theoretical_bounds.csv
-        └── phase3_summary.md           # Phase 3 report
+    │   └── metrics_analysis_summary.md
+    ├── scaling_laws/
+    │   ├── power_law_fit.png
+    │   ├── effective_samples_vs_p.png
+    │   ├── phase_diagram_heatmap.png
+    │   └── scaling_laws_summary.md
+    └── theoretical_interpretation/
+        ├── eigenvalue_gaps_vs_p.png
+        ├── coherence_vs_p.png
+        ├── davis_kahan_bound.png
+        └── theoretical_interpretation_summary.md
 ```
 
 ## Running the Analysis
@@ -51,94 +82,208 @@ analysis/
 pip install numpy pandas matplotlib seaborn scipy
 ```
 
-### Run All Phases
+### Run All Analyses
 
 ```bash
 cd analysis
-python run_all_phases.py
+python run_all.py
 ```
 
-### Run Individual Phases
+This runs all three phases in sequence and generates comprehensive reports.
+
+### Run Individual Analyses
 
 ```bash
-# Phase 1 only
-python run_all_phases.py --phase 1
+# Metrics analysis only
+python -m metrics_analysis.run
 
-# Phase 2 only
-python run_all_phases.py --phase 2
+# Scaling laws only
+python -m scaling_laws.run
 
-# Phase 3 only
-python run_all_phases.py --phase 3
+# Theoretical interpretation only
+python -m theoretical_interpretation.run
 ```
 
-Or run scripts directly:
+## Analysis Descriptions
 
-```bash
-python phase1_diagnostic_metrics.py
-python phase2_scaling_laws.py
-python phase3_theoretical_connection.py
-```
+### Phase 1: Metrics Analysis
 
-## Phase Descriptions
+**Question**: What predicts the transition?
 
-### Phase 1: Diagnostic Metrics Analysis
+**Modules**:
+- `spectral_gap.py` - Analyze spectral gap ratio (primary indicator)
+- `rank_recovery.py` - Analyze when full rank is achieved
+- `frobenius_error.py` - Matrix difference evolution
+- `quality_gap.py` - Quality degradation (M vs S_avg)
+- `transition_table.py` - Comprehensive transition table
 
-**Goal**: Identify which linear algebra metrics best predict the phase transition.
+**Key Finding**: **Spectral gap ratio** (SpGap_LS / SpGap_LM) drops from >100 to <10 at transition.
 
-**Key Questions**:
-- What happens to spectral gap ratio at transition?
-- When does rank become full?
-- What are the critical threshold values?
+### Phase 2: Scaling Laws
 
-**Main Findings**:
-- **Spectral gap ratio** (SpGap_LS / SpGap_LM) is the primary indicator
-- Transition occurs when ratio drops from >100 to <10
-- Full rank is achieved at transition
+**Question**: How do sample requirements scale with problem size?
 
-**Outputs**:
-- Faceted plots of metrics vs sampling probability
-- Transition threshold table
-- Detailed analysis of n=8192, L=10000 case
+**Modules**:
+- `power_law_fitting.py` - Fit p_crit ~ L^b relationship
+- `sample_requirements.py` - Effective samples needed
+- `phase_diagrams.py` - Visualize failure/success regions
 
-### Phase 2: Scaling Laws Analysis
-
-**Goal**: Quantify how transition sampling probability scales with matrix size.
-
-**Key Questions**:
-- How does p_transition scale with (n × L)?
-- What is the power law exponent?
-- How do absolute sample requirements scale?
-
-**Main Findings**:
-- Power law: `p_transition ∝ (n × L)^b` where b ≈ -0.5 to -0.8
-- Larger matrices are more sample-efficient per entry
-- Absolute samples still increase sub-quadratically
-
-**Outputs**:
-- Scaling law fits with R² values
-- Phase diagrams showing success/failure regions
-- Effective sample requirements analysis
+**Key Finding**: Power law p_crit ∝ L^b with b < 0 means larger problems are **more sample-efficient**.
 
 ### Phase 3: Theoretical Interpretation
 
-**Goal**: Connect empirical findings to theoretical frameworks.
+**Question**: Why does the phase transition occur?
 
-**Key Questions**:
-- Does failure regime show random matrix behavior?
-- What is the information-theoretic threshold?
-- Why does coherence increase at transition?
+**Modules**:
+- `eigenvalue_statistics.py` - Spectral gap preservation
+- `coherence_analysis.py` - Eigenvector incoherence
+- `theoretical_bounds.py` - Davis-Kahan theorem validation
 
-**Main Findings**:
-- Undersampled matrices behave like random matrices
-- Transition requires ~50-100 samples per tree parameter
-- Results align with spectral sparsification theory
-- Phase transition explained by perturbation theory (Davis-Kahan)
+**Key Finding**: Transition occurs when Davis-Kahan bound ||E||_F / δ ≈ O(1).
 
-**Outputs**:
-- Eigenvalue behavior across transition
-- Information-theoretic analysis
-- Comparison to theoretical bounds
-- Comprehensive theoretical interpretation
+## Code Organization Principles
+
+Each analysis module follows a **simple, focused pattern**:
+
+```python
+def compute_stats(df: pd.DataFrame) -> dict:
+    """Pure computation. Returns statistics dict."""
+    # Compute numerical results
+    return {'stat1': value1, 'stat2': value2}
+
+def create_plot(df: pd.DataFrame, output_path: Path):
+    """Pure plotting. Saves one focused plot."""
+    # Create and save visualization
+    pass
+
+def analyze(df: pd.DataFrame, output_dir: Path) -> dict:
+    """Orchestrate: compute + plot + print. Returns stats."""
+    stats = compute_stats(df)
+    create_plot(df, output_dir / "plot.png")
+    print(f"  Result: {stats['stat1']}")
+    return stats
+```
+
+**Benefits**:
+- Each file is 50-100 lines
+- Clear single responsibility
+- Easy to understand and modify
+- Simple testing and debugging
+
+## API Reference
+
+### Shared Utilities
+
+```python
+from shared import load_results, get_output_dir, find_transition_point, find_all_transitions
+
+# Load data
+df = load_results()  # Loads results_grid.json with computed columns
+
+# Get output directory
+output_dir = get_output_dir("metrics_analysis")
+
+# Find transitions
+transition = find_transition_point(df, num_taxa=8192, sequence_length=10000)
+all_transitions = find_all_transitions(df, threshold=90.0)
+```
+
+### Plotting Helpers
+
+```python
+from shared import plot_metric_faceted, plot_gap_vs_p
+
+# Create faceted plot with partition agreement overlay
+plot_metric_faceted(
+    df,
+    metric='spectral_gap_ratio',
+    ylabel='Spectral Gap Ratio',
+    title='Spectral Gap Ratio vs p',
+    output_path=output_dir / "plot.png"
+)
+
+# Plot quality gap
+plot_gap_vs_p(df, output_dir / "gap.png")
+```
+
+### Report Writing
+
+```python
+from shared import save_markdown_report
+
+report = """# My Analysis
+## Results
+...
+"""
+save_markdown_report(report, output_dir / "summary.md")
+```
+
+## Key Metrics
+
+**Performance Metrics**:
+- `partition_agreement_M`: Agreement (%) when both use M (ideal)
+- `partition_agreement_S`: Agreement (%) using M vs S_avg (realistic)
+- `mean`: Sign agreement (%) - legacy metric
+
+**Spectral Metrics**:
+- `spectral_gap_ratio`: SpGap_LS / SpGap_LM (primary indicator)
+- `rank_ratio_L_S`: Rank(L_S) / n (full rank = 1.0)
+- `mean_frobenius_error`: ||M - S||_F
+- `mean_coherence_L_S`: Eigenvector coherence
+- `effective_samples`: p × n²
+
+**Matrix Types**:
+- `M`: Original similarity matrix
+- `S`: Sampled version (averaged over bootstrap samples)
+- `L_M`: Laplacian of M
+- `L_S`: Laplacian of S (used for reconstruction)
+
+## Extending the Analysis
+
+### Adding a New Module
+
+1. Create new file in appropriate directory:
+```python
+# metrics_analysis/my_new_analysis.py
+def compute_stats(df):
+    return {'my_stat': 42}
+
+def create_plot(df, output_path):
+    # Create visualization
+    pass
+
+def analyze(df, output_dir):
+    stats = compute_stats(df)
+    create_plot(df, output_dir / "my_plot.png")
+    return stats
+```
+
+2. Import in `run.py`:
+```python
+from . import my_new_analysis
+
+# In main():
+my_stats = my_new_analysis.analyze(df, output_dir)
+```
+
+3. Use stats in report:
+```python
+write_report.generate_report(..., my_stats, output_dir)
+```
+
+### Adding a New Computed Metric
+
+Edit `shared/data_loading.py`:
+
+```python
+def load_results(...):
+    # ... existing code ...
+
+    # Add your metric
+    df['my_metric'] = df['col1'] / df['col2']
+
+    return df
+```
 
 ## Key Results Summary
 
@@ -147,7 +292,7 @@ python phase3_theoretical_connection.py
 1. **Failure regime** (p < p_critical):
    - SpGap_LS >> SpGap_LM (ratio > 100)
    - Sampling noise dominates signal
-   - Sign agreement ≈ 50% (random)
+   - Partition agreement ≈ 50% (random)
 
 2. **Transition** (p ≈ p_critical):
    - SpGap_LS ≈ SpGap_LM (ratio < 10)
@@ -161,136 +306,19 @@ python phase3_theoretical_connection.py
 ### Scaling Law
 
 ```
-p_critical ≈ a × (n × L)^b
+p_critical ≈ a × L^b
 ```
 
-where:
-- `a` ≈ 10^-2 to 10^-3
-- `b` ≈ -0.5 to -0.8
-
-**Practical interpretation**: As matrix size doubles, required sampling rate drops by ~40-60%.
+where b < 0, meaning larger matrices need **less sampling probability** to achieve the same performance.
 
 ### Theoretical Foundation
 
-The transition is explained by **spectral perturbation theory**:
-
+Davis-Kahan theorem:
 ```
-Eigenvector error ≤ Perturbation magnitude / Spectral gap
-```
-
-When sampling provides:
-```
-p > n² / (spectral gap)²
+||v - v_perturbed|| ≤ ||E||_F / δ
 ```
 
-the Fiedler vector is preserved.
-
-## Data Format
-
-### Input: `results_grid.json`
-
-Structure:
-```json
-{
-  "columns": ["num_taxa", "sequence_length", "p", "mean", ...],
-  "rows": [
-    {
-      "num_taxa": 1024,
-      "sequence_length": 500,
-      "p": 0.0001,
-      "mean": 29.01,  // Sign agreement (%)
-      "mean_spectral_gap_L_S": 105.2,
-      "mean_spectral_gap_L_M": 0.0007,
-      ...
-    },
-    ...
-  ]
-}
-```
-
-### Key Metrics
-
-**Genetic Parameters**:
-- `num_taxa` (n): Number of species
-- `sequence_length` (L): DNA sequence length
-- `p`: Sampling probability (mutation rate analog)
-
-**Performance Metric**:
-- `mean`: Sign agreement (%) - reconstruction accuracy
-
-**Linear Algebra Metrics** (all have mean/median/std variants):
-- `spectral_gap_M/S`: Eigenvalue gap (λ₂ - λ₁)
-- `empirical_rank_M/S`: Effective rank
-- `frobenius_error`: ||M - S||_F
-- `coherence_M/S`: Max eigenvector coherence
-- `min_separation_M/S`: Minimum eigenvalue spacing
-
-**Matrix Types**:
-- `M`: Original similarity matrix
-- `S`: Sampled version (with probability p)
-- `L_M`: Laplacian of M
-- `L_S`: Laplacian of S (used for reconstruction)
-
-## Utilities API
-
-### `utils.py`
-
-```python
-from utils import load_results, get_transition_point, plot_metric_vs_p_faceted
-
-# Load data
-df = load_results()
-
-# Find transition point
-trans = get_transition_point(df, num_taxa=8192, sequence_length=10000, threshold=90.0)
-
-# Get all transitions
-transitions = get_all_transitions(df, threshold=90.0)
-
-# Create faceted plots
-plot_metric_vs_p_faceted(
-    df,
-    metric='spectral_gap_ratio',
-    ylabel='Spectral Gap Ratio',
-    output_path='output.png'
-)
-```
-
-## Extending the Analysis
-
-### Adding New Metrics
-
-1. Add computed column in `utils.py`:
-```python
-df['my_new_metric'] = df['col1'] / df['col2']
-```
-
-2. Use in phase scripts:
-```python
-plot_metric_vs_p_faceted(df, metric='my_new_metric', ...)
-```
-
-### Adding New Analyses
-
-Create new phase script following the template:
-
-```python
-from utils import load_results, get_output_dir, save_markdown_report
-
-def my_analysis(df, output_dir):
-    # Analysis code
-    # Save figures to output_dir
-    pass
-
-def main():
-    df = load_results()
-    output_dir = get_output_dir(4)  # Phase 4
-    my_analysis(df, output_dir)
-    # Generate report
-
-if __name__ == "__main__":
-    main()
-```
+Transition occurs when ||E||_F / δ ≈ O(1).
 
 ## Citation
 
@@ -303,7 +331,3 @@ If you use this analysis framework, please cite:
 ## Contact
 
 For questions or issues, please contact [your contact info].
-
-## License
-
-[Your license here]

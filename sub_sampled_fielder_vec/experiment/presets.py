@@ -139,7 +139,8 @@ def create_custom_config(
     run_name="custom",
     taxa_values=None,
     sequence_length_values=None,
-    compute_metrics_on_guardrails=False
+    compute_metrics_on_guardrails=False,
+    display_mode="progress"
 ) -> Config:
     """
     Create a custom configuration with specified parameters.
@@ -155,6 +156,7 @@ def create_custom_config(
         taxa_values: List of taxa values (for sweep/grid)
         sequence_length_values: List of sequence lengths (for grid)
         compute_metrics_on_guardrails: Whether to compute metrics when guardrails trigger
+        display_mode: Display mode ("progress" or "debug")
     
     Returns:
         Config object with custom parameters
@@ -174,6 +176,7 @@ def create_custom_config(
         run_name=run_name,
         fiedler_method=compute_fiedler_estimate,
         progress_prints=3,
-        compute_metrics_on_guardrails=compute_metrics_on_guardrails
+        compute_metrics_on_guardrails=compute_metrics_on_guardrails,
+        display_mode=display_mode
     )
 

@@ -54,13 +54,14 @@ def main():
     all_p_values = sorted(original_p_values + gap_fill_p_values)
     
     cfg = create_custom_config(
-        taxa_values=[1024],
+        taxa_values=[8192],
         sequence_length_values=[500, 1000, 5000, 10000],
         mutation_rate=0.1,
         p_values=tuple(all_p_values),
         bootstrap_reps=10,
         compute_metrics_on_guardrails=True,
-        run_name="hust_1024_to_make_sure"
+        run_name="8192_mu_01",
+        display_mode="debug"
     )
     
     # Option 3: Manually construct Config (for full control)

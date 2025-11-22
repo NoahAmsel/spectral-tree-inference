@@ -34,10 +34,28 @@ def save_json(obj, path: str) -> None:
     with open(path, "w") as f:
         json.dump(obj, f, indent=2)
 
-def save_single_results(*, run_dir: str, p_values: List[float], sign_agreements: List[float] | List[Tuple[float, float, float]] | List[Tuple[float, float]], metrics_dict: Dict[str, List[Tuple[float, float, float]]] | None = None):
+def save_single_results(
+    *,
+    run_dir: str,
+    p_values: List[float],
+    sign_agreements: List[float] | List[Tuple[float, float, float]] | List[Tuple[float, float]],
+    partition_agreement_M: List[float] | None = None,
+    partition_agreement_S: List[float] | None = None,
+    dot_products: List[float] | None = None,
+    metrics_dict: Dict[str, List[Tuple[float, float, float]]] | None = None
+):
     """
-    Save single-parameter results.
-    
+    Save single-parameter results with new partition metrics.
+
+    Args:
+        run_dir: Directory to save results
+        p_values: List of p-values
+        sign_agreements: Legacy sign agreement metric (backward compatibility)
+        partition_agreement_M: NEW - Agreement using M for both partitions
+        partition_agreement_S: NEW - Agreement using M vs S_avg
+        dot_products: NEW - Vector alignment metric
+        metrics_dict: Matrix metrics (optional)
+
     Supports three formats for sign_agreements:
     1. New format: List[float] - single agreement value per p
     2. Legacy format: List[Tuple[float, float, float]] - (mean, median, std)
@@ -45,11 +63,28 @@ def save_single_results(*, run_dir: str, p_values: List[float], sign_agreements:
     """
     # Handle backward compatibility: check if tuples are 2-tuples or 3-tuples or single values
     has_metrics = metrics_dict is not None and len(metrics_dict) > 0
-    
+
     if sign_agreements and isinstance(sign_agreements[0], (int, float)):
         # New format: single values
         columns = ["p", "sign_agreement"]
         rows = [{"p": float(p), "sign_agreement": float(agreement)} for p, agreement in zip(p_values, sign_agreements)]
+
+        # Add new partition metrics if provided
+        if partition_agreement_M is not None:
+            columns.append("partition_agreement_M")
+            for i, row in enumerate(rows):
+                row["partition_agreement_M"] = float(partition_agreement_M[i])
+
+        if partition_agreement_S is not None:
+            columns.append("partition_agreement_S")
+            for i, row in enumerate(rows):
+                row["partition_agreement_S"] = float(partition_agreement_S[i])
+
+        if dot_products is not None:
+            columns.append("dot_product")
+            for i, row in enumerate(rows):
+                row["dot_product"] = float(dot_products[i])
+
     elif sign_agreements and len(sign_agreements[0]) == 2:
         # Old format: (median, std)
         columns = ["p", "median", "std"]
@@ -99,7 +134,16 @@ def save_multi_results(*, run_dir: str, p_values: List[float], all_results: Dict
             np.save(os.path.join(run_dir, f"sign_agreements_mu={mu}.npy"), np.array(sig, dtype=float))
         save_json({"columns": ["mutation_rate", "p", "mean", "median", "std"], "rows": rows}, os.path.join(run_dir, "results_multi.json"))
 
-def save_taxa_results(*, run_dir: str, p_values: List[float], all_results: Dict[int, List[float]] | Dict[int, List[Tuple[float, float, float]]] | Dict[int, List[Tuple[float, float]]], all_metrics: Dict[int, Dict[str, List[Tuple[float, float, float]]]] | None = None):
+def save_taxa_results(
+    *, 
+    run_dir: str, 
+    p_values: List[float], 
+    all_results: Dict[int, List[float]] | Dict[int, List[Tuple[float, float, float]]] | Dict[int, List[Tuple[float, float]]], 
+    all_metrics: Dict[int, Dict[str, List[Tuple[float, float, float]]]] | None = None,
+    all_partition_agreement_M: Dict[int, List[float]] | None = None,
+    all_partition_agreement_S: Dict[int, List[float]] | None = None,
+    all_dot_products: Dict[int, List[float]] | None = None
+):
     """
     Save taxa sweep results.
     
@@ -121,8 +165,26 @@ def save_taxa_results(*, run_dir: str, p_values: List[float], all_results: Dict[
         columns = ["num_taxa", "p", "sign_agreement"]
         rows = []
         for n_taxa, sig in all_results.items():
-            for p, agreement in zip(p_values, sig):
-                rows.append({"num_taxa": int(n_taxa), "p": float(p), "sign_agreement": float(agreement)})
+            for i, (p, agreement) in enumerate(zip(p_values, sig)):
+                row = {"num_taxa": int(n_taxa), "p": float(p), "sign_agreement": float(agreement)}
+                
+                # Add partition agreements if provided
+                if all_partition_agreement_M is not None and n_taxa in all_partition_agreement_M:
+                    if "partition_agreement_M" not in columns:
+                        columns.append("partition_agreement_M")
+                    row["partition_agreement_M"] = float(all_partition_agreement_M[n_taxa][i])
+                
+                if all_partition_agreement_S is not None and n_taxa in all_partition_agreement_S:
+                    if "partition_agreement_S" not in columns:
+                        columns.append("partition_agreement_S")
+                    row["partition_agreement_S"] = float(all_partition_agreement_S[n_taxa][i])
+                
+                if all_dot_products is not None and n_taxa in all_dot_products:
+                    if "dot_product" not in columns:
+                        columns.append("dot_product")
+                    row["dot_product"] = float(all_dot_products[n_taxa][i])
+                
+                rows.append(row)
             np.save(os.path.join(run_dir, f"sign_agreements_n={n_taxa}.npy"), np.array(sig, dtype=float))
     elif is_two_tuple:
         # Old format: (median, std)
@@ -171,7 +233,16 @@ def save_taxa_results(*, run_dir: str, p_values: List[float], all_results: Dict[
     save_json({"columns": columns, "rows": rows}, os.path.join(run_dir, "results_taxa.json"))
 
 
-def save_grid_results(*, run_dir: str, p_values: List[float], all_results: Dict[Tuple[int, int], List[float]] | Dict[Tuple[int, int], List[Tuple[float, float, float]]], all_metrics: Dict[Tuple[int, int], Dict[str, List[Tuple[float, float, float]]]] | None = None):
+def save_grid_results(
+    *, 
+    run_dir: str, 
+    p_values: List[float], 
+    all_results: Dict[Tuple[int, int], List[float]] | Dict[Tuple[int, int], List[Tuple[float, float, float]]], 
+    all_metrics: Dict[Tuple[int, int], Dict[str, List[Tuple[float, float, float]]]] | None = None,
+    all_partition_agreement_M: Dict[Tuple[int, int], List[float]] | None = None,
+    all_partition_agreement_S: Dict[Tuple[int, int], List[float]] | None = None,
+    all_dot_products: Dict[Tuple[int, int], List[float]] | None = None
+):
     """
     Save grid search results for 2D parameter sweep (taxa × sequence_length).
     
@@ -184,6 +255,9 @@ def save_grid_results(*, run_dir: str, p_values: List[float], all_results: Dict[
         p_values: List of p values
         all_results: Dict mapping (n_taxa, seq_len) -> list of agreements
         all_metrics: Optional dict mapping (n_taxa, seq_len) -> metrics_dict
+        all_partition_agreement_M: Optional partition agreement M values
+        all_partition_agreement_S: Optional partition agreement S values
+        all_dot_products: Optional dot product values
     """
     # Check format of first result
     first_result = list(all_results.values())[0] if all_results else []
@@ -194,13 +268,32 @@ def save_grid_results(*, run_dir: str, p_values: List[float], all_results: Dict[
         columns = ["num_taxa", "sequence_length", "p", "sign_agreement"]
         rows = []
         for (n_taxa, seq_len), sig in all_results.items():
-            for p, agreement in zip(p_values, sig):
-                rows.append({
+            for i, (p, agreement) in enumerate(zip(p_values, sig)):
+                row = {
                     "num_taxa": int(n_taxa),
                     "sequence_length": int(seq_len),
                     "p": float(p),
                     "sign_agreement": float(agreement)
-                })
+                }
+                
+                # Add partition agreements if provided
+                key = (n_taxa, seq_len)
+                if all_partition_agreement_M is not None and key in all_partition_agreement_M:
+                    if "partition_agreement_M" not in columns:
+                        columns.append("partition_agreement_M")
+                    row["partition_agreement_M"] = float(all_partition_agreement_M[key][i])
+                
+                if all_partition_agreement_S is not None and key in all_partition_agreement_S:
+                    if "partition_agreement_S" not in columns:
+                        columns.append("partition_agreement_S")
+                    row["partition_agreement_S"] = float(all_partition_agreement_S[key][i])
+                
+                if all_dot_products is not None and key in all_dot_products:
+                    if "dot_product" not in columns:
+                        columns.append("dot_product")
+                    row["dot_product"] = float(all_dot_products[key][i])
+                
+                rows.append(row)
             np.save(os.path.join(run_dir, f"sign_agreements_n={n_taxa}_L={seq_len}.npy"), np.array(sig, dtype=float))
     else:
         # Legacy format: (mean, median, std)

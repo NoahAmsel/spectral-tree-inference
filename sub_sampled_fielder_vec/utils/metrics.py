@@ -236,9 +236,9 @@ def metric_composer(
 ) -> Dict[str, float]:
     """
     Metric Composer: Compute all metrics efficiently for M, S, L_M, and L_S.
-    
+
     This function now delegates to MetricComputer for better organization.
-    
+
     Returns:
         Dictionary with all metrics:
         - 'operator_norm_error': Operator (spectral) norm of S - M
@@ -249,11 +249,99 @@ def metric_composer(
           - 'min_separation_{matrix}': Minimum separation
     """
     global _metric_computer
-    
+
     # Create metric computer with specified parameters
     _metric_computer = MetricComputer(
         empirical_rank_threshold=empirical_rank_threshold,
         coherence_k=coherence_k if coherence_k is not None else 2
     )
-    
+
     return _metric_computer.compute_all(M, S, L_M, L_S, p)
+
+
+# ============================================================================
+# Partition-Based Metrics for STDR Quality Assessment
+# ============================================================================
+
+def _normalize_vector(v: np.ndarray) -> np.ndarray:
+    """
+    Normalize vector to unit length.
+
+    Args:
+        v: Input vector
+
+    Returns:
+        Normalized vector
+
+    Raises:
+        ValueError: If vector has zero or near-zero norm
+    """
+    norm = np.linalg.norm(v)
+    if norm < 1e-12:
+        raise ValueError(f"Vector has zero or near-zero norm: {norm}")
+    return v / norm
+
+
+def compute_partition_agreement(
+    fiedler_full: np.ndarray,
+    fiedler_avg: np.ndarray,
+    similarity_for_full: np.ndarray,
+    similarity_for_avg: np.ndarray,
+    num_gaps: int = 1,
+    min_split: int = 1
+) -> float:
+    """
+    Compute partition agreement between two Fiedler vectors.
+
+    This function is used TWICE to compute two agreement metrics:
+    1. partition_agreement_M = compute_partition_agreement(v_full, v_avg, M, M)
+    2. partition_agreement_S = compute_partition_agreement(v_full, v_avg, M, S_avg)
+
+    Args:
+        fiedler_full: Reference Fiedler vector from L(M)
+        fiedler_avg: Averaged Fiedler vector from subsampled bootstraps
+        similarity_for_full: Similarity matrix to score reference partition (typically M)
+        similarity_for_avg: Similarity matrix to score test partition (M or S_avg)
+        num_gaps: Number of gap-based thresholds to evaluate
+        min_split: Minimum partition size
+
+    Returns:
+        Percentage of taxa in matching partition (0-100)
+
+    Raises:
+        Exception: From partition_taxa if partitioning fails (propagates to caller)
+    """
+    from spectraltree.spectral_tree_reconstruction import partition_taxa
+
+    # Compute two partitions
+    partition_full = partition_taxa(fiedler_full, similarity_for_full, num_gaps, min_split)
+    partition_avg = partition_taxa(fiedler_avg, similarity_for_avg, num_gaps, min_split)
+
+    # Compare (handle both orientations: A|B ≡ B|A)
+    matches_direct = np.sum(partition_full == partition_avg)
+    matches_flipped = np.sum(partition_full != partition_avg)
+    max_matches = max(matches_direct, matches_flipped)
+
+    return 100.0 * max_matches / len(fiedler_full)
+
+
+def compute_fiedler_dot_product(
+    fiedler_full: np.ndarray,
+    fiedler_avg: np.ndarray
+) -> float:
+    """
+    Compute dot product between normalized Fiedler vectors.
+
+    Args:
+        fiedler_full: Reference Fiedler vector
+        fiedler_avg: Averaged Fiedler vector
+
+    Returns:
+        Absolute dot product (0-1, higher = better alignment)
+
+    Raises:
+        ValueError: If either vector has zero norm
+    """
+    u_norm = _normalize_vector(fiedler_full)
+    v_norm = _normalize_vector(fiedler_avg)
+    return float(np.abs(np.dot(u_norm, v_norm)))

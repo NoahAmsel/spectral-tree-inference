@@ -9,7 +9,7 @@ import numpy as np
 import spectraltree
 
 # Import the fiedler method default
-from utils.random_entries import compute_fiedler_estimate as random_entries_fiedler
+from utils.random_entries import compute_fiedler_from_similarity
 
 
 @dataclass(frozen=True)
@@ -29,12 +29,18 @@ class Config:
     tree_model = staticmethod(lambda n: spectraltree.balanced_binary(n))
     seq_model = staticmethod(lambda: spectraltree.Jukes_Cantor())
     # Direct function reference instead of string-based registry
-    fiedler_method: Callable = random_entries_fiedler
+    # CHANGED: Use new strict function that requires S
+    fiedler_method: Callable = compute_fiedler_from_similarity
     fiedler_method_kwargs: Dict[str, object] = field(default_factory=dict)
     # Metrics configuration
     empirical_rank_threshold: float | None = None  # If None, uses 1e-12 * max(singular_values)
     coherence_k: int = 2  # Number of top singular vectors for coherence computation
     compute_metrics_on_guardrails: bool = False  # Whether to compute metrics when guardrails trigger
+    # Partition algorithm parameters (align with STDR defaults from spectral_tree_reconstruction.py:40)
+    num_gaps: int = 1      # Number of gap-based thresholds to evaluate
+    min_split: int = 1     # Minimum partition size
+    # Display mode: "progress" for clean progress bars, "debug" for verbose logging
+    display_mode: str = "progress"  # "progress" or "debug"
 
 
 def set_seed(seed: int) -> None:

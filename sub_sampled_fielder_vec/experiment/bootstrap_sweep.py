@@ -6,46 +6,46 @@ import numpy as np
 import spectraltree
 
 from utils.utils import generate_sequences, align_fiedler_vector, compute_laplacian
-from utils.metrics import compute_sign_agreement, metric_composer
+from utils.metrics import (
+    compute_sign_agreement,
+    compute_partition_agreement,
+    compute_fiedler_dot_product,
+    metric_composer
+)
 from utils.experiment_config import Config, progress_milestones
 from utils.summaries import save_single_results, save_json
-from utils.random_entries import _get_cached_similarity_matrix, _subsample_matrix_entries
-from utils.logging import log_info, log_warning
+from utils.random_entries import _get_cached_similarity_matrix, _subsample_matrix_entries, compute_fiedler_from_similarity
+from utils.logging import log_info, log_warning, create_progress_bar
 
 
 def align_fiedler_by_dot_product(fiedler_vector: np.ndarray, reference_vector: np.ndarray) -> np.ndarray:
     """
     Align a Fiedler vector using magnitude-based dot product alignment.
-    
+
     Algorithm:
     1. Normalize both vectors
     2. Compute dot product
     3. If dot product is negative, flip the sign
-    
+
     Args:
-        fiedler_vector: Fiedler vector to align (will be normalized)
-        reference_vector: Reference vector for alignment (will be normalized)
-        
+        fiedler_vector: Fiedler vector to align
+        reference_vector: Reference vector for alignment
+
     Returns:
         Aligned and normalized Fiedler vector
     """
-    # Normalize both vectors
-    v_norm = np.linalg.norm(fiedler_vector)
-    u_norm = np.linalg.norm(reference_vector)
-    
-    if v_norm < 1e-12:
-        log_warning('align', "Fiedler vector has zero or near-zero norm, returning as-is")
+    from utils.metrics import _normalize_vector
+
+    try:
+        v_normalized = _normalize_vector(fiedler_vector)
+        u_normalized = _normalize_vector(reference_vector)
+    except ValueError as e:
+        log_warning('align', f"Normalization failed: {e}")
         return fiedler_vector
-    
-    if u_norm < 1e-12:
-        raise ValueError("Reference vector has zero or near-zero norm")
-    
-    v_normalized = fiedler_vector / v_norm
-    u_normalized = reference_vector / u_norm
-    
+
     # Compute dot product
     dot_product = np.dot(v_normalized, u_normalized)
-    
+
     # Flip sign if needed
     if dot_product < 0:
         return -v_normalized
@@ -70,20 +70,35 @@ def sweep_for_params(
     n_taxa: int,
     seq_len: int,
     run_dir: str,
-    incremental_save: bool = False
-) -> Tuple[np.ndarray, List[float], Dict[str, List[Tuple[float, float, float]]]]:
+    incremental_save: bool = False,
+    show_progress: bool = True,
+    progress_callback: callable = None
+) -> Tuple[np.ndarray, List[float], List[float], List[float], List[float], Dict[str, List[Tuple[float, float, float]]]]:
     """
     Run sweep for a specific (n_taxa, seq_len) combination.
-    
+
     New bootstrap methodology:
     - For each p-value, collects aligned Fiedler vectors across bootstrap iterations
     - Averages the aligned vectors to create a single mean Fiedler vector
-    - Computes sign agreement once between the mean vector and reference
-    
+    - Computes partition-based agreement metrics
+
+    Args:
+        cfg: Experiment configuration
+        n_taxa: Number of taxa
+        seq_len: Sequence length
+        run_dir: Directory for saving results
+        incremental_save: Whether to save results incrementally
+        show_progress: Whether to show bootstrap progress bars
+        progress_callback: Optional callback function(p_idx) to update parent progress bar
+
     Returns:
-        Tuple of (fiedler_ref, sign_agreements, metrics_dict)
+        Tuple of (fiedler_ref, sign_agreements, partition_agreement_M,
+                  partition_agreement_S, dot_products, metrics_dict)
         - fiedler_ref: Reference Fiedler vector from full matrix (p=1.0)
-        - sign_agreements: List of single agreement values per p-value
+        - sign_agreements: Legacy sign agreement metric (kept for comparison)
+        - partition_agreement_M: Agreement using M for both partitions (ideal)
+        - partition_agreement_S: Agreement using M vs S_avg (realistic)
+        - dot_products: Vector alignment metric (0-1)
         - metrics_dict: Aggregated metrics (mean, median, std) for each metric type
     """
     log_info('bootstrap', f"n={n_taxa}, L={seq_len} building tree and sequences…")
@@ -97,9 +112,17 @@ def sweep_for_params(
     log_info('bootstrap', "Computing full similarity + Fiedler…")
     # Get full similarity matrix M (will be cached)
     M = _get_cached_similarity_matrix(observations)
-    
-    # Use the same method as bootstrap to ensure consistency
-    fiedler_ref = cfg.fiedler_method(observations, p=1.0, **cfg.fiedler_method_kwargs)
+
+    # Compute reference Fiedler vector - check which method signature is being used
+    import inspect
+    sig = inspect.signature(cfg.fiedler_method)
+
+    if 'observations' in sig.parameters:
+        # Old-style method: compute_fiedler_estimate(observations, p, ...)
+        fiedler_ref = cfg.fiedler_method(observations, p=1.0, **cfg.fiedler_method_kwargs)
+    else:
+        # New-style method: compute_fiedler_from_similarity(similarity_matrix)
+        fiedler_ref = cfg.fiedler_method(M, **cfg.fiedler_method_kwargs)
 
     # Compute Laplacian of M once (for metrics that need it)
     L_M = compute_laplacian(M)
@@ -108,8 +131,11 @@ def sweep_for_params(
     empirical_rank_threshold = getattr(cfg, 'empirical_rank_threshold', None)
     coherence_k = getattr(cfg, 'coherence_k', 2)
 
-    sign_agreements: List[float] = []  # Single agreement value per p-value
-    
+    sign_agreements: List[float] = []            # Legacy metric (kept for comparison)
+    partition_agreement_M: List[float] = []      # NEW: ideal scenario (both use M)
+    partition_agreement_S: List[float] = []      # NEW: realistic scenario (M vs S_avg)
+    dot_products: List[float] = []               # NEW: vector alignment
+
     # Initialize metric storage - all metrics for M, S, L_M, L_S
     metric_keys = [
         'operator_norm_error',
@@ -123,9 +149,8 @@ def sweep_for_params(
     }
     
     milestones = progress_milestones(cfg.bootstrap_reps, cfg.progress_prints)
-    
+
     for p_idx, p in enumerate(cfg.p_values):
-        log_info('bootstrap', f"Computing sign agreement for p={p} , n={n_taxa}, L={seq_len}")
         agreements_for_p: List[float] = []
         
         # Initialize metric lists for this p-value - one list per metric
@@ -185,24 +210,44 @@ def sweep_for_params(
             # Normal bootstrap loop for p < 1.0
             # NEW ALGORITHM: Collect aligned vectors, average them, then compute single sign agreement
             aligned_vectors = []  # Collect aligned, normalized Fiedler vectors
-            
+            S_avg = None  # Running average of S matrices
+            n_bootstrap_collected = 0  # Counter for streaming average
+
+            # Create progress bar for bootstrap iterations only if requested (for debugging)
+            bootstrap_pbar = None
+            if show_progress:
+                bootstrap_pbar = create_progress_bar(
+                    total=cfg.bootstrap_reps,
+                    desc=f"    Bootstraps p={p:.4g}",
+                    unit='rep',
+                    leave=False,
+                    position=100  # High position so it doesn't interfere with config bars
+                )
+
             for i in range(cfg.bootstrap_reps):
-                if i in milestones:
-                    log_info('bootstrap', f"Bootstrap {i+1}/{cfg.bootstrap_reps} for p={p:.4g}…")
-                
+
                 # Set bootstrap-specific seed for reproducibility
                 bootstrap_seed = cfg.seed + i
-                
-                # Compute subsampled similarity matrix S
+
+                # Compute S once per bootstrap rep
                 S = _subsample_matrix_entries(M, p, seed=bootstrap_seed)
-                
-                # Compute Laplacian of S
+
+                # Update running average of S (streaming - no storage!)
+                # Uses Welford's online algorithm for numerical stability
+                if S_avg is None:
+                    S_avg = S.copy()
+                    n_bootstrap_collected = 1
+                else:
+                    n_bootstrap_collected += 1
+                    S_avg += (S - S_avg) / n_bootstrap_collected
+
+                # Compute L_S for metrics
                 try:
                     L_S = compute_laplacian(S)
                 except Exception as e:
                     log_warning('bootstrap', f"Failed to compute Laplacian of S: {e}")
                     L_S = None
-                
+
                 # Compute all metrics efficiently using the metric composer
                 if L_S is not None:
                     try:
@@ -217,46 +262,100 @@ def sweep_for_params(
                         all_metrics = None
                 else:
                     all_metrics = None
-                
-                # If computation failed, store NaN for all metrics
+
+                # Store metrics (existing code)
                 if all_metrics is None:
                     all_metrics = {key: float('nan') for key in metric_keys}
-                
-                # Store all metric values
+
                 for key in metric_keys:
                     metric_values[key].append(all_metrics.get(key, float('nan')))
-                
-                # Call the fiedler method directly to get estimated Fiedler vector
-                f_est = cfg.fiedler_method(
-                    observations, p,
-                    seed=bootstrap_seed,
-                    **cfg.fiedler_method_kwargs
-                )
-                
+
+                # Compute Fiedler from S directly
+                # Always use compute_fiedler_from_similarity since we already have S
+                f_est = compute_fiedler_from_similarity(S)
+
                 # Align using dot product and normalize
                 f_aligned_normalized = align_fiedler_by_dot_product(f_est, fiedler_ref)
                 aligned_vectors.append(f_aligned_normalized)
+
+                # Update bootstrap progress bar
+                if bootstrap_pbar:
+                    bootstrap_pbar.update(1)
             
             # After bootstrap loop: Average the aligned vectors
-            if len(aligned_vectors) > 0:
+            if len(aligned_vectors) > 0 and S_avg is not None:
                 v_avg = np.mean(aligned_vectors, axis=0)
-                
+
                 # Normalize the averaged vector
-                v_avg_norm = np.linalg.norm(v_avg)
-                if v_avg_norm > 1e-12:
-                    v_avg = v_avg / v_avg_norm
-                else:
-                    log_warning('bootstrap', f"Averaged vector has zero norm for p={p:.4g}")
-                
-                # Compute single sign agreement between averaged vector and reference
-                agreement = compute_sign_agreement(fiedler_ref, v_avg)
+                from utils.metrics import _normalize_vector
+                try:
+                    v_avg = _normalize_vector(v_avg)
+                except ValueError as e:
+                    log_warning('bootstrap', f"Averaged vector normalization failed: {e}")
+                    # Fallback: zero vector (will produce 0% agreement)
+                    v_avg = np.zeros_like(v_avg)
+
+                # OLD metric (keep for comparison)
+                sign_agreement = compute_sign_agreement(fiedler_ref, v_avg)
+
+                # NEW METRIC 1: partition_agreement_M
+                # Tests: How well does averaged Fiedler perform with clean STDR?
+                # Computes 2 partitions:
+                #   - partition_taxa(fiedler_full, M)  [reference]
+                #   - partition_taxa(fiedler_avg, M)   [test vs M]
+                # Then compares them
+                try:
+                    partition_agr_M = compute_partition_agreement(
+                        fiedler_ref, v_avg, M, M,  # Both use M
+                        num_gaps=getattr(cfg, 'num_gaps', 1),
+                        min_split=getattr(cfg, 'min_split', 1)
+                    )
+                except Exception as e:
+                    log_warning('bootstrap', f"partition_agreement (M) failed: {e}")
+                    partition_agr_M = float('nan')
+
+                # NEW METRIC 2: partition_agreement_S
+                # Tests: Realistic scenario where test uses averaged subsampled data
+                # Computes 2 partitions:
+                #   - partition_taxa(fiedler_full, M)      [reference - same as above]
+                #   - partition_taxa(fiedler_avg, S_avg)   [test vs S_avg]
+                # Then compares them
+                try:
+                    partition_agr_S = compute_partition_agreement(
+                        fiedler_ref, v_avg, M, S_avg,  # Reference uses M, test uses S_avg
+                        num_gaps=getattr(cfg, 'num_gaps', 1),
+                        min_split=getattr(cfg, 'min_split', 1)
+                    )
+                except Exception as e:
+                    log_warning('bootstrap', f"partition_agreement (S_avg) failed: {e}")
+                    partition_agr_S = float('nan')
+
+                # NEW METRIC 3: Vector alignment
+                try:
+                    dot_prod = compute_fiedler_dot_product(fiedler_ref, v_avg)
+                except Exception as e:
+                    log_warning('bootstrap', f"dot_product failed: {e}")
+                    dot_prod = float('nan')
             else:
                 log_warning('bootstrap', f"No valid aligned vectors for p={p:.4g}")
-                agreement = 0.0
-        
-        # Store single sign agreement value
-        sign_agreements.append(float(agreement))
-        log_info('bootstrap', f"p={p:.4g}  sign_agreement={agreement:.2f}%")
+                sign_agreement = 0.0
+                partition_agr_M = 0.0
+                partition_agr_S = 0.0
+                dot_prod = 0.0
+
+            # Close bootstrap progress bar
+            if bootstrap_pbar:
+                bootstrap_pbar.close()
+
+        # Store all metrics
+        sign_agreements.append(float(sign_agreement))
+        partition_agreement_M.append(float(partition_agr_M))
+        partition_agreement_S.append(float(partition_agr_S))
+        dot_products.append(float(dot_prod))
+
+        # Update parent progress bar via callback
+        if progress_callback:
+            progress_callback(p_idx)
         
         # Aggregate metrics
         def aggregate_metric(values: List[float]) -> Tuple[float, float, float]:
@@ -300,16 +399,18 @@ def sweep_for_params(
         
         # Check if guardrails trigger (two consecutive 100% agreements)
         if check_guardrails_trigger(sign_agreements):
-            log_info('bootstrap', f"Guardrails triggered at p={p:.4g}: Two consecutive 100% agreements detected")
-            log_info('bootstrap', f"Filling remaining {len(cfg.p_values) - p_idx - 1} p-values with 100% agreement")
-            
-            # Fill remaining p-values with 100% agreement
+            log_info('bootstrap', "Guardrails triggered: skipping remaining p-values (all 100%)")
+
+            # Fill remaining p-values with perfect agreement values
             for remaining_p_idx in range(p_idx + 1, len(cfg.p_values)):
                 remaining_p = cfg.p_values[remaining_p_idx]
-                
-                # Fill sign agreement with 100%
+
+                # Fill all agreement metrics with best values
                 sign_agreements.append(100.0)
-                
+                partition_agreement_M.append(100.0)  # NEW
+                partition_agreement_S.append(100.0)  # NEW
+                dot_products.append(1.0)             # NEW - perfect alignment
+
                 # Handle metrics based on flag
                 if cfg.compute_metrics_on_guardrails:
                     # Compute metrics for p=1.0 case (S=M, L_S=L_M)
@@ -338,9 +439,11 @@ def sweep_for_params(
                         metrics_dict[key].append((float(val), float(val), 0.0))
                     for key in varying_metrics:
                         metrics_dict[key].append((float('nan'), float('nan'), float('nan')))
-                
-                log_info('bootstrap', f"p={remaining_p:.4g}  [guardrails] sign_agreement=100.00%")
-            
+
+                # Update parent progress bar via callback for skipped p-values
+                if progress_callback:
+                    progress_callback(remaining_p_idx)
+
             # Break out of p-value loop
             break
         
@@ -349,32 +452,41 @@ def sweep_for_params(
             # Save current progress
             current_p_values = cfg.p_values[:p_idx + 1]
             current_sign_agreements = sign_agreements
-            
+            current_partition_agreement_M = partition_agreement_M  # NEW
+            current_partition_agreement_S = partition_agreement_S  # NEW
+            current_dot_products = dot_products                    # NEW
+
             # Create current metrics dict with only completed p-values
             current_metrics_dict = {
                 key: values[:p_idx + 1]
                 for key, values in metrics_dict.items()
             }
-            
+
             # Save as both single and taxa format for compatibility
             save_single_results(
                 run_dir=run_dir,
                 p_values=current_p_values,
                 sign_agreements=current_sign_agreements,
+                partition_agreement_M=current_partition_agreement_M,  # NEW
+                partition_agreement_S=current_partition_agreement_S,  # NEW
+                dot_products=current_dot_products,                    # NEW
                 metrics_dict=current_metrics_dict
             )
-            
+
             # Also save individual p-value results
             p_result = {
                 "p": float(p),
-                "sign_agreement": float(agreement)
+                "sign_agreement": float(sign_agreement),
+                "partition_agreement_M": float(partition_agr_M),  # NEW
+                "partition_agreement_S": float(partition_agr_S),  # NEW
+                "dot_product": float(dot_prod)                    # NEW
             }
             save_json(
                 p_result,
                 os.path.join(run_dir, f"p_{p:.0e}_n_{n_taxa}_L={seq_len}.json")
             )
-            
+
             log_info('bootstrap', f"Saved incremental results for p={p:.4g}")
-            
-    return fiedler_ref, sign_agreements, metrics_dict
+
+    return fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S, dot_products, metrics_dict
 

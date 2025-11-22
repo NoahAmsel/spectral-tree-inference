@@ -81,14 +81,41 @@ def compute_fiedler_estimate(observations, p, roughness_factor=1.0,
     return compute_fielder_vector(similarity_matrix)
 
 
-def compute_similarity_matrix(observations, p, roughness_factor=1.0, 
-                            min_similarity=0.0, use_raw_hamming=False, 
+def compute_similarity_matrix(observations, p, roughness_factor=1.0,
+                            min_similarity=0.0, use_raw_hamming=False,
                             seed=None):
     """
     Compute similarity matrix using random entry subsampling approach.
     [Kept for backward compatibility - consider using compute_fiedler_estimate instead]
-    
+
     This function now delegates to SimilarityMatrixBuilder for better organization.
     Note: roughness_factor and use_raw_hamming are kept for API compatibility but not used.
     """
     return _similarity_builder.build_subsampled(observations, p, seed, min_similarity)
+
+
+def compute_fiedler_from_similarity(similarity_matrix: np.ndarray) -> np.ndarray:
+    """
+    Compute Fiedler vector from pre-computed similarity matrix.
+
+    This is a strict version that requires S to be provided (no fallback).
+    Use this when you've already computed the similarity matrix and want
+    to avoid recomputation.
+
+    Args:
+        similarity_matrix: Pre-computed similarity matrix S (n x n)
+
+    Returns:
+        Fiedler vector (n-dimensional)
+
+    Raises:
+        ValueError: If similarity_matrix is None
+
+    Example:
+        S = _subsample_matrix_entries(M, p=0.5, seed=42)
+        fiedler = compute_fiedler_from_similarity(S)
+    """
+    if similarity_matrix is None:
+        raise ValueError("similarity_matrix must be provided (cannot be None)")
+
+    return compute_fielder_vector(similarity_matrix)
