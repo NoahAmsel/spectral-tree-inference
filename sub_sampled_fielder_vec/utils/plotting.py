@@ -105,7 +105,11 @@ def plot_from_json_simple(
         if "columns" in d and "rows" in d:
             series = {}
             for r in d["rows"]:
-                key = f"n={int(r['num_taxa'])}"
+                # Handle both single experiments (no num_taxa field) and taxa/grid experiments
+                if "num_taxa" in r:
+                    key = f"n={int(r['num_taxa'])}"
+                else:
+                    key = "single"  # Single experiment, use generic key
                 s = series.setdefault(key, {"x": [], "mean": [], "std": []})
                 s["x"].append(float(r["p"]))
                 # Prefer partition_agreement_M (averaged f vs M), fall back to sign_agreement, then median or mean

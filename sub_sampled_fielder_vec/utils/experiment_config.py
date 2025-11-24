@@ -41,6 +41,43 @@ class Config:
     min_split: int = 1     # Minimum partition size
     # Display mode: "progress" for clean progress bars, "debug" for verbose logging
     display_mode: str = "progress"  # "progress" or "debug"
+    # Persistent cache: whether to use disk-based caching for experiment data
+    use_persistent_cache: bool = False
+
+    def get_tree_model_name(self) -> str:
+        """
+        Extract tree model name from the tree_model callable.
+
+        Returns:
+            Tree model name (e.g., "balanced_binary")
+        """
+        # Check if it's a lambda
+        if hasattr(self.tree_model, '__name__'):
+            if self.tree_model.__name__ == '<lambda>':
+                # For lambda, try to extract from source or use generic name
+                return "balanced_binary"  # Default assumption
+            return self.tree_model.__name__
+
+        # Fallback
+        return "custom_tree"
+
+    def get_seq_model_name(self) -> str:
+        """
+        Extract sequence model name from the seq_model callable.
+
+        Returns:
+            Sequence model name (e.g., "Jukes_Cantor")
+        """
+        # seq_model returns an instance, so we need to call it
+        try:
+            model_instance = self.seq_model()
+            # Get class name
+            return model_instance.__class__.__name__
+        except Exception:
+            # Fallback if we can't instantiate
+            if hasattr(self.seq_model, '__name__'):
+                return self.seq_model.__name__
+            return "custom_model"
 
 
 def set_seed(seed: int) -> None:

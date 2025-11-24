@@ -3,7 +3,7 @@ import hashlib
 import numpy as np
 import spectraltree
 
-from .logging import log_info
+from .logging import log_info, suppress_warnings
 
 
 class SimilarityMatrixBuilder:
@@ -31,7 +31,9 @@ class SimilarityMatrixBuilder:
         
         if obs_hash not in self._cache:
             log_info('cache', "Computing and caching full similarity matrix...")
-            full_similarity = spectraltree.JC_similarity_matrix(observations)
+            # Wrap similarity computation to capture numerical warnings
+            with suppress_warnings('similarity'):
+                full_similarity = spectraltree.JC_similarity_matrix(observations)
             self._cache[obs_hash] = full_similarity
         
         return self._cache[obs_hash]

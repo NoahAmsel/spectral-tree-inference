@@ -44,9 +44,12 @@ def set_display_mode(mode: str):
         raise ValueError(f"Invalid display mode: {mode}. Must be 'progress' or 'debug'")
     _DISPLAY_MODE = mode
 
-    # In progress mode, suppress numpy/sklearn warnings
+    # Always redirect warnings to logging system (suppress in progress mode, log in debug mode)
     if mode == "progress":
         suppress_numerical_warnings()
+    else:
+        # In debug mode, capture and log warnings
+        setup_warning_logging()
 
 
 def get_display_mode() -> str:
@@ -63,6 +66,48 @@ def suppress_numerical_warnings():
     """Suppress common numerical warnings from numpy and sklearn."""
     warnings.filterwarnings('ignore', category=RuntimeWarning, module='numpy.*')
     warnings.filterwarnings('ignore', category=RuntimeWarning, module='sklearn.*')
+
+
+def setup_warning_logging():
+    """
+    Configure warnings to be logged through the logging system.
+    
+    This captures all RuntimeWarnings and formats them using our logging infrastructure.
+    Useful for debug mode where we want to see warnings but keep them organized.
+    """
+    def warning_handler(message, category, filename, lineno, file=None, line=None):
+        """Custom warning handler that routes warnings through our logging system."""
+        if category == RuntimeWarning:
+            # Extract module name from filename
+            module_parts = filename.split('/')
+            if 'numpy' in filename:
+                component = 'numpy'
+            elif 'scipy' in filename:
+                component = 'scipy'
+            elif 'bootstrap_sweep' in filename:
+                component = 'bootstrap'
+            elif 'similarity' in filename or 'cache' in filename:
+                component = 'cache'
+            else:
+                component = 'runtime'
+            
+            # Format: COMPONENT | WARNING | message [file:line]
+            comp_name = COMPONENTS.get(component, component.upper())
+            location = f"{module_parts[-1]}:{lineno}"
+            msg_str = str(message).strip()
+            print(f"{comp_name} | WARNING | {msg_str} [{location}]")
+        else:
+            # For non-RuntimeWarnings, use default handler
+            if file is None:
+                import sys
+                file = sys.stderr
+            try:
+                file.write(warnings.formatwarning(message, category, filename, lineno, line))
+            except (AttributeError, OSError):
+                pass
+    
+    # Set our custom warning handler
+    warnings.showwarning = warning_handler
 
 
 # Component names for standardized logging
@@ -108,13 +153,32 @@ def suppress_warnings(component: str):
     
     Args:
         component: Component name for logging
+    
+    Behavior:
+        - In progress mode: Suppress all RuntimeWarnings completely
+        - In debug mode: Capture RuntimeWarnings and log them with proper formatting
     """
-    original_showwarning = warnings.showwarning
-    warnings.showwarning = get_warning_handler(component)
-    try:
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        # Configure warning filters based on display mode
+        if is_progress_mode():
+            # In progress mode, suppress (ignore) all RuntimeWarnings
+            warnings.simplefilter("ignore", RuntimeWarning)
+        else:
+            # In debug mode, capture all warnings for logging
+            warnings.simplefilter("always", RuntimeWarning)
+        
         yield
-    finally:
-        warnings.showwarning = original_showwarning
+        
+        # In debug mode, log captured warnings through our logging system
+        if not is_progress_mode() and caught_warnings:
+            comp_name = COMPONENTS.get(component, component.upper())
+            for w in caught_warnings:
+                if issubclass(w.category, RuntimeWarning):
+                    # Extract filename (last part of path)
+                    filename_parts = w.filename.split('/')
+                    location = f"{filename_parts[-1]}:{w.lineno}"
+                    msg_str = str(w.message).strip()
+                    print(f"{comp_name} | WARNING | {msg_str} [{location}]")
 
 
 def log_info(component: str, message: str, force: bool = False):

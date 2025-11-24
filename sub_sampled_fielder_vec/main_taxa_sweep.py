@@ -55,12 +55,12 @@ def main():
     
     cfg = create_custom_config(
         taxa_values=[8192],
-        sequence_length_values=[500, 1000, 5000, 10000],
+        sequence_length_values=[500, 1000],
         mutation_rate=0.1,
         p_values=tuple(all_p_values),
         bootstrap_reps=10,
         compute_metrics_on_guardrails=True,
-        run_name="8192_mu_01",
+        run_name="8192_500_1000_mu_01",
         display_mode="debug"
     )
     

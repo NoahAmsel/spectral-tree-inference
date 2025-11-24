@@ -15,7 +15,12 @@ from utils.metrics import (
 from utils.experiment_config import Config, progress_milestones
 from utils.summaries import save_single_results, save_json
 from utils.random_entries import _get_cached_similarity_matrix, _subsample_matrix_entries, compute_fiedler_from_similarity
-from utils.logging import log_info, log_warning, create_progress_bar
+from utils.logging import log_info, log_warning, create_progress_bar, suppress_warnings
+from utils.persistent_cache import (
+    _get_cache_key,
+    save_experiment_data,
+    load_experiment_data
+)
 
 
 def align_fiedler_by_dot_product(fiedler_vector: np.ndarray, reference_vector: np.ndarray) -> np.ndarray:
@@ -43,8 +48,9 @@ def align_fiedler_by_dot_product(fiedler_vector: np.ndarray, reference_vector: n
         log_warning('align', f"Normalization failed: {e}")
         return fiedler_vector
 
-    # Compute dot product
-    dot_product = np.dot(v_normalized, u_normalized)
+    # Compute dot product (wrapped to catch numerical warnings)
+    with suppress_warnings('align'):
+        dot_product = np.dot(v_normalized, u_normalized)
 
     # Flip sign if needed
     if dot_product < 0:
@@ -53,16 +59,103 @@ def align_fiedler_by_dot_product(fiedler_vector: np.ndarray, reference_vector: n
         return v_normalized
 
 
-def check_guardrails_trigger(sign_agreements: List[float], 
+def check_guardrails_trigger(sign_agreements: List[float],
                               threshold: float = 99.9) -> bool:
     """
     Check if the last two sign agreements are both >= threshold.
-    
+
     Returns True if guardrails should trigger (skip remaining computations).
     """
     if len(sign_agreements) < 2:
         return False
     return sign_agreements[-1] >= threshold and sign_agreements[-2] >= threshold
+
+
+def _get_or_generate_experiment_data(
+    cfg: Config,
+    n_taxa: int,
+    seq_len: int
+) -> Tuple[object, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Get experiment data from persistent cache or generate fresh.
+
+    Single responsibility: Implements get-or-create pattern for experiment data.
+
+    Args:
+        cfg: Experiment configuration
+        n_taxa: Number of taxa
+        seq_len: Sequence length
+
+    Returns:
+        Tuple of (tree, observations, similarity_matrix, fiedler_ref)
+    """
+    # Try to load from persistent cache if enabled
+    if cfg.use_persistent_cache:
+        cache_key = _get_cache_key(
+            n_taxa=n_taxa,
+            seq_len=seq_len,
+            mutation_rate=cfg.mutation_rate,
+            tree_model_name=cfg.get_tree_model_name(),
+            seq_model_name=cfg.get_seq_model_name()
+        )
+
+        cached = load_experiment_data(cache_key)
+        if cached is not None:
+            log_info('cache', f"Loaded from persistent cache: {cache_key}", force=True)
+            return (
+                cached['tree'],
+                cached['observations'],
+                cached['similarity_matrix'],
+                cached['fiedler_ref']
+            )
+
+        log_info('cache', f"Cache miss, generating fresh data for: {cache_key}", force=True)
+
+    # Generate fresh data
+    log_info('bootstrap', f"Generating tree and sequences...", force=True)
+    tree = cfg.tree_model(n_taxa)
+    seq_model = cfg.seq_model()
+    observations = generate_sequences(
+        n_taxa, seq_len, cfg.mutation_rate,
+        tree_model=tree, seq_model=seq_model
+    )
+
+    log_info('bootstrap', "Computing full similarity matrix...", force=True)
+    M = _get_cached_similarity_matrix(observations)
+
+    log_info('bootstrap', "Computing reference Fiedler vector...", force=True)
+    # Compute reference Fiedler vector - check which method signature is being used
+    import inspect
+    sig = inspect.signature(cfg.fiedler_method)
+
+    if 'observations' in sig.parameters:
+        # Old-style method: compute_fiedler_estimate(observations, p, ...)
+        fiedler_ref = cfg.fiedler_method(observations, p=1.0, **cfg.fiedler_method_kwargs)
+    else:
+        # New-style method: compute_fiedler_from_similarity(similarity_matrix)
+        fiedler_ref = cfg.fiedler_method(M, **cfg.fiedler_method_kwargs)
+
+    # Save to persistent cache if enabled
+    if cfg.use_persistent_cache:
+        metadata = {
+            'n_taxa': n_taxa,
+            'seq_len': seq_len,
+            'mutation_rate': cfg.mutation_rate,
+            'tree_model': cfg.get_tree_model_name(),
+            'seq_model': cfg.get_seq_model_name(),
+            'seed': cfg.seed
+        }
+
+        save_experiment_data(
+            cache_key=cache_key,
+            tree=tree,
+            observations=observations,
+            similarity_matrix=M,
+            fiedler_ref=fiedler_ref,
+            metadata=metadata
+        )
+
+    return (tree, observations, M, fiedler_ref)
 
 
 def sweep_for_params(
@@ -101,28 +194,10 @@ def sweep_for_params(
         - dot_products: Vector alignment metric (0-1)
         - metrics_dict: Aggregated metrics (mean, median, std) for each metric type
     """
-    log_info('bootstrap', f"n={n_taxa}, L={seq_len} building tree and sequences…")
-    tree = cfg.tree_model(n_taxa)
-    seq_model = cfg.seq_model()
-    observations = generate_sequences(
-        n_taxa, seq_len, cfg.mutation_rate,
-        tree_model=tree, seq_model=seq_model
-    )
+    log_info('bootstrap', f"n={n_taxa}, L={seq_len} preparing experiment data…", force=True)
 
-    log_info('bootstrap', "Computing full similarity + Fiedler…")
-    # Get full similarity matrix M (will be cached)
-    M = _get_cached_similarity_matrix(observations)
-
-    # Compute reference Fiedler vector - check which method signature is being used
-    import inspect
-    sig = inspect.signature(cfg.fiedler_method)
-
-    if 'observations' in sig.parameters:
-        # Old-style method: compute_fiedler_estimate(observations, p, ...)
-        fiedler_ref = cfg.fiedler_method(observations, p=1.0, **cfg.fiedler_method_kwargs)
-    else:
-        # New-style method: compute_fiedler_from_similarity(similarity_matrix)
-        fiedler_ref = cfg.fiedler_method(M, **cfg.fiedler_method_kwargs)
+    # Get or generate experiment data (with optional persistent caching)
+    tree, observations, M, fiedler_ref = _get_or_generate_experiment_data(cfg, n_taxa, seq_len)
 
     # Compute Laplacian of M once (for metrics that need it)
     L_M = compute_laplacian(M)
@@ -151,6 +226,8 @@ def sweep_for_params(
     milestones = progress_milestones(cfg.bootstrap_reps, cfg.progress_prints)
 
     for p_idx, p in enumerate(cfg.p_values):
+        log_info('bootstrap', f"Processing p-value {p_idx+1}/{len(cfg.p_values)}: p={p:.4g}", force=True)
+        
         agreements_for_p: List[float] = []
         
         # Initialize metric lists for this p-value - one list per metric
@@ -186,6 +263,7 @@ def sweep_for_params(
         p_is_one = p >= 0.9999
         
         if p_is_one:
+            log_info('bootstrap', f"p={p:.4g} is 1.0 (or very close), skipping bootstrap (S=M deterministically)", force=True)
             # When p=1.0, S=M and L_S=L_M deterministically - no bootstrap needed
             # Sign agreement will be 100% (or very close)
             agreement = 100.0
@@ -283,6 +361,7 @@ def sweep_for_params(
                     bootstrap_pbar.update(1)
             
             # After bootstrap loop: Average the aligned vectors
+            log_info('bootstrap', f"Completed {cfg.bootstrap_reps} bootstrap iterations for p={p:.4g}", force=True)
             if len(aligned_vectors) > 0 and S_avg is not None:
                 v_avg = np.mean(aligned_vectors, axis=0)
 
@@ -352,6 +431,8 @@ def sweep_for_params(
         partition_agreement_M.append(float(partition_agr_M))
         partition_agreement_S.append(float(partition_agr_S))
         dot_products.append(float(dot_prod))
+        
+        log_info('bootstrap', f"p={p:.4g} results: sign={sign_agreement:.2f}%, part_M={partition_agr_M:.2f}%, part_S={partition_agr_S:.2f}%, dot={dot_prod:.4f}", force=True)
 
         # Update parent progress bar via callback
         if progress_callback:
@@ -399,7 +480,7 @@ def sweep_for_params(
         
         # Check if guardrails trigger (two consecutive 100% agreements)
         if check_guardrails_trigger(sign_agreements):
-            log_info('bootstrap', "Guardrails triggered: skipping remaining p-values (all 100%)")
+            log_info('bootstrap', "Guardrails triggered: skipping remaining p-values (all 100%)", force=True)
 
             # Fill remaining p-values with perfect agreement values
             for remaining_p_idx in range(p_idx + 1, len(cfg.p_values)):
@@ -486,7 +567,7 @@ def sweep_for_params(
                 os.path.join(run_dir, f"p_{p:.0e}_n_{n_taxa}_L={seq_len}.json")
             )
 
-            log_info('bootstrap', f"Saved incremental results for p={p:.4g}")
+            log_info('bootstrap', f"Saved incremental results for p={p:.4g}", force=True)
 
     return fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S, dot_products, metrics_dict
 
