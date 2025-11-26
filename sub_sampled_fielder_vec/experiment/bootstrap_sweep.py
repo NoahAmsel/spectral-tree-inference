@@ -14,7 +14,7 @@ from utils.metrics import (
 )
 from utils.experiment_config import Config, progress_milestones
 from utils.summaries import save_single_results, save_json
-from utils.random_entries import _get_cached_similarity_matrix, _subsample_matrix_entries, compute_fiedler_from_similarity
+from utils.random_entries import _get_cached_similarity_matrix, _subsample_matrix_entries, compute_fiedler_from_similarity, compute_fiedler_from_laplacian
 from utils.logging import log_info, log_warning, create_progress_bar, suppress_warnings
 from utils.persistent_cache import (
     _get_cache_key,
@@ -404,9 +404,13 @@ def sweep_for_params(
                 for key in metric_keys:
                     metric_values[key].append(all_metrics.get(key, float('nan')))
 
-                # Compute Fiedler from S directly
-                # Always use compute_fiedler_from_similarity since we already have S
-                f_est = compute_fiedler_from_similarity(S)
+                # Compute Fiedler from L_S directly (reuse Laplacian computed for metrics)
+                # This avoids recomputing the Laplacian (2x speedup on Laplacian work)
+                if L_S is not None:
+                    f_est = compute_fiedler_from_laplacian(L_S)
+                else:
+                    # Fallback: compute from similarity if Laplacian computation failed
+                    f_est = compute_fiedler_from_similarity(S)
 
                 # Align using dot product and normalize
                 f_aligned_normalized = align_fiedler_by_dot_product(f_est, fiedler_ref)

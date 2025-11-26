@@ -54,10 +54,35 @@ def compute_laplacian(similarity_matrix: np.ndarray) -> np.ndarray:
 def compute_fielder_vector(similarity_matrix: np.ndarray) -> np.ndarray:
     """
     Compute the Fiedler vector with deterministic sign convention.
-    
+
     This function now delegates to FiedlerVectorComputer for better organization.
     """
     return _fiedler_computer.compute(similarity_matrix)
+
+
+def compute_fiedler_from_laplacian(laplacian: np.ndarray) -> np.ndarray:
+    """
+    Compute Fiedler vector from pre-computed Laplacian matrix.
+
+    This function is useful when you've already computed the Laplacian
+    for other purposes (e.g., metrics) and want to avoid recomputing it.
+
+    Args:
+        laplacian: Pre-computed Laplacian matrix L = D - S
+
+    Returns:
+        Fiedler vector with consistent sign convention
+
+    Example:
+        >>> S = build_similarity_matrix(observations)
+        >>> L = compute_laplacian(S)
+        >>> # Use L for metrics
+        >>> metrics = compute_metrics(L)
+        >>> # Reuse L for Fiedler vector (avoids recomputing Laplacian)
+        >>> f = compute_fiedler_from_laplacian(L)
+    """
+    return _fiedler_computer.compute_from_laplacian(laplacian)
+
 
 def compute_fielder_for_sparse_matrix(similarity_matrix: np.ndarray) -> np.ndarray:
     """

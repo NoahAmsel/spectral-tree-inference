@@ -27,12 +27,12 @@ class FiedlerVectorComputer:
     def compute(self, similarity_matrix: np.ndarray) -> np.ndarray:
         """
         Compute the Fiedler vector with deterministic sign convention.
-        
+
         Automatically selects dense or sparse computation based on sparsity.
-        
+
         Args:
             similarity_matrix: Similarity matrix (n x n)
-            
+
         Returns:
             Fiedler vector with consistent sign convention
         """
@@ -43,7 +43,7 @@ class FiedlerVectorComputer:
         else:
             sparsity = 1.0 - np.count_nonzero(similarity_matrix) / similarity_matrix.size
             is_sparse_format = False
-        
+
         # Choose method based on sparsity
         if sparsity > self.sparsity_threshold and similarity_matrix.shape[0] > 100:
             self.last_method_used = 'sparse'
@@ -51,73 +51,132 @@ class FiedlerVectorComputer:
         else:
             self.last_method_used = 'dense'
             return self._compute_dense(similarity_matrix)
+
+    def compute_from_laplacian(self, laplacian: np.ndarray) -> np.ndarray:
+        """
+        Compute Fiedler vector from pre-computed Laplacian matrix.
+
+        This method bypasses Laplacian computation and directly computes
+        the Fiedler vector from an already-computed Laplacian. Useful when
+        the Laplacian is needed for other purposes (e.g., metrics) and you
+        want to avoid recomputing it.
+
+        Args:
+            laplacian: Pre-computed Laplacian matrix L = D - S
+
+        Returns:
+            Fiedler vector with consistent sign convention
+        """
+        # Detect if sparse
+        if isinstance(laplacian, csr_matrix):
+            self.last_method_used = 'sparse'
+            return self._compute_from_laplacian_sparse(laplacian)
+        else:
+            # Check sparsity for dense matrix
+            sparsity = 1.0 - np.count_nonzero(laplacian) / laplacian.size
+            if sparsity > self.sparsity_threshold and laplacian.shape[0] > 100:
+                self.last_method_used = 'sparse'
+                # Convert to sparse for efficiency
+                laplacian_sparse = csr_matrix(laplacian)
+                return self._compute_from_laplacian_sparse(laplacian_sparse)
+            else:
+                self.last_method_used = 'dense'
+                return self._compute_from_laplacian_dense(laplacian)
     
     def _compute_dense(self, similarity_matrix: np.ndarray) -> np.ndarray:
         """
         Compute Fiedler vector using dense methods.
-        
+
         Args:
             similarity_matrix: Similarity matrix
-            
+
         Returns:
             Fiedler vector
         """
         # Compute the unnormalized Laplacian
         laplacian = self._compute_laplacian(similarity_matrix)
-        
+
+        # Delegate to Laplacian-based computation
+        return self._compute_from_laplacian_dense(laplacian)
+
+    def _compute_from_laplacian_dense(self, laplacian: np.ndarray) -> np.ndarray:
+        """
+        Compute Fiedler vector from pre-computed dense Laplacian.
+
+        Args:
+            laplacian: Pre-computed Laplacian matrix
+
+        Returns:
+            Fiedler vector
+        """
         # Suppress numpy/scipy warnings and log in standardized format
         with suppress_warnings('fiedler'):
             # Compute the two smallest eigenvalues and corresponding eigenvectors
             eigvals, eigvecs = scipy.linalg.eigh(laplacian, subset_by_index=(0, 1))
-        
+
         # The Fiedler vector is the eigenvector corresponding to the second smallest eigenvalue
         fiedler_vector = eigvecs[:, 1]
-        
+
         # Enforce a consistent sign convention
         return self._apply_sign_convention(fiedler_vector)
     
     def _compute_sparse(self, similarity_matrix: np.ndarray, is_sparse_format: bool = False) -> np.ndarray:
         """
         Compute Fiedler vector using sparse methods (optimized for sparse matrices).
-        
+
         Args:
             similarity_matrix: Similarity matrix
             is_sparse_format: Whether the matrix is already in sparse format
-            
+
         Returns:
             Fiedler vector
         """
         # Convert to sparse matrix if not already
         if not is_sparse_format:
             similarity_matrix = csr_matrix(similarity_matrix)
-        
+
         # Compute the unnormalized Laplacian: L = D - A
         degrees = np.array(similarity_matrix.sum(axis=0)).flatten()
         laplacian = diags(degrees) - similarity_matrix
-        
+
+        # Delegate to Laplacian-based computation
+        return self._compute_from_laplacian_sparse(laplacian)
+
+    def _compute_from_laplacian_sparse(self, laplacian) -> np.ndarray:
+        """
+        Compute Fiedler vector from pre-computed sparse Laplacian.
+
+        Args:
+            laplacian: Pre-computed sparse Laplacian matrix
+
+        Returns:
+            Fiedler vector
+        """
         # Suppress warnings
         with suppress_warnings('fiedler'):
             try:
                 # First attempt: Use sigma=0 to find eigenvalues near zero (more stable for Laplacian)
                 # Increase maxiter and adjust tolerance for better convergence
-                eigvals, eigvecs = eigsh(laplacian, k=2,  sigma=1e-10, ncv=50, which='LM', 
+                eigvals, eigvecs = eigsh(laplacian, k=2,  sigma=1e-10, ncv=50, which='LM',
                                         maxiter=laplacian.shape[0] * 10, tol=1e-6)
             except Exception as e:
                 log_warning('fiedler', f"Sparse eigsh with sigma=1e-10 failed: {str(e)}, trying without sigma...")
                 try:
                     # Second attempt: Standard approach with increased iterations
-                    eigvals, eigvecs = eigsh(laplacian, k=2, which='SM', 
+                    eigvals, eigvecs = eigsh(laplacian, k=2, which='SM',
                                             maxiter=laplacian.shape[0] * 10, tol=1e-6)
                 except Exception as e2:
                     # Final fallback: Use dense computation
                     log_warning('fiedler', f"Sparse computation failed: {str(e2)}, falling back to dense method")
-                    return self._compute_dense(similarity_matrix)
-        
+                    # Convert to dense and use dense method
+                    laplacian_dense = laplacian.toarray() if hasattr(laplacian, 'toarray') else laplacian
+                    return self._compute_from_laplacian_dense(laplacian_dense)
+
         # The Fiedler vector is the eigenvector corresponding to the second smallest eigenvalue
         # (eigsh does not guarantee order, so sort)
         idx = np.argsort(eigvals)
         fiedler_vector = eigvecs[:, idx[1]]
-        
+
         # Enforce a consistent sign convention
         return self._apply_sign_convention(fiedler_vector)
     

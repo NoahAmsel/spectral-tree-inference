@@ -10,7 +10,7 @@ from scipy.sparse.linalg import eigsh
 import hashlib
 
 from sklearn.decomposition import TruncatedSVD
-from .utils import compute_fielder_vector
+from .utils import compute_fielder_vector, compute_fiedler_from_laplacian
 from .logging import log_info
 from .similarity_builder import SimilarityMatrixBuilder
 
