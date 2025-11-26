@@ -3,9 +3,15 @@ import warnings
 from contextlib import contextmanager
 from typing import Callable, Optional
 from tqdm import tqdm
+import os
+from datetime import datetime
 
 # Global display mode - set by experiment runner
 _DISPLAY_MODE = "progress"  # "progress" or "debug"
+
+# Global log file handle
+_LOG_FILE = None
+_LOG_FILE_PATH = None
 
 
 class DummyProgressBar:
@@ -30,6 +36,49 @@ class DummyProgressBar:
     def __exit__(self, *args):
         """Context manager exit."""
         pass
+
+
+def setup_log_file(run_dir: str):
+    """
+    Set up file-based logging for the experiment.
+
+    Args:
+        run_dir: Directory where log file will be created
+    """
+    global _LOG_FILE, _LOG_FILE_PATH
+
+    # Close existing log file if any
+    if _LOG_FILE is not None:
+        _LOG_FILE.close()
+
+    # Create log file path
+    _LOG_FILE_PATH = os.path.join(run_dir, "experiment.log")
+
+    # Open log file in append mode
+    _LOG_FILE = open(_LOG_FILE_PATH, 'w')
+
+    # Write header
+    _LOG_FILE.write(f"{'='*80}\n")
+    _LOG_FILE.write(f"Experiment Log Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    _LOG_FILE.write(f"{'='*80}\n\n")
+    _LOG_FILE.flush()
+
+
+def close_log_file():
+    """Close the log file if open."""
+    global _LOG_FILE, _LOG_FILE_PATH
+
+    if _LOG_FILE is not None:
+        _LOG_FILE.write(f"\n{'='*80}\n")
+        _LOG_FILE.write(f"Experiment Log Ended: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        _LOG_FILE.write(f"{'='*80}\n")
+        _LOG_FILE.close()
+        _LOG_FILE = None
+
+
+def get_log_file_path() -> Optional[str]:
+    """Get the path to the current log file."""
+    return _LOG_FILE_PATH
 
 
 def set_display_mode(mode: str):
@@ -190,12 +239,20 @@ def log_info(component: str, message: str, force: bool = False):
         message: Message to log
         force: If True, log even in progress mode (for important final messages)
     """
-    # In progress mode, only show forced messages
+    comp_name = COMPONENTS.get(component, component.upper())
+    log_line = f"{comp_name} | INFO | {message}"
+
+    # Always write to log file if available
+    if _LOG_FILE is not None:
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        _LOG_FILE.write(f"[{timestamp}] {log_line}\n")
+        _LOG_FILE.flush()
+
+    # In progress mode, only show forced messages to stdout
     if is_progress_mode() and not force:
         return
 
-    comp_name = COMPONENTS.get(component, component.upper())
-    print(f"{comp_name} | INFO | {message}")
+    print(log_line)
 
 
 def log_warning(component: str, message: str, force: bool = False):
@@ -207,18 +264,34 @@ def log_warning(component: str, message: str, force: bool = False):
         message: Message to log
         force: If True, log even in progress mode
     """
-    # In progress mode, only show forced warnings
+    comp_name = COMPONENTS.get(component, component.upper())
+    log_line = f"{comp_name} | WARNING | {message}"
+
+    # Always write to log file if available
+    if _LOG_FILE is not None:
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        _LOG_FILE.write(f"[{timestamp}] {log_line}\n")
+        _LOG_FILE.flush()
+
+    # In progress mode, only show forced warnings to stdout
     if is_progress_mode() and not force:
         return
 
-    comp_name = COMPONENTS.get(component, component.upper())
-    print(f"{comp_name} | WARNING | {message}")
+    print(log_line)
 
 
 def log_error(component: str, message: str):
     """Log error message (always shown)."""
     comp_name = COMPONENTS.get(component, component.upper())
-    print(f"{comp_name} | ERROR | {message}")
+    log_line = f"{comp_name} | ERROR | {message}"
+
+    # Always write to log file if available
+    if _LOG_FILE is not None:
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        _LOG_FILE.write(f"[{timestamp}] {log_line}\n")
+        _LOG_FILE.flush()
+
+    print(log_line)
 
 
 def create_progress_bar(total: int, desc: str, unit: str = 'it',

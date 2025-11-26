@@ -43,6 +43,12 @@ class Config:
     display_mode: str = "progress"  # "progress" or "debug"
     # Persistent cache: whether to use disk-based caching for experiment data
     use_persistent_cache: bool = False
+    # Parallelization: middle-out strategy with multiprocessing
+    num_workers: int = 1  # Number of parallel workers (1 = sequential)
+    use_middle_out: bool = False  # Use middle-out p-value processing strategy
+    low_side_threshold: float = 50.0  # Stop low-side expansion when agreement < this threshold
+    low_side_epsilon: float = 0.99  # Epsilon margin for low-side threshold (effective check: < threshold + epsilon)
+    guardrails_metric: str = 'partition_agreement_M'  # Metric for guardrails: 'sign_agreement', 'partition_agreement_M', or 'partition_agreement_S'
 
     def get_tree_model_name(self) -> str:
         """
@@ -109,5 +115,14 @@ def save_config(cfg: Config, run_dir: str) -> None:
     config_dict = asdict(cfg)
     # Replace the function with its name for serialization
     config_dict['fiedler_method'] = cfg.fiedler_method.__name__
+    
+    # Remove redundant parameters based on experiment type:
+    # - If taxa_values is specified, remove num_taxa (it's ignored)
+    # - If sequence_length_values is specified, remove sequence_length (it's ignored)
+    if cfg.taxa_values is not None:
+        config_dict.pop('num_taxa', None)
+    if cfg.sequence_length_values is not None:
+        config_dict.pop('sequence_length', None)
+    
     save_json(config_dict, os.path.join(run_dir, "config.json"))
 

@@ -27,19 +27,9 @@ def main():
     3. Manually construct a Config object
     """
     
-    # Option 1: Use a preset configuration
-    # Uncomment one of these:
-    # cfg = create_quick_test_config()  # Fast test (32 taxa, 5 reps)
-    # cfg = create_standard_config()  # Standard (1024 taxa, 100 reps)
-    # cfg = create_large_scale_config()  # Large (8192 taxa, 10 reps)
-    # cfg = create_taxa_sweep_config()  # Sweep over taxa values
-    # cfg = create_grid_search_config()  # Grid search over taxa × seq_len
-    
-    # Option 2: Create a custom configuration using the factory
-    # Complete p values: original logspace values + gap-filling values for transition regions
     # Original logspace(-4, 0, 15) values:
     original_p_values = list(np.logspace(-4, 0, 15))
-    
+
     # Gap-filling values for transition regions:
     gap_fill_p_values = [
         0.00193,   # Between 0.00139 and 0.00268
@@ -49,19 +39,34 @@ def main():
         0.0268,    # Between 0.0193 and 0.0373
         0.05       # Between 0.0373 and 0.072
     ]
-    
-    # Combine and sort all p values
-    all_p_values = sorted(original_p_values + gap_fill_p_values)
-    
+
+    # Refinement values for smoother transition curves (4 additional points):
+    # Added based on historical data showing transition typically occurs in p ≈ 0.005-0.02 range
+    refinement_p_values = [
+        0.0062,    # Between 0.00518 and 0.0072 (finer resolution in steep transition)
+        0.0082,    # Between 0.0072 and 0.01 (captures mid-transition behavior)
+        0.0115,    # Between 0.01 and 0.0139 (post-transition detail)
+        0.0165,    # Between 0.0139 and 0.0193 (saturation onset)
+    ]
+
+    # Combine and sort all p values (21 base + 4 refinement = 25 total)
+    all_p_values = sorted(original_p_values + gap_fill_p_values + refinement_p_values)
+
     cfg = create_custom_config(
         taxa_values=[8192],
-        sequence_length_values=[500, 1000],
+        sequence_length_values=[1000],
         mutation_rate=0.1,
         p_values=tuple(all_p_values),
         bootstrap_reps=10,
         compute_metrics_on_guardrails=True,
-        run_name="8192_500_1000_mu_01",
-        display_mode="debug"
+        run_name="8192_1k_mu_01_parallel",
+        display_mode="debug",
+        # Parallel execution with middle-out strategy
+        num_workers=8,
+        use_middle_out=True,
+        low_side_threshold=50.0,
+        low_side_epsilon=0.99,  # Triggers when performance < 50.99%
+        guardrails_metric='partition_agreement_M'
     )
     
     # Option 3: Manually construct Config (for full control)

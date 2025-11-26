@@ -140,11 +140,16 @@ def create_custom_config(
     taxa_values=None,
     sequence_length_values=None,
     compute_metrics_on_guardrails=False,
-    display_mode="progress"
+    display_mode="progress",
+    num_workers=1,
+    use_middle_out=False,
+    low_side_threshold=50.0,
+    low_side_epsilon=0.99,
+    guardrails_metric='partition_agreement_M'
 ) -> Config:
     """
     Create a custom configuration with specified parameters.
-    
+
     Args:
         num_taxa: Number of taxa (for single experiment)
         sequence_length: Sequence length (for single experiment)
@@ -157,13 +162,18 @@ def create_custom_config(
         sequence_length_values: List of sequence lengths (for grid)
         compute_metrics_on_guardrails: Whether to compute metrics when guardrails trigger
         display_mode: Display mode ("progress" or "debug")
-    
+        num_workers: Number of parallel workers (1 = sequential)
+        use_middle_out: Use middle-out p-value processing strategy
+        low_side_threshold: Stop low-side expansion when agreement < this threshold
+        low_side_epsilon: Epsilon margin for low-side threshold (effective check: < threshold + epsilon)
+        guardrails_metric: Metric for guardrails ('sign_agreement', 'partition_agreement_M', etc.)
+
     Returns:
         Config object with custom parameters
     """
     if p_values is None:
         p_values = tuple(np.logspace(-4, 0, 15))
-    
+
     return Config(
         num_taxa=num_taxa,
         sequence_length=sequence_length,
@@ -177,6 +187,11 @@ def create_custom_config(
         fiedler_method=compute_fiedler_estimate,
         progress_prints=3,
         compute_metrics_on_guardrails=compute_metrics_on_guardrails,
-        display_mode=display_mode
+        display_mode=display_mode,
+        num_workers=num_workers,
+        use_middle_out=use_middle_out,
+        low_side_threshold=low_side_threshold,
+        low_side_epsilon=low_side_epsilon,
+        guardrails_metric=guardrails_metric
     )
 

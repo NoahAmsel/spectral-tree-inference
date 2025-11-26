@@ -22,6 +22,14 @@ from utils.persistent_cache import (
     load_experiment_data
 )
 
+# Import middle-out runner (conditional on use_middle_out flag)
+try:
+    from .middle_out_runner import sweep_for_params_middle_out
+    MIDDLE_OUT_AVAILABLE = True
+except ImportError:
+    MIDDLE_OUT_AVAILABLE = False
+    log_warning('bootstrap', "Middle-out runner not available, falling back to sequential")
+
 
 def align_fiedler_by_dot_product(fiedler_vector: np.ndarray, reference_vector: np.ndarray) -> np.ndarray:
     """
@@ -201,10 +209,58 @@ def sweep_for_params(
 
     # Compute Laplacian of M once (for metrics that need it)
     L_M = compute_laplacian(M)
-    
+
     # Get config parameters for metrics
     empirical_rank_threshold = getattr(cfg, 'empirical_rank_threshold', None)
     coherence_k = getattr(cfg, 'coherence_k', 2)
+
+    # Dispatch to middle-out parallel runner if enabled
+    if getattr(cfg, 'use_middle_out', False) and getattr(cfg, 'num_workers', 1) > 1:
+        if not MIDDLE_OUT_AVAILABLE:
+            log_warning('bootstrap', "Middle-out requested but not available, falling back to sequential")
+        else:
+            log_info('bootstrap', f"Using middle-out parallel processing with {cfg.num_workers} workers", force=True)
+
+            # Compute M-based metrics once (needed for filling guardrail results)
+            try:
+                M_metrics = metric_composer(
+                    M=M, S=M, L_M=L_M, L_S=L_M,
+                    p=1.0,
+                    empirical_rank_threshold=empirical_rank_threshold,
+                    coherence_k=coherence_k
+                )
+                M_constants = {
+                    'operator_norm_error': float('nan'),
+                    'empirical_rank_M': M_metrics.get('empirical_rank_M', float('nan')),
+                    'empirical_rank_L_M': M_metrics.get('empirical_rank_L_M', float('nan')),
+                    'spectral_gap_M': M_metrics.get('spectral_gap_M', float('nan')),
+                    'spectral_gap_L_M': M_metrics.get('spectral_gap_L_M', float('nan')),
+                    'coherence_M': M_metrics.get('coherence_M', float('nan')),
+                    'coherence_L_M': M_metrics.get('coherence_L_M', float('nan')),
+                    'min_separation_M': M_metrics.get('min_separation_M', float('nan')),
+                    'min_separation_L_M': M_metrics.get('min_separation_L_M', float('nan')),
+                }
+            except Exception as e:
+                log_warning('bootstrap', f"Failed to compute M-based metrics: {e}")
+                M_constants = {}
+
+            # Call middle-out runner
+            sign_agreements, partition_agreement_M, partition_agreement_S, dot_products, metrics_dict = \
+                sweep_for_params_middle_out(
+                    cfg=cfg,
+                    n_taxa=n_taxa,
+                    seq_len=seq_len,
+                    M=M,
+                    fiedler_ref=fiedler_ref,
+                    L_M=L_M,
+                    M_constants=M_constants,
+                    run_dir=run_dir
+                )
+
+            return fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S, dot_products, metrics_dict
+
+    # Fall through to sequential processing
+    log_info('bootstrap', "Using sequential processing", force=True)
 
     sign_agreements: List[float] = []            # Legacy metric (kept for comparison)
     partition_agreement_M: List[float] = []      # NEW: ideal scenario (both use M)
@@ -222,7 +278,7 @@ def sweep_for_params(
     metrics_dict: Dict[str, List[Tuple[float, float, float]]] = {
         key: [] for key in metric_keys
     }
-    
+
     milestones = progress_milestones(cfg.bootstrap_reps, cfg.progress_prints)
 
     for p_idx, p in enumerate(cfg.p_values):

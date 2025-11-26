@@ -13,7 +13,10 @@ from utils.plotting import (
     plot_faceted_by_sequence_length
 )
 from utils.random_entries import clear_similarity_cache
-from utils.logging import log_info, create_progress_bar, create_config_progress_bar, set_display_mode, is_progress_mode
+from utils.logging import (
+    log_info, create_progress_bar, create_config_progress_bar,
+    set_display_mode, is_progress_mode, setup_log_file, close_log_file, get_log_file_path
+)
 from .bootstrap_sweep import sweep_for_params
 
 
@@ -39,6 +42,11 @@ class ExperimentRunner:
         set_seed(cfg.seed)
         self.run_dir = make_run_dir(cfg.run_name)
         save_config(cfg, self.run_dir)
+
+        # Setup file-based logging
+        setup_log_file(self.run_dir)
+        log_info('experiment', f"Log file created: {get_log_file_path()}", force=True)
+        log_info('experiment', f"All progress will be logged to this file", force=True)
 
     def _print_opening_title(self):
         """Print opening title with experiment configuration."""
@@ -128,7 +136,10 @@ class ExperimentRunner:
         log_info('experiment', f"Completed! Results saved to: {self.run_dir}", force=True)
         # Clear cache after single run
         clear_similarity_cache()
-        
+
+        # Close log file
+        close_log_file()
+
         return self.run_dir, sign_agreements
     
     def _run_taxa_sweep(self) -> Tuple[str, Dict[int, List[float]]]:
@@ -223,7 +234,10 @@ class ExperimentRunner:
         )
         
         log_info('experiment', f"[done] artifacts written to: {self.run_dir} for taxa counts: {list(self.cfg.taxa_values)}", force=True)
-        
+
+        # Close log file
+        close_log_file()
+
         return self.run_dir, all_results
     
     def _run_grid_search(self) -> Tuple[str, Dict[Tuple[int, int], List[float]]]:
@@ -330,5 +344,8 @@ class ExperimentRunner:
             f"taxa={list(self.cfg.taxa_values)}, seq_len={list(self.cfg.sequence_length_values)}",
             force=True
         )
-        
+
+        # Close log file
+        close_log_file()
+
         return self.run_dir, all_results
