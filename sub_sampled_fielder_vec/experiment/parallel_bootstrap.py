@@ -309,12 +309,16 @@ def create_perfect_result(p: float, M_constants: Dict) -> Dict:
 
 
 def create_below_threshold_result(p: float) -> Dict:
-    """Create a result dict for p-values below threshold (low-side guardrails)."""
+    """Create a result dict for p-values below threshold (low-side guardrails).
+    
+    For partition agreements, we use 50.0 (random baseline) instead of NaN
+    since this is the expected performance when there's no signal.
+    """
     return {
         'p': float(p),
         'sign_agreement': float('nan'),
-        'partition_agreement_M': float('nan'),
-        'partition_agreement_S': float('nan'),
+        'partition_agreement_M': 50.0,
+        'partition_agreement_S': 50.0,
         'dot_product': float('nan'),
         'metrics': {},
         'S_avg': None
