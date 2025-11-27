@@ -55,9 +55,17 @@ def compute_fielder_vector(similarity_matrix: np.ndarray) -> np.ndarray:
     """
     Compute the Fiedler vector with deterministic sign convention.
 
-    This function now delegates to FiedlerVectorComputer for better organization.
+    Convenience wrapper that computes Laplacian from similarity matrix
+    and then computes the Fiedler vector.
+
+    Args:
+        similarity_matrix: Similarity matrix S
+
+    Returns:
+        Fiedler vector with consistent sign convention
     """
-    return _fiedler_computer.compute(similarity_matrix)
+    laplacian = compute_laplacian(similarity_matrix)
+    return _fiedler_computer.compute(laplacian)
 
 
 def compute_fiedler_from_laplacian(laplacian: np.ndarray) -> np.ndarray:
@@ -81,19 +89,34 @@ def compute_fiedler_from_laplacian(laplacian: np.ndarray) -> np.ndarray:
         >>> # Reuse L for Fiedler vector (avoids recomputing Laplacian)
         >>> f = compute_fiedler_from_laplacian(L)
     """
-    return _fiedler_computer.compute_from_laplacian(laplacian)
+    return _fiedler_computer.compute(laplacian)
 
 
 def compute_fielder_for_sparse_matrix(similarity_matrix: np.ndarray) -> np.ndarray:
     """
-    Compute the Fiedler vector for the Laplacian of the given similarity matrix.
-    This version is optimized for sparse matrices.
-    
-    This function now delegates to FiedlerVectorComputer for better organization.
+    Compute the Fiedler vector for sparse similarity matrices.
+
+    Convenience wrapper that computes Laplacian from sparse similarity matrix
+    and uses sparse solver. The FiedlerVectorComputer will automatically detect
+    the sparse format and use the appropriate solver.
+
+    Args:
+        similarity_matrix: Sparse similarity matrix S
+
+    Returns:
+        Fiedler vector with consistent sign convention
     """
-    # Force sparse computation
-    is_sparse_format = isinstance(similarity_matrix, csr_matrix)
-    return _fiedler_computer._compute_sparse(similarity_matrix, is_sparse_format)
+    # Compute Laplacian (handles sparse matrices efficiently)
+    from scipy.sparse import issparse, diags as sparse_diags
+
+    if issparse(similarity_matrix):
+        # Use sparse Laplacian computation
+        degrees = np.array(similarity_matrix.sum(axis=0)).flatten()
+        laplacian = sparse_diags(degrees) - similarity_matrix
+    else:
+        laplacian = compute_laplacian(similarity_matrix)
+
+    return _fiedler_computer.compute(laplacian)
 
 def align_fiedler_vector(fiedler_vector: np.ndarray, reference_vector: np.ndarray) -> np.ndarray:
     """

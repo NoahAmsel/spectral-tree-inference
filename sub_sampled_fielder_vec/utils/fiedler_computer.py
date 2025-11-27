@@ -190,22 +190,12 @@ class FiedlerVectorComputer:
         # Enforce a consistent sign convention
         return self._apply_sign_convention(fiedler_vector)
 
-    def _apply_sign_convention(self, fiedler_vector: np.ndarray) -> np.ndarray:
-        """
-        Enforce a consistent sign convention on the Fiedler vector.
-        
-        Choose sign so that the first non-zero element is positive.
-        
-        Args:
-            fiedler_vector: Fiedler vector
-            
-        Returns:
-            Fiedler vector with consistent sign
-        """
-        first_nonzero_idx = np.argmax(np.abs(fiedler_vector) > 1e-12)
-        if fiedler_vector[first_nonzero_idx] < 0:
-            return -fiedler_vector
-        return fiedler_vector
+  def _apply_sign_convention(self, fiedler_vector: np.ndarray) -> np.ndarray:
+      # Find first nonzero and exit immediately
+      for i, val in enumerate(fiedler_vector):
+          if abs(val) > 1e-12:
+              return -fiedler_vector if val < 0 else fiedler_vector
+      return fiedler_vector  # All zeros case
     
     def align_vector(self, fiedler_vector: np.ndarray, reference_vector: np.ndarray) -> np.ndarray:
         """
