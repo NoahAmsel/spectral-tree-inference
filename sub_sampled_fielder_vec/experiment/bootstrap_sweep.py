@@ -281,39 +281,41 @@ def sweep_for_params(
 
     milestones = progress_milestones(cfg.bootstrap_reps, cfg.progress_prints)
 
+    # OPTIMIZATION (Issue #10): Compute M-based metrics ONCE before p-value loop
+    # These metrics are constant across all p-values since they depend only on M and L_M
+    log_info('bootstrap', "Computing M-based metrics (once for all p-values)...", force=True)
+    try:
+        M_metrics = metric_composer(
+            M=M, S=M, L_M=L_M, L_S=L_M,  # Use M/L_M for both since we're computing M metrics
+            p=1.0,  # Not used for M metrics
+            empirical_rank_threshold=empirical_rank_threshold,
+            coherence_k=coherence_k
+        )
+        # Extract M and L_M metrics (ignore the S/L_S columns which are duplicates)
+        M_constants = {
+            'operator_norm_error': float('nan'),  # Not applicable for M alone
+            'empirical_rank_M': M_metrics.get('empirical_rank_M', float('nan')),
+            'empirical_rank_L_M': M_metrics.get('empirical_rank_L_M', float('nan')),
+            'spectral_gap_M': M_metrics.get('spectral_gap_M', float('nan')),
+            'spectral_gap_L_M': M_metrics.get('spectral_gap_L_M', float('nan')),
+            'coherence_M': M_metrics.get('coherence_M', float('nan')),
+            'coherence_L_M': M_metrics.get('coherence_L_M', float('nan')),
+            'min_separation_M': M_metrics.get('min_separation_M', float('nan')),
+            'min_separation_L_M': M_metrics.get('min_separation_L_M', float('nan')),
+        }
+    except Exception as e:
+        log_warning('bootstrap', f"Failed to compute M-based metrics: {e}")
+        M_constants = {key: float('nan') for key in metric_keys}
+
     for p_idx, p in enumerate(cfg.p_values):
         log_info('bootstrap', f"Processing p-value {p_idx+1}/{len(cfg.p_values)}: p={p:.4g}", force=True)
-        
+
         agreements_for_p: List[float] = []
-        
+
         # Initialize metric lists for this p-value - one list per metric
         metric_values: Dict[str, List[float]] = {
             key: [] for key in metric_keys
         }
-        
-        # Compute M-based metrics once per p-value (they don't depend on bootstrap rep)
-        try:
-            M_metrics = metric_composer(
-                M=M, S=M, L_M=L_M, L_S=L_M,  # Use M/L_M for both since we're computing M metrics
-                p=1.0,  # Not used for M metrics
-                empirical_rank_threshold=empirical_rank_threshold,
-                coherence_k=coherence_k
-            )
-            # Extract M and L_M metrics (ignore the S/L_S columns which are duplicates)
-            M_constants = {
-                'operator_norm_error': float('nan'),  # Not applicable for M alone
-                'empirical_rank_M': M_metrics.get('empirical_rank_M', float('nan')),
-                'empirical_rank_L_M': M_metrics.get('empirical_rank_L_M', float('nan')),
-                'spectral_gap_M': M_metrics.get('spectral_gap_M', float('nan')),
-                'spectral_gap_L_M': M_metrics.get('spectral_gap_L_M', float('nan')),
-                'coherence_M': M_metrics.get('coherence_M', float('nan')),
-                'coherence_L_M': M_metrics.get('coherence_L_M', float('nan')),
-                'min_separation_M': M_metrics.get('min_separation_M', float('nan')),
-                'min_separation_L_M': M_metrics.get('min_separation_L_M', float('nan')),
-            }
-        except Exception as e:
-            log_warning('bootstrap', f"Failed to compute M-based metrics: {e}")
-            M_constants = {key: float('nan') for key in metric_keys}
         
         # Check if p=1.0 (or very close): S=M and L_S=L_M, no need to bootstrap
         p_is_one = p >= 0.9999

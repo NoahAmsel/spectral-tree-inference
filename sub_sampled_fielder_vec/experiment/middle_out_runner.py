@@ -223,8 +223,6 @@ def sweep_for_params_middle_out(
 
             # Process chunk in parallel
             log_info('middle_out', f"  Processing {len(to_process)} p-values in parallel...", force=True)
-            log_info('middle_out', f"  Estimated time: ~{cfg.bootstrap_reps * 6}s per p-value (with {cfg.num_workers} workers in parallel)", force=True)
-            log_info('middle_out', f"  [Workers are running silently - check back in ~{cfg.bootstrap_reps * 6}s]", force=True)
 
             round_start_time = time.time()
             worker_args = [(M, fiedler_ref, L_M, p, cfg) for (_, _, p) in to_process]
