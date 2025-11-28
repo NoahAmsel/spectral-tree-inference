@@ -38,7 +38,7 @@ class Config:
     compute_metrics_on_guardrails: bool = False  # Whether to compute metrics when guardrails trigger
     # Partition algorithm parameters (align with STDR defaults from spectral_tree_reconstruction.py:40)
     num_gaps: int = 1      # Number of gap-based thresholds to evaluate
-    min_split: int = 1     # Minimum partition size
+    min_split: int = 2     # Minimum partition size (2 prevents singleton trap where svd2=0)
     # Display mode: "progress" for clean progress bars, "debug" for verbose logging
     display_mode: str = "progress"  # "progress" or "debug"
     # Persistent cache: whether to use disk-based caching for experiment data
