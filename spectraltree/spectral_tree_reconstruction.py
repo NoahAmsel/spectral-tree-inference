@@ -1,6 +1,7 @@
 import os
 from itertools import product
 import time
+import warnings
 
 import dendropy
 # Having trouble installing numba (https://github.com/numba/llvmlite/issues/527)
@@ -73,16 +74,60 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
     return partition_min
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
+
+# Track if we've already warned about degenerate matrices (avoid spam)
+_svd2_warned = False
+
 def svd2(mat, normalized = False):
+    """
+    Compute second singular value of a matrix using TruncatedSVD.
+
+    Note: For very thin/tall matrices (e.g., 998x2 from unbalanced partitions),
+    numerical instability may occur. This is expected and handled gracefully.
+    """
+    global _svd2_warned
+
     if (mat.shape[0] == 1) | (mat.shape[1] == 1):
         return 0
     elif (mat.shape[0] == 2) | (mat.shape[1] == 2):
         return np.linalg.svd(mat,False,False)[1]
     else:
-        sigmas = SVD2_OBJ.fit(mat).singular_values_
+        # Suppress sklearn's verbose RuntimeWarnings during SVD computation
+        # These occur for degenerate matrices (e.g., 998x2 from unbalanced partitions)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=RuntimeWarning, module='sklearn')
+
+            try:
+                sigmas = SVD2_OBJ.fit(mat).singular_values_
+
+                # Check if result is valid
+                if np.any(np.isnan(sigmas)) or np.any(np.isinf(sigmas)):
+                    if not _svd2_warned:
+                        warnings.warn(
+                            f"svd2: Numerical instability detected for matrix shape {mat.shape}. "
+                            f"This typically occurs with highly unbalanced partitions (e.g., 998|2 split). "
+                            f"Returning 0 for this partition. (This warning shown once per session)",
+                            RuntimeWarning,
+                            stacklevel=2
+                        )
+                        _svd2_warned = True
+                    return 0
+
+            except Exception as e:
+                if not _svd2_warned:
+                    warnings.warn(
+                        f"svd2: TruncatedSVD failed for matrix shape {mat.shape}: {e}. "
+                        f"This typically occurs with degenerate/unbalanced partitions. "
+                        f"Returning 0. (This warning shown once per session)",
+                        RuntimeWarning,
+                        stacklevel=2
+                    )
+                    _svd2_warned = True
+                return 0
+
         if normalized:
             return sigmas[1]**2/(sigmas[1]**2 + sigmas[0]**2)
-        else: 
+        else:
             return sigmas[1]
 
 def compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma):

@@ -1,0 +1,221 @@
+Detailed Stability Metrics - Full Statistics
+========================================================================================================================
+
+
+[1] unrooted_pure_kingman_tree_pop_size_0.1, n=1000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0028  std=  0.0021  min=  0.0011  max=  0.0083
+  Numerical Rank           : mean=  1.0024  std=  0.0035  min=  1.0002  max=  1.0123
+  Sigma2                   : mean=  0.0503  std=  0.0245  min=  0.0087  max=  0.0937
+  Spectral Gap             : mean= 13.9874  std= 21.4073  min=  0.1521  max= 71.5109
+  Relative Spectral Gap    : mean=  0.0171  std=  0.0272  min=  0.0002  max=  0.0913
+  Lambda2                  : mean=883.5945  std= 47.3565  min=782.9004  max=951.1458
+  Lambda3                  : mean=897.5818  std= 31.2532  min=848.9621  max=952.8064
+  Partition Split          : 268.9|731.1 (std: 140.7|140.7, range: [49-498]|[502-951])
+  Partition Validity       : 0/10 (0.0%)
+
+[2] unrooted_pure_kingman_tree_pop_size_0.1, n=2000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0017  std=  0.0010  min=  0.0006  max=  0.0039
+  Numerical Rank           : mean=  1.0047  std=  0.0039  min=  1.0003  max=  1.0126
+  Sigma2                   : mean=  0.1147  std=  0.0642  min=  0.0294  max=  0.2741
+  Spectral Gap             : mean= 62.9865  std= 39.8211  min=  3.0298  max=127.0686
+  Relative Spectral Gap    : mean=  0.0444  std=  0.0345  min=  0.0016  max=  0.1181
+  Lambda2                  : mean=1605.4844  std=267.4352  min=971.3084  max=1899.6345
+  Lambda3                  : mean=1668.4709  std=241.0258  min=1086.0520  max=1902.6643
+  Partition Split          : 573.4|1426.6 (std: 204.6|204.6, range: [249-980]|[1020-1751])
+  Partition Validity       : 0/10 (0.0%)
+
+[3] unrooted_pure_kingman_tree_pop_size_0.1, n=3000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0013  std=  0.0010  min=  0.0005  max=  0.0034
+  Numerical Rank           : mean=  1.0024  std=  0.0024  min=  1.0001  max=  1.0088
+  Sigma2                   : mean=  0.1626  std=  0.1177  min=  0.0000  max=  0.3335
+  Spectral Gap             : mean= 51.6923  std= 42.4197  min=  0.7562  max=129.3741
+  Relative Spectral Gap    : mean=  0.0206  std=  0.0176  min=  0.0003  max=  0.0561
+  Lambda2                  : mean=2595.8822  std=134.8283  min=2306.5993  max=2853.6659
+  Lambda3                  : mean=2647.5745  std=106.4489  min=2435.9734  max=2854.4221
+  Partition Split          : 625.0|2375.0 (std: 410.5|410.5, range: [17-1167]|[1833-2983])
+  Partition Validity       : 0/10 (0.0%)
+
+[4] unrooted_pure_kingman_tree_pop_size_0.1, n=1000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0041  std=  0.0031  min=  0.0012  max=  0.0123
+  Numerical Rank           : mean=  1.0121  std=  0.0221  min=  1.0007  max=  1.0780
+  Sigma2                   : mean=  0.0869  std=  0.0507  min=  0.0250  max=  0.2007
+  Spectral Gap             : mean= 28.0163  std= 31.0307  min=  2.6298  max=113.5326
+  Relative Spectral Gap    : mean=  0.0454  std=  0.0621  min=  0.0030  max=  0.2234
+  Lambda2                  : mean=736.9783  std=105.3272  min=508.2642  max=882.9328
+  Lambda3                  : mean=764.9946  std= 81.4916  min=621.7968  max=886.8456
+  Partition Split          : 203.1|796.9 (std: 143.7|143.7, range: [28-454]|[546-972])
+  Partition Validity       : 0/10 (0.0%)
+
+[5] unrooted_pure_kingman_tree_pop_size_0.1, n=2000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0013  std=  0.0010  min=  0.0007  max=  0.0034
+  Numerical Rank           : mean=  1.0196  std=  0.0231  min=  1.0046  max=  1.0831
+  Sigma2                   : mean=  0.3217  std=  0.2585  min=  0.0509  max=  1.0174
+  Spectral Gap             : mean=101.1764  std= 78.3084  min= 21.5919  max=303.1778
+  Relative Spectral Gap    : mean=  0.0799  std=  0.0796  min=  0.0138  max=  0.3007
+  Lambda2                  : mean=1416.8039  std=173.8961  min=1008.3325  max=1600.5180
+  Lambda3                  : mean=1517.9803  std=118.1105  min=1311.5102  max=1693.5602
+  Partition Split          : 647.3|1352.7 (std: 262.4|262.4, range: [270-991]|[1009-1730])
+  Partition Validity       : 0/10 (0.0%)
+
+[6] unrooted_pure_kingman_tree_pop_size_0.1, n=3000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0009  std=  0.0004  min=  0.0004  max=  0.0016
+  Numerical Rank           : mean=  1.0114  std=  0.0166  min=  1.0011  max=  1.0576
+  Sigma2                   : mean=  0.3865  std=  0.3420  min=  0.0478  max=  1.2584
+  Spectral Gap             : mean= 73.1825  std= 97.7034  min=  1.2492  max=351.0581
+  Relative Spectral Gap    : mean=  0.0396  std=  0.0644  min=  0.0005  max=  0.2279
+  Lambda2                  : mean=2300.5021  std=312.5452  min=1540.4902  max=2626.6947
+  Lambda3                  : mean=2373.6847  std=228.9952  min=1891.5483  max=2651.4358
+  Partition Split          : 661.7|2338.3 (std: 410.7|410.7, range: [32-1333]|[1667-2968])
+  Partition Validity       : 0/10 (0.0%)
+
+[7] unrooted_pure_kingman_tree_pop_size_1.0, n=1000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0030  std=  0.0017  min=  0.0013  max=  0.0073
+  Numerical Rank           : mean=  1.1242  std=  0.1013  min=  1.0184  max=  1.4019
+  Sigma2                   : mean=  0.2739  std=  0.1875  min=  0.0288  max=  0.5430
+  Spectral Gap             : mean= 59.7600  std= 41.1178  min=  6.6822  max=126.2932
+  Relative Spectral Gap    : mean=  0.2458  std=  0.2608  min=  0.0196  max=  0.7657
+  Lambda2                  : mean=360.1694  std=148.1023  min=130.6420  max=649.8092
+  Lambda3                  : mean=419.9294  std=133.9788  min=230.6720  max=698.1072
+  Partition Split          : 247.1|752.9 (std: 156.1|156.1, range: [13-498]|[502-987])
+  Partition Validity       : 0/10 (0.0%)
+
+[8] unrooted_pure_kingman_tree_pop_size_1.0, n=2000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0014  std=  0.0005  min=  0.0007  max=  0.0023
+  Numerical Rank           : mean=  1.1790  std=  0.1470  min=  1.0173  max=  1.4304
+  Sigma2                   : mean=  0.2672  std=  0.1715  min=  0.0632  max=  0.6830
+  Spectral Gap             : mean=146.8214  std=102.4910  min= 40.2258  max=371.9141
+  Relative Spectral Gap    : mean=  0.7365  std=  1.1189  min=  0.0551  max=  3.8998
+  Lambda2                  : mean=487.6715  std=271.4302  min= 58.6526  max=857.7276
+  Lambda3                  : mean=634.4929  std=241.2736  min=287.3879  max=931.0609
+  Partition Split          : 469.9|1530.1 (std: 347.4|347.4, range: [55-971]|[1029-1945])
+  Partition Validity       : 0/10 (0.0%)
+
+[9] unrooted_pure_kingman_tree_pop_size_1.0, n=3000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0010  std=  0.0005  min=  0.0004  max=  0.0022
+  Numerical Rank           : mean=  1.2155  std=  0.2132  min=  1.0164  max=  1.6893
+  Sigma2                   : mean=  0.5949  std=  0.5200  min=  0.0359  max=  1.8058
+  Spectral Gap             : mean=215.0074  std=171.8662  min= 35.4242  max=576.0820
+  Relative Spectral Gap    : mean=  0.9759  std=  1.9614  min=  0.0277  max=  6.7983
+  Lambda2                  : mean=809.8177  std=560.3646  min= 50.4640  max=1956.9264
+  Lambda3                  : mean=1024.8251  std=498.4748  min=275.1561  max=2024.3442
+  Partition Split          : 708.7|2291.3 (std: 414.6|414.6, range: [76-1464]|[1536-2924])
+  Partition Validity       : 0/10 (0.0%)
+
+[10] unrooted_pure_kingman_tree_pop_size_1.0, n=1000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0029  std=  0.0007  min=  0.0020  max=  0.0047
+  Numerical Rank           : mean=  1.4733  std=  0.2706  min=  1.0684  max=  1.9765
+  Sigma2                   : mean=  0.1215  std=  0.0879  min=  0.0001  max=  0.2407
+  Spectral Gap             : mean= 58.2126  std= 51.3984  min=  1.9790  max=139.9387
+  Relative Spectral Gap    : mean=118.4629  std=351.9139  min=  0.0363  max=1174.2018
+  Lambda2                  : mean= 59.9572  std= 44.3834  min=  0.0590  max=123.7363
+  Lambda3                  : mean=118.1698  std= 76.5528  min=  2.9168  max=252.4602
+  Partition Split          : 295.7|704.3 (std: 156.0|156.0, range: [2-480]|[520-998])
+  Partition Validity       : 0/10 (0.0%)
+
+[11] unrooted_pure_kingman_tree_pop_size_1.0, n=2000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0020  std=  0.0008  min=  0.0010  max=  0.0035
+  Numerical Rank           : mean=  1.2434  std=  0.1957  min=  1.0335  max=  1.7296
+  Sigma2                   : mean=  0.4903  std=  0.4243  min=  0.0382  max=  1.4240
+  Spectral Gap             : mean=110.7090  std= 72.0178  min= 26.2594  max=294.3420
+  Relative Spectral Gap    : mean=  2.7539  std=  4.7807  min=  0.1708  max= 16.0829
+  Lambda2                  : mean=295.5565  std=244.5256  min=  4.3928  max=676.2243
+  Lambda3                  : mean=406.2655  std=266.6528  min= 30.6521  max=820.2190
+  Partition Split          : 529.3|1470.7 (std: 233.7|233.7, range: [124-881]|[1119-1876])
+  Partition Validity       : 0/10 (0.0%)
+
+[12] unrooted_pure_kingman_tree_pop_size_1.0, n=3000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0011  std=  0.0004  min=  0.0006  max=  0.0020
+  Numerical Rank           : mean=  1.4926  std=  0.2734  min=  1.1273  max=  1.9930
+  Sigma2                   : mean=  0.4675  std=  0.3323  min=  0.0043  max=  1.0999
+  Spectral Gap             : mean=183.9373  std=150.0562  min=  4.3747  max=584.1819
+  Relative Spectral Gap    : mean=  3.3499  std=  8.1429  min=  0.0233  max= 27.7253
+  Lambda2                  : mean=276.1205  std=174.6354  min= 21.0703  max=654.4400
+  Lambda3                  : mean=460.0578  std=160.9583  min=192.3733  max=805.3121
+  Partition Split          : 700.5|2299.5 (std: 442.2|442.2, range: [5-1259]|[1741-2995])
+  Partition Validity       : 0/10 (0.0%)
+
+[13] unrooted_pure_kingman_tree_pop_size_1000, n=1000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.1571  std=  0.0243  min=  0.0974  max=  0.1845
+  Numerical Rank           : mean= 58.9563  std= 11.9528  min= 38.5386  max= 74.7445
+  Sigma2                   : mean=  0.0003  std=  0.0004  min=  0.0001  max=  0.0013
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.0720  std=  0.0436  min= -0.1368  max= -0.0142
+  Lambda2                  : mean= -0.0001  std=  0.0000  min= -0.0001  max= -0.0001
+  Lambda3                  : mean= -0.0001  std=  0.0000  min= -0.0001  max= -0.0001
+  Partition Split          : 445.5|554.5 (std: 44.8|44.8, range: [353-498]|[502-647])
+  Partition Validity       : 0/10 (0.0%)
+
+[14] unrooted_pure_kingman_tree_pop_size_1000, n=2000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0897  std=  0.0134  min=  0.0622  max=  0.1155
+  Numerical Rank           : mean= 65.7843  std=  7.1340  min= 55.3337  max= 79.4049
+  Sigma2                   : mean=  0.0004  std=  0.0003  min=  0.0001  max=  0.0010
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.0816  std=  0.0555  min= -0.2327  max= -0.0165
+  Lambda2                  : mean= -0.0001  std=  0.0000  min= -0.0002  max= -0.0001
+  Lambda3                  : mean= -0.0001  std=  0.0000  min= -0.0001  max= -0.0001
+  Partition Split          : 857.3|1142.7 (std: 78.5|78.5, range: [748-997]|[1003-1252])
+  Partition Validity       : 0/10 (0.0%)
+
+[15] unrooted_pure_kingman_tree_pop_size_1000, n=3000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0635  std=  0.0119  min=  0.0374  max=  0.0788
+  Numerical Rank           : mean= 68.9009  std= 15.6769  min= 39.3136  max= 99.1617
+  Sigma2                   : mean=  0.0019  std=  0.0033  min=  0.0002  max=  0.0113
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.0602  std=  0.0369  min= -0.1568  max= -0.0230
+  Lambda2                  : mean= -0.0002  std=  0.0000  min= -0.0002  max= -0.0002
+  Lambda3                  : mean= -0.0002  std=  0.0000  min= -0.0002  max= -0.0002
+  Partition Split          : 1385.6|1614.4 (std: 80.1|80.1, range: [1227-1486]|[1514-1773])
+  Partition Validity       : 0/10 (0.0%)
+
+[16] unrooted_pure_kingman_tree_pop_size_1000, n=1000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.2435  std=  0.0259  min=  0.2085  max=  0.2906
+  Numerical Rank           : mean= 88.2761  std= 13.9137  min= 65.0609  max=109.7733
+  Sigma2                   : mean=  0.0005  std=  0.0004  min=  0.0001  max=  0.0011
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.1283  std=  0.1177  min= -0.3323  max= -0.0041
+  Lambda2                  : mean= -0.0001  std=  0.0000  min= -0.0001  max= -0.0001
+  Lambda3                  : mean= -0.0001  std=  0.0000  min= -0.0001  max= -0.0001
+  Partition Split          : 448.3|551.7 (std: 23.7|23.7, range: [394-482]|[518-606])
+  Partition Validity       : 0/10 (0.0%)
+
+[17] unrooted_pure_kingman_tree_pop_size_1000, n=2000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.1448  std=  0.0174  min=  0.1099  max=  0.1724
+  Numerical Rank           : mean=107.6182  std= 26.2176  min= 50.9167  max=144.4087
+  Sigma2                   : mean=  0.0013  std=  0.0013  min=  0.0004  max=  0.0041
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.0657  std=  0.0401  min= -0.1558  max= -0.0201
+  Lambda2                  : mean= -0.0001  std=  0.0000  min= -0.0002  max= -0.0001
+  Lambda3                  : mean= -0.0001  std=  0.0000  min= -0.0002  max= -0.0001
+  Partition Split          : 917.3|1082.7 (std: 64.3|64.3, range: [782-1000]|[1000-1218])
+  Partition Validity       : 0/10 (0.0%)
+
+[18] unrooted_pure_kingman_tree_pop_size_1000, n=3000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.1005  std=  0.0176  min=  0.0780  max=  0.1328
+  Numerical Rank           : mean= 98.1718  std= 22.1834  min= 70.6070  max=150.5884
+  Sigma2                   : mean=  0.0021  std=  0.0011  min=  0.0007  max=  0.0043
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0001
+  Relative Spectral Gap    : mean= -0.1047  std=  0.0720  min= -0.2546  max= -0.0189
+  Lambda2                  : mean= -0.0002  std=  0.0000  min= -0.0002  max= -0.0001
+  Lambda3                  : mean= -0.0002  std=  0.0000  min= -0.0002  max= -0.0001
+  Partition Split          : 1341.4|1658.6 (std: 82.4|82.4, range: [1224-1478]|[1522-1776])
+  Partition Validity       : 0/10 (0.0%)
+
+========================================================================================================================

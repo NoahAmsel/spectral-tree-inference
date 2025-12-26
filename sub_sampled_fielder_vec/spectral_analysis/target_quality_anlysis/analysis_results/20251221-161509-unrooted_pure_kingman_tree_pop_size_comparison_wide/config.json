@@ -1,0 +1,89 @@
+{
+  "experiment_name": "unrooted_pure_kingman_tree_pop_size_comparison_wide",
+  "description": "Comparison of Kingman mean trees (population sizes 1000, 1.0) under JC69 model versus balanced tree.",
+  "models": [
+    {
+      "name": "unrooted_pure_kingman_tree_pop_size_0.1",
+      "tree": {
+        "model": "kingman",
+        "params": {
+          "pop_size": 0.1
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "unrooted_pure_kingman_tree_pop_size_1.0",
+      "tree": {
+        "model": "kingman",
+        "params": {
+          "pop_size": 1.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "unrooted_pure_kingman_tree_pop_size_10",
+      "tree": {
+        "model": "kingman",
+        "params": {
+          "pop_size": 10.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "unrooted_pure_kingman_tree_pop_size_100",
+      "tree": {
+        "model": "kingman",
+        "params": {
+          "pop_size": 100.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "unrooted_pure_kingman_tree_pop_size_1000",
+      "tree": {
+        "model": "kingman",
+        "params": {
+          "pop_size": 1000.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    }
+  ],
+  "configs": [
+    {
+      "n": 3000,
+      "L": 10000,
+      "mu": 0.1
+    },
+    {
+      "n": 3000,
+      "L": 10000,
+      "mu": 0.2
+    }
+  ],
+  "analysis_params": {
+    "num_gaps": 0,
+    "min_split": 2,
+    "k_scree": 10,
+    "coherence_k": 4
+  }
+}

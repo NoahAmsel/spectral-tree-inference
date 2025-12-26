@@ -1,0 +1,54 @@
+{
+  "experiment_name": "birth_death_tree_comparison",
+  "description": "Comparison of birth-death process trees: Pure birth (Yule, λ=0.5, μ=0) vs extinction-heavy (λ=0.5, μ=0.4). Yule generates imbalanced trees; high extinction creates bushy trees near root, stressing bipartition finding.",
+
+  "models": [
+    {
+      "name": "yule_pure_birth",
+      "description": "Pure birth (Yule process). λ=0.5, μ=0. Generates more imbalanced trees than Kingman.",
+      "tree": {
+        "model": "birth_death",
+        "params": {
+          "birth_rate": 0.5,
+          "death_rate": 0.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "extinction_heavy",
+      "description": "High extinction rate (λ=0.5, μ=0.4). Creates bushy trees near root, potentially stressing bipartition finding.",
+      "tree": {
+        "model": "birth_death",
+        "params": {
+          "birth_rate": 0.5,
+          "death_rate": 0.4
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    }
+  ],
+
+  "configs": [
+    {"n": 1000, "L": 10000, "mu": 0.1},
+    {"n": 2000, "L": 10000, "mu": 0.1},
+    {"n": 3000, "L": 10000, "mu": 0.1},
+    {"n": 1000, "L": 10000, "mu": 0.2},
+    {"n": 2000, "L": 10000, "mu": 0.2},
+    {"n": 3000, "L": 10000, "mu": 0.2}
+  ],
+
+  "analysis_params": {
+    "num_gaps": 5,
+    "min_split": 2,
+    "k_scree": 10,
+    "coherence_k": 4
+  }
+}
+

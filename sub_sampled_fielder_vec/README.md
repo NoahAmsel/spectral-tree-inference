@@ -2,6 +2,8 @@
 
 A modular framework for analyzing Fiedler vector quality under sub-sampling, using partition-based metrics that reflect how STDR (Spectral Top-Down Recovery) actually partitions phylogenetic trees.
 
+> **Status (Nov 2025)**: Experiments are launched through `scripts/run_experiment.py`, which builds validated `StructuredConfig` objects (Pydantic v2) under `src/config`. See `docs/MIGRATION_GUIDE.md` for migration notes.
+
 ## Overview
 
 This framework evaluates whether **preprocessing** (subsampling similarity matrices and averaging Fiedler vectors) produces equivalent results to using full data directly in STDR. It supports three types of experiments:
@@ -81,46 +83,35 @@ Then we compare:
 
 ```mermaid
 flowchart TD
-    Start([main_taxa_sweep.py]) --> Config[Config Definition]
+    Start([scripts/run_experiment.py]) --> Config[Edit SWEEP_CONFIG<br/>custom_config(...)]
     Config --> Runner[ExperimentRunner.__init__]
 
     Runner --> Setup[Setup Phase]
     Setup --> Seed[set_seed]
     Setup --> Dir[make_run_dir]
-    Setup --> SaveCfg[save_config]
+    Setup --> SaveCfg[StructuredConfig.to_json]
 
-    Seed --> Run[runner.run]
-    Dir --> Run
-    SaveCfg --> Run
+    Seed --> Loop[Iterate n_taxa × seq_len]
+    Dir --> Loop
+    SaveCfg --> Loop
 
-    Run --> Check{Experiment Type?}
-
-    Check -->|Single| Single[_run_single_experiment]
-    Check -->|Taxa Sweep| Taxa[_run_taxa_sweep]
-    Check -->|Grid Search| Grid[_run_grid_search]
-
-    Single --> Sweep[sweep_for_params]
-    Taxa --> Loop1[Loop: taxa_values]
-    Grid --> Loop2[Loop: taxa × seq_len]
-
-    Loop1 --> Sweep
-    Loop2 --> Sweep
+    Loop --> Sweep[sweep_for_params]
 
     Sweep --> GenSeq[generate_sequences]
-    GenSeq --> FiedlerRef[Compute Reference Fiedler<br/>p=1.0]
-    FiedlerRef --> Bootstrap[Bootstrap Loop]
+    GenSeq --> FiedlerRef[Compute Reference Fiedler<br/>p=1.0 full matrix]
+    FiedlerRef --> Bootstrap[Bootstrap Loop per p-value]
 
-    Bootstrap --> SubsampleS[Subsample M → S<br/>Streaming S average]
-    SubsampleS --> EstFiedler[Compute Fiedler from S]
-    EstFiedler --> Align[Align and Normalize<br/>dot product alignment]
-    Align --> Collect[Collect Aligned Vectors]
-    Collect --> Average[Average Aligned Vectors<br/>Normalize]
-    Average --> PartMetrics[Compute Partition Metrics<br/>3 partitions, 2 agreements]
-    PartMetrics --> VecMetrics[Compute Vector Metrics<br/>dot product, sign agreement]
+    Bootstrap --> SubsampleS[Subsample M → S_k<br/>Streaming average S̄]
+    SubsampleS --> EstFiedler[Compute Fiedler from S_k]
+    EstFiedler --> Align[Align to reference<br/>(dot-product sign fix)]
+    Align --> Collect[Aggregate aligned vectors]
+    Collect --> Average[Normalize averaged vector]
+    Average --> PartMetrics[Partition Metrics<br/>M vs M and M vs S̄]
+    PartMetrics --> VecMetrics[Vector Metrics<br/>dot product, sign agreement]
 
-    VecMetrics --> Save[Save Results]
-    Save --> Plot[Generate Plots]
-    Plot --> End([Results Directory])
+    VecMetrics --> Save[save_single_results / save_taxa_results]
+    Save --> Plot[plot_from_json_simple / plot_faceted]
+    Plot --> End([results/<timestamp>-<run_name>])
 
     style Start fill:#e1f5ff
     style Runner fill:#fff4e1
@@ -135,37 +126,48 @@ flowchart TD
 ```
 sub_sampled_fielder_vec/
 │
-├── main_taxa_sweep.py          # Entry point - defines Config and launches experiment
+├── README.md                          # This file
+├── scripts/
+│   ├── run_experiment.py             # CLI entry point, edit SWEEP_CONFIG here
+│   ├── check_partition_quality.py    # Inspect σ₂-based partition quality
+│   └── validation/                   # Targeted validation utilities
 │
-├── experiment/                  # Core experiment execution
-│   ├── __init__.py
-│   ├── experiment_runner.py    # ExperimentRunner class - orchestrates experiments
-│   └── bootstrap_sweep.py      # sweep_for_params() - bootstrap logic with streaming S
+├── src/                               # Core experiment implementation
+│   ├── config/                        # StructuredConfig + presets
+│   │   ├── base_config.py            # Pydantic models (tree, sequence, experiment, ...)
+│   │   ├── presets.py                # Helpers like custom_config()
+│   │   └── sweeps.py                 # Predefined sweep builders
+│   ├── models/                        # Tree and sequence abstractions
+│   │   ├── tree_models.py
+│   │   └── sequence_models.py
+│   ├── core/                          # Numerical kernels
+│   │   ├── similarity_builder.py
+│   │   ├── fiedler_computer.py
+│   │   └── metric_computer.py
+│   ├── runners/                       # Orchestration logic
+│   │   ├── experiment_runner.py
+│   │   ├── bootstrap_sweep.py
+│   │   └── parallel_bootstrap.py
+│   └── utils/                         # Shared utilities (logging, plotting, metrics, ...)
 │
-└── utils/                       # Utility modules
-    ├── experiment_config.py    # Config dataclass, setup utilities
-    ├── summaries.py            # Result saving (JSON, numpy arrays)
-    ├── plotting.py             # Visualization (single, multi, faceted plots)
-    ├── metrics.py              # Partition-based and vector metrics
-    ├── utils.py                # Sequence generation, Fiedler computation
-    ├── random_entries.py       # Fiedler estimation from similarity matrices
-    ├── fiedler_computer.py     # FiedlerVectorComputer class (sparse/dense)
-    ├── similarity_builder.py   # SimilarityMatrixBuilder with caching
-    ├── metric_computer.py      # MetricComputer for matrix metrics
-    └── logging.py              # Standardized logging utilities
+├── configs/                           # Saved JSON configs (presets + custom)
+├── docs/                              # Design notes and guides (migration, performance, ...)
+├── examples/                          # Small runnable samples
+├── tests/                             # Unit + integration suites
+└── results/                           # Automatically generated experiment artifacts
 ```
 
 ## Component Details
 
 ### 1. Main Entry Point
-**File**: `main_taxa_sweep.py`
+**File**: `scripts/run_experiment.py`
 
-- Defines experiment configuration using `Config` dataclass
-- Creates `ExperimentRunner` instance
-- Triggers experiment execution
+- Edit the `SWEEP_CONFIG` dictionary to describe the sweep (tree model, taxa, sequence length, p-values, etc.)
+- Calls `custom_config(...)` from `src/config/presets.py` to build a validated `StructuredConfig`
+- Creates an `ExperimentRunner` per `(n_taxa, sequence_length)` combination and launches the run
 
 ### 2. Experiment Runner
-**File**: `experiment/experiment_runner.py`
+**File**: `src/runners/experiment_runner.py`
 
 **Class**: `ExperimentRunner`
 
@@ -183,11 +185,11 @@ sub_sampled_fielder_vec/
 - Handles cache clearing between parameter combinations
 
 ### 3. Bootstrap Sweep
-**File**: `experiment/bootstrap_sweep.py`
+**File**: `src/runners/bootstrap_sweep.py`
 
 **Function**: `sweep_for_params(cfg, n_taxa, seq_len, run_dir)`
 
-**Returns**: `(fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S, dot_products, metrics_dict)`
+**Returns**: `(fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S, dot_products, metrics_dict, ...)`
 
 **Process**:
 1. Generate sequences for given (n_taxa, seq_len)
@@ -204,40 +206,24 @@ sub_sampled_fielder_vec/
      * Compute partition_agreement_M: compare partition_taxa(v_full, M) vs partition_taxa(v_avg, M)
      * Compute partition_agreement_S: compare partition_taxa(v_full, M) vs partition_taxa(v_avg, S_avg)
      * Compute dot_product and sign_agreement
-4. Return all metrics
+4. Return all metrics and per-p-value diagnostics (σ₂ statistics, partition splits, provenance flags)
+
+### 4. Configuration System
+**File**: `src/config/base_config.py`
+
+- `StructuredConfig` groups tree, sequence, experiment, metrics, guardrails, cache, and output sections into a single validated object
+- `TreeConfig` guards topology-specific parameters (`model`, `num_taxa`, `edge_length`, etc.)
+- `SequenceConfig` validates sequence models (JC69/HKY/GTR/...) including mutation rate defaults
+- `ExperimentConfig` tracks sweep knobs (p-values, bootstrap reps, run name, progress mode, parallelism)
+- Helper methods (`to_json_file`, `summary`, `get_num_taxa`, ...) keep run metadata consistent across scripts
 
 **Memory Optimization**:
 - Uses Welford's streaming algorithm to compute S_avg without storing all K matrices
 - For n=4000, K=100: saves ~12.8 GB memory
 - Only stores one S_avg matrix (~128 MB) instead of 100 S matrices
 
-### 4. Configuration
-**File**: `utils/experiment_config.py`
-
-**Class**: `Config` (dataclass)
-
-**Key Parameters**:
-- `num_taxa`: int - Number of taxa (single experiment)
-- `sequence_length`: int - Sequence length (single experiment)
-- `taxa_values`: List[int] | None - Taxa values for sweep
-- `sequence_length_values`: List[int] | None - Sequence lengths for grid search
-- `mutation_rate`: float - Mutation rate
-- `p_values`: List[float] - Sub-sampling probabilities
-- `bootstrap_reps`: int - Number of bootstrap replicates
-- `seed`: int - Random seed
-- `run_name`: str - Experiment name
-- `num_gaps`: int = 1 - Number of gap-based thresholds (STDR parameter)
-- `min_split`: int = 1 - Minimum partition size (STDR parameter)
-- `fiedler_method`: Callable - Function to compute Fiedler vectors (default: `compute_fiedler_from_similarity`)
-
-**Functions**:
-- `set_seed()`: Set random seeds for reproducibility
-- `make_run_dir()`: Create timestamped results directory
-- `progress_milestones()`: Calculate progress printing milestones
-- `save_config()`: Save config to JSON
-
 ### 5. Metrics
-**File**: `utils/metrics.py`
+**File**: `src/utils/metrics.py`
 
 **Partition-Based Metrics**:
 - `compute_partition_agreement(v_full, v_avg, sim_full, sim_avg, num_gaps, min_split)`
@@ -261,7 +247,7 @@ sub_sampled_fielder_vec/
   - Returns aggregated statistics (mean, median, std)
 
 ### 6. Results & Summaries
-**File**: `utils/summaries.py`
+**File**: `src/utils/summaries.py`
 
 **Functions**:
 - `save_single_results(run_dir, p_values, sign_agreements, partition_agreement_M, partition_agreement_S, dot_products, metrics_dict)`
@@ -293,7 +279,7 @@ sub_sampled_fielder_vec/
 **Matrix Metrics**: Each metric includes `mean_{metric}`, `median_{metric}`, `std_{metric}` columns.
 
 ### 7. Plotting
-**File**: `utils/plotting.py`
+**File**: `src/utils/plotting.py`
 
 **Functions**:
 - `plot_from_json_simple()`: Plot agreement metrics vs p for single/taxa experiments
@@ -301,7 +287,7 @@ sub_sampled_fielder_vec/
 - `plot_fiedler_vectors()`: Visualize Fiedler vectors
 
 ### 8. Fiedler Computation
-**File**: `utils/random_entries.py`
+**File**: `src/utils/random_entries.py`
 
 **Functions**:
 - `compute_fiedler_from_similarity(similarity_matrix)` - **NEW strict version**
@@ -316,7 +302,7 @@ sub_sampled_fielder_vec/
 - `_subsample_matrix_entries(M, p, seed)` - Subsample and scale by 1/p
 - `_get_cached_similarity_matrix(observations)` - Cached full similarity computation
 
-**File**: `utils/fiedler_computer.py`
+**File**: `src/core/fiedler_computer.py`
 
 **Class**: `FiedlerVectorComputer`
 - Automatic sparse/dense method selection based on sparsity
@@ -327,18 +313,17 @@ sub_sampled_fielder_vec/
 
 ### Single Experiment
 ```python
-from utils.experiment_config import Config
-from experiment.experiment_runner import ExperimentRunner
+from sub_sampled_fielder_vec.src.config.presets import custom_config
+from sub_sampled_fielder_vec.src.runners.experiment_runner import ExperimentRunner
 
-cfg = Config(
+cfg = custom_config(
     num_taxa=8192,
     sequence_length=1000,
     mutation_rate=0.1,
     p_values=(1e-4, 1e-3, 1e-2, 1e-1, 1.0),
     bootstrap_reps=100,
-    num_gaps=1,        # STDR parameter
-    min_split=1,       # STDR parameter
-    run_name="single_experiment"
+    run_name="single_experiment",
+    display_mode="progress",
 )
 
 runner = ExperimentRunner(cfg)
@@ -348,40 +333,42 @@ run_dir, results = runner.run()
 ### Taxa Sweep
 ```python
 import numpy as np
+from sub_sampled_fielder_vec.src.config.presets import custom_config
+from sub_sampled_fielder_vec.src.runners.experiment_runner import ExperimentRunner
 
-cfg = Config(
+cfg = custom_config(
     taxa_values=[1024, 2048, 4096, 8192],
-    sequence_length=1000,  # Fixed
+    sequence_length=1000,
     mutation_rate=0.3,
     p_values=tuple(np.logspace(-4, 0, 15)),
     bootstrap_reps=30,
-    run_name="taxa_sweep"
+    run_name="taxa_sweep",
 )
 
 runner = ExperimentRunner(cfg)
-run_dir, results = runner.run()
+run_dir, results = runner._run_taxa_sweep()
 ```
 
 ### Grid Search
 ```python
-cfg = Config(
+cfg = custom_config(
     taxa_values=[1024, 2048, 4096],
     sequence_length_values=[500, 1000, 2000],
     mutation_rate=0.3,
     p_values=tuple(np.logspace(-4, 0, 15)),
     bootstrap_reps=30,
-    run_name="grid_search"
+    run_name="grid_search",
 )
 
 runner = ExperimentRunner(cfg)
-run_dir, results = runner.run()
+# Grid mode is being reintroduced; call the helper once support lands.
 ```
 
 ## Data Flow
 
 ### Detailed Algorithm
 
-1. **Configuration** → `Config` object defines experiment parameters
+1. **Configuration** → `StructuredConfig` (built via `custom_config` or directly via Pydantic models) defines experiment parameters
 
 2. **Setup** → Seed set, run directory created, config saved
 
@@ -601,6 +588,57 @@ If `partition_taxa` fails (raises exception):
 - Partition metrics add ~0.1-5s per p-value depending on n
 - Use sparse methods automatically for sparse matrices
 - Consider reducing `num_gaps` (1 is usually sufficient)
+
+## Directory Structure
+
+High-level layout of the maintained sub-package:
+
+```
+sub_sampled_fielder_vec/
+├── README.md
+├── configs/
+│   ├── presets/            # Checked-in JSON presets
+│   └── custom/             # User-provided configs (gitignored)
+├── docs/                   # Long-form documentation and retrospectives
+├── examples/               # Lightweight usage samples
+├── scripts/                # Entry points (experiments, validation, tooling)
+├── src/                    # Installable package code (importable as `sub_sampled_fielder_vec`)
+│   ├── config/             # StructuredConfig definitions + helpers
+│   ├── core/               # Numerical kernels and matrix ops
+│   ├── models/             # Tree + sequence model factories
+│   ├── runners/            # Experiment orchestration (ExperimentRunner, bootstrap)
+│   └── utils/              # Logging, plotting, metrics, persistence
+├── tests/                  # Unit / integration coverage
+└── results/                # Auto-generated run artifacts
+```
+
+Key docs to review when extending the system:
+
+- `docs/MIGRATION_GUIDE.md` – rationale behind the StructuredConfig move
+- `docs/PERFORMANCE_OPTIMIZATION_REPORT.md` – profiling results + hotspots
+- `docs/SVD_OPTIMIZATION_SUMMARY.md` – σ₂ scoring deep-dive
+
+For an end-to-end diff of the reorganization, see `docs/development/PLAN_partition_metric.md` and related notes in `docs/development/`.
+
+## Quick Start
+
+### 1. Configure a Sweep
+Edit `scripts/run_experiment.py` and update `SWEEP_CONFIG`. Keep the keys aligned with the helpers in `src/config/presets.py` (tree model, taxa list, sequence lengths, mutation rate, p-values, bootstrap reps, etc.).
+
+### 2. Launch Experiments
+```bash
+python scripts/run_experiment.py
+```
+This script will materialize timestamped subdirectories under `results/` (e.g., `results/20251130-193600-balanced_tree_mu_01/...`).
+
+### 3. Inspect Results
+- JSON tables: `results/<ts-run_name>/results*.json`
+- Plots: `plot_single.png`, `plot_multi_taxa.png`, `plot_grid_faceted.png`
+- Reference vectors: `fiedler_ref*.npy`
+
+### 4. Optional Utilities
+- `python scripts/check_partition_quality.py` – recompute σ₂-based diagnostics for a saved run
+- `python examples/basic_config_examples.py` – see how to construct `StructuredConfig` programmatically
 
 ## Citation
 

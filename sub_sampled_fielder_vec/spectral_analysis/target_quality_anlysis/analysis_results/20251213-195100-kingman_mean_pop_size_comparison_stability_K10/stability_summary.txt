@@ -1,0 +1,52 @@
+Stability Summary - Variation Across Configurations
+============================================================
+
+This shows how trial-averaged metrics vary across different
+(model, n, L, μ) configurations.
+
+Coherence (mean):
+  Mean:     0.046476
+  Median:   0.002638
+  Min:      0.000876
+  Max:      0.244420
+  Std:      0.071448
+
+Numerical Rank (mean):
+  Mean:    28.459606
+  Median:   1.306003
+  Min:      1.002335
+  Max:    115.443051
+  Std:     40.707012
+
+Sigma2 (mean):
+  Mean:     0.060865
+  Median:   0.028420
+  Min:      0.000018
+  Max:      0.226196
+  Std:      0.073111
+
+Spectral Gap (mean):
+  Mean:    79.981994
+  Median:  59.567895
+  Min:      0.000003
+  Max:    275.166982
+  Std:     85.359478
+
+Relative Spectral Gap (mean):
+  Mean:     0.355925
+  Median:   0.042593
+  Min:     -0.121892
+  Max:      1.796916
+  Std:      0.645529
+
+Partition Validity Success Rate:
+  Mean:     0.750000
+  Median:   0.800000
+  Min:      0.400000
+  Max:      1.000000
+  Std:      0.174005
+
+Partition Validity Analysis:
+  Configs with 100% success: 3/18
+  Configs with partial success: 15/18
+  Configs with 0% success: 0/18
