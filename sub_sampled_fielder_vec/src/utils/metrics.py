@@ -265,11 +265,16 @@ def _normalize_vector(v: np.ndarray) -> np.ndarray:
         Normalized vector
 
     Raises:
-        ValueError: If vector has zero or near-zero norm
+        ValueError: If vector has zero or near-zero norm, with diagnostic info
     """
     norm = np.linalg.norm(v)
     if norm < 1e-12:
-        raise ValueError(f"Vector has zero or near-zero norm: {norm}")
+        # Provide diagnostic information about the degenerate vector
+        n_nan = np.sum(np.isnan(v))
+        n_inf = np.sum(np.isinf(v))
+        n_zero = np.sum(v == 0)
+        diag_info = f"norm={norm:.2e}, nan_count={n_nan}, inf_count={n_inf}, zero_count={n_zero}/{len(v)}"
+        raise ValueError(f"Vector has zero or near-zero norm: {diag_info}")
     return v / norm
 
 
@@ -344,11 +349,42 @@ def compute_fiedler_dot_product(
         Absolute dot product (0-1, higher = better alignment)
 
     Raises:
-        ValueError: If either vector has zero norm
+        ValueError: If either vector has zero norm or numerical issues occur
     """
-    u_norm = _normalize_vector(fiedler_full)
-    v_norm = _normalize_vector(fiedler_avg)
-    return float(np.abs(np.dot(u_norm, v_norm)))
+    # Suppress numpy RuntimeWarnings (divide by zero, overflow, invalid value)
+    # and instead raise a single informative ValueError if issues occur
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+
+        try:
+            # Normalize both vectors
+            u_norm = _normalize_vector(fiedler_full)
+            v_norm = _normalize_vector(fiedler_avg)
+
+            # Compute dot product
+            dot_prod = np.dot(u_norm, v_norm)
+
+            # Check for numerical issues in the result
+            if not np.isfinite(dot_prod):
+                raise ValueError(f"Dot product is not finite: {dot_prod}")
+
+            return float(np.abs(dot_prod))
+
+        except ValueError as e:
+            # Re-raise with context about which vector failed
+            if "fiedler_full" in str(e) or "zero or near-zero norm" in str(e):
+                # Determine which vector is problematic
+                norm_full = np.linalg.norm(fiedler_full)
+                norm_avg = np.linalg.norm(fiedler_avg)
+
+                if norm_full < 1e-12:
+                    raise ValueError(f"Reference Fiedler vector has degenerate norm: {str(e)}")
+                elif norm_avg < 1e-12:
+                    raise ValueError(f"Averaged Fiedler vector has degenerate norm: {str(e)}")
+                else:
+                    raise ValueError(f"Numerical issue in dot product computation: {str(e)}")
+            else:
+                raise
 
 
 def compute_reference_partition_and_quality(

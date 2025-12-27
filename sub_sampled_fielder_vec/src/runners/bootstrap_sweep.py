@@ -8,7 +8,8 @@ import numpy as np
 import spectraltree
 
 # Add spectral_analysis to path for partition validation
-PACKAGE_ROOT = Path(__file__).resolve().parents[3]
+# parents[2] = sub_sampled_fielder_vec (contains spectral_analysis folder)
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 SPECTRAL_ANALYSIS_PATH = PACKAGE_ROOT / "spectral_analysis" / "target_quality_anlysis" / "output"
 if str(SPECTRAL_ANALYSIS_PATH) not in sys.path:
     sys.path.insert(0, str(SPECTRAL_ANALYSIS_PATH))
@@ -29,7 +30,7 @@ from ..config import StructuredConfig
 from ..models import get_tree_factory, get_sequence_factory
 from ..utils.summaries import save_single_results, save_json
 from ..utils.random_entries import _get_cached_similarity_matrix, _subsample_matrix_entries, compute_fiedler_from_similarity, compute_fiedler_from_laplacian
-from ..utils.logging import log_info, log_warning, create_progress_bar, suppress_warnings
+from ..utils.logging import log_info, log_warning, create_progress_bar, suppress_warnings, is_progress_mode
 from ..utils.persistent_cache import (
     _get_cache_key,
     save_experiment_data,
@@ -61,24 +62,35 @@ def align_fiedler_by_dot_product(fiedler_vector: np.ndarray, reference_vector: n
     Returns:
         Aligned and normalized Fiedler vector
     """
+    import warnings
     from ..utils.metrics import _normalize_vector
 
-    try:
-        v_normalized = _normalize_vector(fiedler_vector)
-        u_normalized = _normalize_vector(reference_vector)
-    except ValueError as e:
-        log_warning('align', f"Normalization failed: {e}")
-        return fiedler_vector
+    # Suppress all numpy RuntimeWarnings during alignment
+    # (normalization and dot product can trigger numerical warnings for degenerate vectors)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
 
-    # Compute dot product (wrapped to catch numerical warnings)
-    with suppress_warnings('align'):
+        try:
+            v_normalized = _normalize_vector(fiedler_vector)
+            u_normalized = _normalize_vector(reference_vector)
+        except ValueError as e:
+            # Vector is degenerate (near-zero norm) - skip alignment
+            log_warning('align', f"Normalization failed: {e}")
+            return fiedler_vector
+
+        # Compute dot product
         dot_product = np.dot(v_normalized, u_normalized)
 
-    # Flip sign if needed
-    if dot_product < 0:
-        return -v_normalized
-    else:
-        return v_normalized
+        # Check for numerical issues
+        if not np.isfinite(dot_product):
+            log_warning('align', f"Non-finite dot product: {dot_product}")
+            return fiedler_vector
+
+        # Flip sign if needed
+        if dot_product < 0:
+            return -v_normalized
+        else:
+            return v_normalized
 
 
 def check_guardrails_trigger(sign_agreements: List[float],
@@ -184,7 +196,8 @@ def sweep_for_params(
     progress_callback: callable = None
 ) -> Tuple[np.ndarray, List[float], List[float], List[float], List[float],
            Dict[str, List[Tuple[float, float, float]]], float, List[float], List[float],
-           List[Tuple[int, int] | None], List[Tuple[int, int] | None], List[str]]:
+           List[Tuple[int, int] | None], List[Tuple[int, int] | None], List[str],
+           object, np.ndarray]:
     """
     Run sweep for a specific (n_taxa, seq_len) combination.
 
@@ -206,7 +219,7 @@ def sweep_for_params(
         Tuple of (fiedler_ref, sign_agreements, partition_agreement_M,
                   partition_agreement_S, dot_products, metrics_dict, reference_partition_quality,
                   sigma2_avg_M_list, sigma2_avg_S_list, partition_split_M_list,
-                  partition_split_S_list, result_source_list)
+                  partition_split_S_list, result_source_list, tree, partition_ref)
         - fiedler_ref: Reference Fiedler vector from full matrix (p=1.0)
         - sign_agreements: Legacy sign agreement metric (kept for comparison)
         - partition_agreement_M: Agreement using M for both partitions (ideal)
@@ -219,6 +232,8 @@ def sweep_for_params(
         - partition_split_M_list: Partition split sizes (n_small, n_large) for M, or None
         - partition_split_S_list: Partition split sizes (n_small, n_large) for S_avg, or None
         - result_source_list: Source of each result ('computed', 'guardrail_high', 'p_is_one')
+        - tree: Ground truth tree object
+        - partition_ref: Reference partition mask (boolean array)
     """
     log_info('bootstrap', f"n={n_taxa}, L={seq_len} preparing experiment data…")
 
@@ -310,7 +325,8 @@ def sweep_for_params(
             return (fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S, 
                     dot_products, metrics_dict, reference_partition_quality, 
                     sigma2_avg_M_list, sigma2_avg_S_list,
-                    partition_split_M_list, partition_split_S_list, result_source_list)
+                    partition_split_M_list, partition_split_S_list, result_source_list,
+                    tree, partition_ref)
 
     # Fall through to sequential processing
     log_info('bootstrap', "Using sequential processing")
@@ -380,6 +396,10 @@ def sweep_for_params(
         log_warning('bootstrap', f"Failed to compute M-based metrics: {e}")
         M_constants = {key: float('nan') for key in metric_keys}
         M_constants['ipr_ref'] = float('nan')
+
+    # Track numerical failures across all p-values
+    numerical_failures = 0
+    failed_p_values = []
 
     for p_idx, p in enumerate(cfg.experiment.p_values):
         log_info('bootstrap', f"Processing p-value {p_idx+1}/{len(cfg.experiment.p_values)}: p={p:.4g}")
@@ -586,7 +606,11 @@ def sweep_for_params(
                 try:
                     dot_prod = compute_fiedler_dot_product(fiedler_ref, v_avg)
                 except Exception as e:
-                    log_warning('bootstrap', f"dot_product failed: {e}")
+                    # Track numerical failure
+                    numerical_failures += 1
+                    failed_p_values.append((p, str(e)))
+                    # Log detailed error in debug mode only
+                    log_warning('bootstrap', f"dot_product failed for p={p:.4g}: {e}")
                     dot_prod = float('nan')
             else:
                 log_warning('bootstrap', f"No valid aligned vectors for p={p:.4g}")
@@ -769,8 +793,26 @@ def sweep_for_params(
 
             log_info('bootstrap', f"Saved incremental results for p={p:.4g}")
 
-    return (fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S, 
-            dot_products, metrics_dict, reference_partition_quality, 
+    # Log summary of numerical issues if any occurred
+    if numerical_failures > 0:
+        total_p_values = len(cfg.experiment.p_values)
+        failure_pct = 100.0 * numerical_failures / total_p_values
+        log_warning('bootstrap',
+                   f"Numerical issues detected for {numerical_failures}/{total_p_values} p-values ({failure_pct:.1f}%). "
+                   f"See NaN values in dot_product column.",
+                   force=True)
+
+        # In debug mode, list all failed p-values
+        if not is_progress_mode():
+            log_info('bootstrap', "Failed p-values:")
+            for p_val, error_msg in failed_p_values:
+                # Truncate error message to keep it readable
+                error_summary = error_msg.split(':')[0] if ':' in error_msg else error_msg
+                log_info('bootstrap', f"  p={p_val:.4g}: {error_summary}")
+
+    return (fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S,
+            dot_products, metrics_dict, reference_partition_quality,
             sigma2_avg_M_list, sigma2_avg_S_list,
-            partition_split_M_list, partition_split_S_list, result_source_list)
+            partition_split_M_list, partition_split_S_list, result_source_list,
+            tree, partition_ref)
 

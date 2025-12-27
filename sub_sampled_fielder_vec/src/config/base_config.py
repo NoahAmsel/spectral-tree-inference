@@ -172,13 +172,15 @@ class MetricsConfig(BaseModel):
     Attributes:
         empirical_rank_threshold: Threshold for empirical rank computation (None = auto)
         coherence_k: Number of top singular vectors for coherence computation
-        num_gaps: Number of gap-based thresholds for partition (STDR parameter)
+        num_gaps: Number of gap-based thresholds for partition (STDR parameter).
+            0 = always use threshold=0 (sign-based partition, no optimization).
+            >0 = evaluate num_gaps gap-based thresholds and pick best by σ₂.
         min_split: Minimum partition size (STDR parameter)
         validate_partition_in_tree: Validate that Fiedler partition corresponds to a real tree edge before running experiment
     """
     empirical_rank_threshold: Optional[float] = None
     coherence_k: int = Field(ge=1, default=2)
-    num_gaps: int = Field(ge=1, default=1)
+    num_gaps: int = Field(ge=0, default=0)  # 0 = always use threshold=0 (no gap-based optimization)
     min_split: int = Field(ge=1, default=1)
     validate_partition_in_tree: bool = Field(
         default=True,

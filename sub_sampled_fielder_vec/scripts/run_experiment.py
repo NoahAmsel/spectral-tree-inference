@@ -16,43 +16,25 @@ from src import ExperimentRunner
 from src.config.presets import custom_config
 
 
-WIDE_SWEEP_P_VALUES = list(np.logspace(-3, 0, 15))
-STABILIZED_TRANSITION_P_VALUES = [
-    0.005179474679231213,  # Earliest high-agreement transition (8192 x 10k)
-    0.0062,
-    0.0072,
-    0.0082,
-    0.01,
-    0.0115,
-    0.0139,
-    0.0165,
-    0.019306977288832496,
-    0.0268,  # Anything larger was already saturated at ~100% agreement
-]
-MISSING_P_VALUES = [
-    0.0062,
-    0.0071968567300115215,
-]
-
-DEFAULT_P_VALUES = sorted(set(WIDE_SWEEP_P_VALUES + STABILIZED_TRANSITION_P_VALUES))
+WIDE_SWEEP_P_VALUES = list(np.logspace(-4, 0, 20))
 
 # -----------------------------------------------------------------------------
 # Manual configuration block - edit these values when launching new sweeps.
 # -----------------------------------------------------------------------------
 SWEEP_CONFIG: Dict[str, Any] = {
     "tree_model": "kingman_mean",
-    "taxa_values": [512,1024,2048],
-    "sequence_length_values": [500,1000,5000,10000],
+    "taxa_values": [500, 1000, 3000, 5000,7000, 10000],
+    "sequence_length_values": [10000],
     "mutation_rate": 0.1,
-    "bootstrap_reps": 10,
+    "bootstrap_reps": 20,
     "num_workers": 8,
     "use_middle_out": False,
-    "run_name_prefix": "kingman_mean_tree_mu_01_pop_1000",
+    "run_name_prefix": "kingman_mean_taxa_sweep_L10k_Ne1",
     "p_values": WIDE_SWEEP_P_VALUES,
     "tree_params": {
-        "pop_size": 1000.0,
+        "pop_size": 1.0,
     },
-    "coherence_k": 3,
+    "coherence_k": 4,
     "num_gaps": 0,
     "guardrails_enabled": False,
 }
@@ -70,7 +52,7 @@ def main():
     taxa_values: List[int] = config["taxa_values"]
     sequence_length_values: List[int] = config["sequence_length_values"]
     mutation_rate: float = config["mutation_rate"]
-    p_values: List[float] = config.get("p_values", DEFAULT_P_VALUES)
+    p_values: List[float] = config.get("p_values", WIDE_SWEEP_P_VALUES)
     tree_kwargs = config.get("tree_params", {})
     bootstrap_reps: int = config.get("bootstrap_reps", 10)
     num_workers: int = config.get("num_workers", 8)

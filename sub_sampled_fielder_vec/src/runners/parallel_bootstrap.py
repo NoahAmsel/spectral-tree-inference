@@ -34,22 +34,34 @@ def align_fiedler_by_dot_product(fiedler_vector: np.ndarray, reference_vector: n
     Returns:
         Aligned and normalized Fiedler vector
     """
-    try:
-        v_normalized = _normalize_vector(fiedler_vector)
-        u_normalized = _normalize_vector(reference_vector)
-    except ValueError as e:
-        log_warning('align', f"Normalization failed: {e}")
-        return fiedler_vector
+    import warnings
 
-    # Compute dot product (wrapped to catch numerical warnings)
-    with suppress_warnings('align'):
+    # Suppress all numpy RuntimeWarnings during alignment
+    # (normalization and dot product can trigger numerical warnings for degenerate vectors)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+
+        try:
+            v_normalized = _normalize_vector(fiedler_vector)
+            u_normalized = _normalize_vector(reference_vector)
+        except ValueError as e:
+            # Vector is degenerate (near-zero norm) - skip alignment
+            log_warning('align', f"Normalization failed: {e}")
+            return fiedler_vector
+
+        # Compute dot product
         dot_product = np.dot(v_normalized, u_normalized)
 
-    # Flip sign if needed
-    if dot_product < 0:
-        return -v_normalized
-    else:
-        return v_normalized
+        # Check for numerical issues
+        if not np.isfinite(dot_product):
+            log_warning('align', f"Non-finite dot product: {dot_product}")
+            return fiedler_vector
+
+        # Flip sign if needed
+        if dot_product < 0:
+            return -v_normalized
+        else:
+            return v_normalized
 
 
 def process_p_value_worker(

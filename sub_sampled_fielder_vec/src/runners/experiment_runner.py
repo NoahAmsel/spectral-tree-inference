@@ -2,6 +2,8 @@
 import os
 from typing import Tuple, Dict, List
 from itertools import product
+from pathlib import Path
+import sys
 
 import numpy as np
 
@@ -22,6 +24,13 @@ from ..utils.logging import (
     set_display_mode, is_progress_mode, setup_log_file, close_log_file, get_log_file_path
 )
 from .bootstrap_sweep import sweep_for_params
+
+# Add spectral_analysis to path for tree plotting
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+SPECTRAL_ANALYSIS_PATH = PACKAGE_ROOT / "spectral_analysis" / "target_quality_anlysis" / "visualization"
+if str(SPECTRAL_ANALYSIS_PATH) not in sys.path:
+    sys.path.insert(0, str(SPECTRAL_ANALYSIS_PATH))
+from tree_plots import plot_tree_with_partition, plot_combined_tree_and_fiedler
 
 
 class ExperimentRunner:
@@ -101,7 +110,8 @@ class ExperimentRunner:
         (fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S, 
          dot_products, metrics_dict, reference_partition_quality, 
          sigma2_avg_M_list, sigma2_avg_S_list,
-         partition_split_M_list, partition_split_S_list, result_source_list) = sweep_for_params(
+         partition_split_M_list, partition_split_S_list, result_source_list,
+         tree, partition_ref) = sweep_for_params(
             cfg=self.cfg,
             n_taxa=self.cfg.get_num_taxa(),
             seq_len=self.cfg.get_sequence_length(),
@@ -136,6 +146,45 @@ class ExperimentRunner:
             run_dir=self.run_dir,
             output_path=os.path.join(self.run_dir, "fiedler_vectors.png")
         )
+        
+        # Generate tree partition visualizations if partition is available
+        if partition_ref is not None and tree is not None:
+            log_info('experiment', "Generating tree partition visualizations...", force=True)
+            n_taxa = self.cfg.get_num_taxa()
+            tree_plot_path = Path(self.run_dir) / f"tree_partition_n{n_taxa}"
+            
+            # Prepare stats dict for visualization
+            stats_dict = {
+                'sigma2': reference_partition_quality,
+                'partition_split': partition_split_M_list[0] if partition_split_M_list and partition_split_M_list[0] else None
+            }
+            # Add spectral gap if available
+            if metrics_dict and 'spectral_gap_L_M' in metrics_dict and metrics_dict['spectral_gap_L_M']:
+                stats_dict['spectral_gap'] = metrics_dict['spectral_gap_L_M'][0][0]  # Mean value
+            # Add coherence if available
+            if metrics_dict and 'coherence_L_M' in metrics_dict and metrics_dict['coherence_L_M']:
+                stats_dict['coherence'] = metrics_dict['coherence_L_M'][0][0]  # Mean value
+            
+            try:
+                plot_tree_with_partition(
+                    tree=tree,
+                    partition_mask=partition_ref,
+                    fiedler_vector=fiedler_ref,
+                    output_path=tree_plot_path,
+                    title=f"Tree Partition (n={n_taxa})",
+                    stats_dict=stats_dict
+                )
+                plot_combined_tree_and_fiedler(
+                    tree=tree,
+                    partition_mask=partition_ref,
+                    fiedler_vector=fiedler_ref,
+                    output_path=tree_plot_path,
+                    title=f"Tree Partition (n={n_taxa})",
+                    stats_dict=stats_dict
+                )
+                log_info('experiment', f"Tree partition visualizations saved to: {tree_plot_path}", force=True)
+            except Exception as e:
+                log_info('experiment', f"Failed to generate tree partition visualizations: {e}", force=True)
         
         log_info('experiment', f"Completed! Results saved to: {self.run_dir}", force=True)
         # Clear cache after single run
@@ -192,7 +241,7 @@ class ExperimentRunner:
 
             (fiedler_ref, sig, partition_agr_M, partition_agr_S, dot_prod, metrics_dict,
              ref_quality, sigma2_M, sigma2_S,
-             split_M, split_S, result_src) = sweep_for_params(
+             split_M, split_S, result_src, tree, partition_ref) = sweep_for_params(
                 cfg=self.cfg,
                 n_taxa=n_taxa,
                 seq_len=self.cfg.get_sequence_length(),
@@ -213,6 +262,44 @@ class ExperimentRunner:
             all_partition_split_S[n_taxa] = split_S
             all_result_source[n_taxa] = result_src
             np.save(os.path.join(self.run_dir, f"fiedler_ref_n={n_taxa}.npy"), fiedler_ref)
+            
+            # Generate tree partition visualizations for this n_taxa if partition is available
+            if partition_ref is not None and tree is not None:
+                log_info('experiment', f"Generating tree partition visualizations for n={n_taxa}...", force=True)
+                tree_plot_path = Path(self.run_dir) / f"tree_partition_n{n_taxa}"
+                
+                # Prepare stats dict for visualization
+                stats_dict = {
+                    'sigma2': ref_quality,
+                    'partition_split': split_M[0] if split_M and split_M[0] else None
+                }
+                # Add spectral gap if available
+                if metrics_dict and 'spectral_gap_L_M' in metrics_dict and metrics_dict['spectral_gap_L_M']:
+                    stats_dict['spectral_gap'] = metrics_dict['spectral_gap_L_M'][0][0]  # Mean value
+                # Add coherence if available
+                if metrics_dict and 'coherence_L_M' in metrics_dict and metrics_dict['coherence_L_M']:
+                    stats_dict['coherence'] = metrics_dict['coherence_L_M'][0][0]  # Mean value
+                
+                try:
+                    plot_tree_with_partition(
+                        tree=tree,
+                        partition_mask=partition_ref,
+                        fiedler_vector=fiedler_ref,
+                        output_path=tree_plot_path,
+                        title=f"Tree Partition (n={n_taxa})",
+                        stats_dict=stats_dict
+                    )
+                    plot_combined_tree_and_fiedler(
+                        tree=tree,
+                        partition_mask=partition_ref,
+                        fiedler_vector=fiedler_ref,
+                        output_path=tree_plot_path,
+                        title=f"Tree Partition (n={n_taxa})",
+                        stats_dict=stats_dict
+                    )
+                    log_info('experiment', f"Tree partition visualizations saved to: {tree_plot_path}", force=True)
+                except Exception as e:
+                    log_info('experiment', f"Failed to generate tree partition visualizations for n={n_taxa}: {e}", force=True)
 
             # Save incremental taxa-results after each taxa count
             save_taxa_results(
@@ -318,7 +405,8 @@ class ExperimentRunner:
                 pbar.update(1)
 
             (fiedler_ref, sig, partition_agr_M, partition_agr_S, dot_prod, metrics_dict,
-             ref_quality, sigma2_M, sigma2_S) = sweep_for_params(
+             ref_quality, sigma2_M, sigma2_S,
+             split_M, split_S, result_src, tree, partition_ref) = sweep_for_params(
                 cfg=self.cfg,
                 n_taxa=n_taxa,
                 seq_len=seq_len,

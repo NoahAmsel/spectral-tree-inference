@@ -332,15 +332,16 @@ class MetricComputer:
         x = rng.standard_normal(n)
         x /= np.linalg.norm(x)
 
-        for _ in range(n_iter):
-            # y = (S - M) @ x  -- computed without forming the difference matrix
-            y = S @ x - M @ x
-            norm_y = np.linalg.norm(y)
-            if norm_y < 1e-14:
-                return 0.0
-            x = y / norm_y
+        with suppress_warnings('metrics'):
+            for _ in range(n_iter):
+                # y = (S - M) @ x  -- computed without forming the difference matrix
+                y = S @ x - M @ x
+                norm_y = np.linalg.norm(y)
+                if norm_y < 1e-14:
+                    return 0.0
+                x = y / norm_y
 
-        # Final estimate: Rayleigh quotient gives the dominant eigenvalue magnitude
-        y = S @ x - M @ x
-        return float(np.linalg.norm(y))
+            # Final estimate: Rayleigh quotient gives the dominant eigenvalue magnitude
+            y = S @ x - M @ x
+            return float(np.linalg.norm(y))
 
