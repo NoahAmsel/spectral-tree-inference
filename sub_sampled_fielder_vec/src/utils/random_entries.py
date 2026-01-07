@@ -14,8 +14,8 @@ from ..core.utils import compute_fielder_vector, compute_fiedler_from_laplacian
 from .logging import log_info
 from ..core.similarity_builder import SimilarityMatrixBuilder
 
-# Global builder instance for backward compatibility
-_similarity_builder = SimilarityMatrixBuilder()
+# Global builder instance for backward compatibility (defaults to uniform)
+_similarity_builder = SimilarityMatrixBuilder(method="uniform")
 
 def _get_observations_hash(observations):
     """
@@ -42,7 +42,7 @@ def clear_similarity_cache():
     _similarity_builder.clear_cache()
 
 
-def _subsample_matrix_entries(matrix, p, seed=None):
+def _subsample_matrix_entries(matrix, p, seed=None, builder=None):
     """
     Subsample matrix entries with probability p and scale by 1/p.
     
@@ -50,13 +50,16 @@ def _subsample_matrix_entries(matrix, p, seed=None):
         matrix: Input matrix to subsample
         p: Sampling probability (0 < p <= 1)
         seed: Random seed for reproducibility
+        builder: Optional SimilarityMatrixBuilder instance (uses global if None)
         
     Returns:
         Subsampled matrix with entries scaled by 1/p
         
-    This function now delegates to SimilarityMatrixBuilder for better organization.
+    This function now delegates to SimilarityMatrixBuilder sampler for better organization.
     """
-    return _similarity_builder._subsample(matrix, p, seed)
+    if builder is None:
+        builder = _similarity_builder
+    return builder.sampler.sample(matrix, p, seed)
 
 
 def compute_fiedler_estimate(observations, p, roughness_factor=1.0, 

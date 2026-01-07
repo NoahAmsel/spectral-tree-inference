@@ -166,6 +166,26 @@ class ExperimentConfig(BaseModel):
         extra = "forbid"
 
 
+class SamplingConfig(BaseModel):
+    """Sampling method configuration.
+    
+    Attributes:
+        method: Sampling method ("uniform" or "leveraged")
+        theta: Phase 1 budget ratio for leveraged sampling (0 < theta < 1)
+        target_rank: Rank r for SVD in leverage score computation
+        ialm_max_iter: Maximum iterations for IALM solver
+        ialm_tol: Convergence tolerance for IALM
+    """
+    method: Literal["uniform", "leveraged"] = "uniform"
+    theta: float = Field(default=0.3, gt=0.0, lt=1.0, description="Phase 1 budget ratio")
+    target_rank: int = Field(default=2, ge=1, description="SVD rank for leverage estimation")
+    ialm_max_iter: int = Field(default=100, ge=1, description="IALM maximum iterations")
+    ialm_tol: float = Field(default=1e-6, gt=0.0, description="IALM convergence tolerance")
+    
+    class Config:
+        extra = "forbid"
+
+
 class MetricsConfig(BaseModel):
     """Metrics computation parameters.
 
@@ -266,6 +286,7 @@ class StructuredConfig(BaseModel):
         tree: Tree topology configuration
         sequence: Sequence evolution configuration
         experiment: Experiment execution parameters
+        sampling: Sampling method configuration (optional, has defaults)
         metrics: Metrics computation parameters (optional, has defaults)
         guardrails: Early stopping guardrails (optional, has defaults)
         cache: Caching behavior (optional, has defaults)
@@ -274,6 +295,7 @@ class StructuredConfig(BaseModel):
     tree: TreeConfig
     sequence: SequenceConfig
     experiment: ExperimentConfig
+    sampling: SamplingConfig = Field(default_factory=SamplingConfig)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     guardrails: GuardrailsConfig = Field(default_factory=GuardrailsConfig)
     cache: CacheConfig = Field(default_factory=CacheConfig)

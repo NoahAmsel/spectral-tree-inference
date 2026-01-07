@@ -8,7 +8,7 @@ using the new StructuredConfig system.
 import numpy as np
 from .base_config import (
     StructuredConfig, TreeConfig, SequenceConfig, ExperimentConfig,
-    MetricsConfig, GuardrailsConfig, CacheConfig, OutputConfig
+    SamplingConfig, MetricsConfig, GuardrailsConfig, CacheConfig, OutputConfig
 )
 
 
@@ -149,6 +149,11 @@ def custom_config(
     num_workers: int = 1,
     use_middle_out: bool = False,
     validate_partition_in_tree: bool = True,
+    sampling_method: str = "uniform",
+    sampling_theta: float = 0.3,
+    sampling_target_rank: int = 2,
+    sampling_ialm_max_iter: int = 100,
+    sampling_ialm_tol: float = 1e-6,
     **kwargs
 ) -> StructuredConfig:
     """
@@ -171,6 +176,11 @@ def custom_config(
         num_workers: Number of parallel workers (1 = sequential)
         use_middle_out: Use middle-out p-value processing strategy
         validate_partition_in_tree: Validate that Fiedler partition corresponds to a real tree edge before running experiment
+        sampling_method: Sampling method ("uniform" or "leveraged")
+        sampling_theta: Phase 1 budget ratio for leveraged sampling (0 < theta < 1)
+        sampling_target_rank: Rank for SVD in leverage estimation
+        sampling_ialm_max_iter: Maximum IALM solver iterations
+        sampling_ialm_tol: IALM convergence tolerance
         **kwargs: Additional model-specific parameters (e.g., kappa, edge_length, etc.)
 
     Returns:
@@ -221,6 +231,15 @@ def custom_config(
     # Build metrics config
     metrics = MetricsConfig(validate_partition_in_tree=validate_partition_in_tree)
     
+    # Build sampling config
+    sampling = SamplingConfig(
+        method=sampling_method,
+        theta=sampling_theta,
+        target_rank=sampling_target_rank,
+        ialm_max_iter=sampling_ialm_max_iter,
+        ialm_tol=sampling_ialm_tol
+    )
+    
     return StructuredConfig(
         tree=TreeConfig(model=tree_model, params=tree_params),
         sequence=SequenceConfig(model=seq_model, len=sequence_length, params=seq_params),
@@ -233,5 +252,6 @@ def custom_config(
             num_workers=num_workers,
             use_middle_out=use_middle_out
         ),
+        sampling=sampling,
         metrics=metrics
     )

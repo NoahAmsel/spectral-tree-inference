@@ -30,6 +30,7 @@ from ..config import StructuredConfig
 from ..models import get_tree_factory, get_sequence_factory
 from ..utils.summaries import save_single_results, save_json
 from ..utils.random_entries import _get_cached_similarity_matrix, _subsample_matrix_entries, compute_fiedler_from_similarity, compute_fiedler_from_laplacian
+from ..core.similarity_builder import SimilarityMatrixBuilder
 from ..utils.logging import log_info, log_warning, create_progress_bar, suppress_warnings, is_progress_mode
 from ..utils.persistent_cache import (
     _get_cache_key,
@@ -236,6 +237,16 @@ def sweep_for_params(
         - partition_ref: Reference partition mask (boolean array)
     """
     log_info('bootstrap', f"n={n_taxa}, L={seq_len} preparing experiment data…")
+
+    # Create similarity builder with configured sampling method
+    similarity_builder = SimilarityMatrixBuilder(
+        method=cfg.sampling.method,
+        theta=cfg.sampling.theta,
+        target_rank=cfg.sampling.target_rank,
+        ialm_max_iter=cfg.sampling.ialm_max_iter,
+        ialm_tol=cfg.sampling.ialm_tol
+    )
+    log_info('bootstrap', f"Using sampling method: {cfg.sampling.method}")
 
     # Get or generate experiment data (with optional persistent caching)
     tree, observations, M, fiedler_ref = _get_or_generate_experiment_data(cfg, n_taxa, seq_len)
@@ -470,7 +481,7 @@ def sweep_for_params(
                 bootstrap_seed = cfg.experiment.seed + i
 
                 # Compute S once per bootstrap rep
-                S = _subsample_matrix_entries(M, p, seed=bootstrap_seed)
+                S = _subsample_matrix_entries(M, p, seed=bootstrap_seed, builder=similarity_builder)
 
                 # Update running average of S (streaming - no storage!)
                 # Uses Welford's online algorithm for numerical stability
