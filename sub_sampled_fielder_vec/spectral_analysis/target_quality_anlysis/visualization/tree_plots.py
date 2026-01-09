@@ -142,7 +142,8 @@ def plot_tree_with_partition(
     # Add cleaner title (use sigma_2 instead of σ₂ to avoid font issues)
     if stats_dict:
         p_split = stats_dict.get('partition_split', ('N/A', 'N/A'))
-        title_text = f"{title} - Fiedler Vector\nsigma2={stats_dict.get('sigma2', 0):.4f}, Gap={stats_dict.get('spectral_gap', 0):.4f}, Coherence={stats_dict.get('coherence', 0):.4f}"
+        valid_str = "Valid" if stats_dict.get('is_valid', False) else "Invalid"
+        title_text = f"{title} - Fiedler Vector [{valid_str}]\nsigma2={stats_dict.get('sigma2', 0):.4f}, Gap={stats_dict.get('spectral_gap', 0):.4f}, Coherence={stats_dict.get('coherence', 0):.4f}"
     else:
         title_text = f"{title} - Fiedler Vector"
 
@@ -310,7 +311,8 @@ def plot_combined_tree_and_fiedler(
     # ========== Overall Title ==========
     if stats_dict:
         p_split = stats_dict.get('partition_split', ('N/A', 'N/A'))
-        suptitle = f"{title}\nsigma2={stats_dict.get('sigma2', 0):.4f}, Gap={stats_dict.get('spectral_gap', 0):.4f}, Coherence={stats_dict.get('coherence', 0):.4f}"
+        valid_str = "Valid" if stats_dict.get('is_valid', False) else "Invalid"
+        suptitle = f"{title} [{valid_str}]\nsigma2={stats_dict.get('sigma2', 0):.4f}, Gap={stats_dict.get('spectral_gap', 0):.4f}, Coherence={stats_dict.get('coherence', 0):.4f}"
     else:
         suptitle = title
 

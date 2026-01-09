@@ -32,6 +32,12 @@ if str(SPECTRAL_ANALYSIS_PATH) not in sys.path:
     sys.path.insert(0, str(SPECTRAL_ANALYSIS_PATH))
 from tree_plots import plot_tree_with_partition, plot_combined_tree_and_fiedler
 
+# Add spectral_analysis to path for partition validation
+SPECTRAL_ANALYSIS_OUTPUT_PATH = PACKAGE_ROOT / "spectral_analysis" / "target_quality_anlysis" / "output"
+if str(SPECTRAL_ANALYSIS_OUTPUT_PATH) not in sys.path:
+    sys.path.insert(0, str(SPECTRAL_ANALYSIS_OUTPUT_PATH))
+from partition_validity import check_partition_valid_in_tree
+
 
 class ExperimentRunner:
     """Orchestrates and runs bootstrap sweep experiments."""
@@ -151,12 +157,20 @@ class ExperimentRunner:
         if partition_ref is not None and tree is not None:
             log_info('experiment', "Generating tree partition visualizations...", force=True)
             n_taxa = self.cfg.get_num_taxa()
-            tree_plot_path = Path(self.run_dir) / f"tree_partition_n{n_taxa}"
+            
+            # Create tree_plots subdirectory
+            tree_plots_dir = Path(self.run_dir) / "tree_plots"
+            tree_plots_dir.mkdir(exist_ok=True)
+            tree_plot_path = tree_plots_dir / f"tree_partition_n{n_taxa}"
+            
+            # Check partition validity
+            is_valid = check_partition_valid_in_tree(tree, partition_ref)
             
             # Prepare stats dict for visualization
             stats_dict = {
                 'sigma2': reference_partition_quality,
-                'partition_split': partition_split_M_list[0] if partition_split_M_list and partition_split_M_list[0] else None
+                'partition_split': partition_split_M_list[0] if partition_split_M_list and partition_split_M_list[0] else None,
+                'is_valid': is_valid
             }
             # Add spectral gap if available
             if metrics_dict and 'spectral_gap_L_M' in metrics_dict and metrics_dict['spectral_gap_L_M']:
@@ -266,12 +280,20 @@ class ExperimentRunner:
             # Generate tree partition visualizations for this n_taxa if partition is available
             if partition_ref is not None and tree is not None:
                 log_info('experiment', f"Generating tree partition visualizations for n={n_taxa}...", force=True)
-                tree_plot_path = Path(self.run_dir) / f"tree_partition_n{n_taxa}"
+                
+                # Create tree_plots subdirectory
+                tree_plots_dir = Path(self.run_dir) / "tree_plots"
+                tree_plots_dir.mkdir(exist_ok=True)
+                tree_plot_path = tree_plots_dir / f"tree_partition_n{n_taxa}"
+                
+                # Check partition validity
+                is_valid = check_partition_valid_in_tree(tree, partition_ref)
                 
                 # Prepare stats dict for visualization
                 stats_dict = {
                     'sigma2': ref_quality,
-                    'partition_split': split_M[0] if split_M and split_M[0] else None
+                    'partition_split': split_M[0] if split_M and split_M[0] else None,
+                    'is_valid': is_valid
                 }
                 # Add spectral gap if available
                 if metrics_dict and 'spectral_gap_L_M' in metrics_dict and metrics_dict['spectral_gap_L_M']:
