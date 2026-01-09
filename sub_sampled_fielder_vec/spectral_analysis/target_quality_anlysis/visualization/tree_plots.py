@@ -1,6 +1,7 @@
 """
 Generate circular tree visualizations with Fiedler vector heatmap rings.
 """
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import patches
@@ -138,26 +139,26 @@ def plot_tree_with_partition(
     ]
     ax.legend(handles=legend_elements, loc='lower right', fontsize=9, framealpha=0.9)
 
-    # Add cleaner title
+    # Add cleaner title (use sigma_2 instead of σ₂ to avoid font issues)
     if stats_dict:
         p_split = stats_dict.get('partition_split', ('N/A', 'N/A'))
-        title_text = f"{title} - Fiedler Vector\nσ₂={stats_dict.get('sigma2', 0):.4f}, Gap={stats_dict.get('spectral_gap', 0):.4f}, Coherence={stats_dict.get('coherence', 0):.4f}"
+        title_text = f"{title} - Fiedler Vector\nsigma2={stats_dict.get('sigma2', 0):.4f}, Gap={stats_dict.get('spectral_gap', 0):.4f}, Coherence={stats_dict.get('coherence', 0):.4f}"
     else:
         title_text = f"{title} - Fiedler Vector"
 
     ax.set_title(title_text, fontsize=12, pad=15)
 
-    plt.tight_layout()
+    # Suppress matplotlib layout warnings during save
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        plt.tight_layout()
 
-    # Save Fiedler plot
-    fiedler_plot_path = output_path.with_suffix('.fiedler.pdf')
-    fiedler_png_path = output_path.with_suffix('.fiedler.png')
-    plt.savefig(fiedler_plot_path, dpi=150, bbox_inches='tight')
-    plt.savefig(fiedler_png_path, dpi=150, bbox_inches='tight')
+        # Save Fiedler plot
+        fiedler_plot_path = output_path.with_suffix('.fiedler.pdf')
+        fiedler_png_path = output_path.with_suffix('.fiedler.png')
+        plt.savefig(fiedler_plot_path, dpi=150, bbox_inches='tight')
+        plt.savefig(fiedler_png_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
-
-    print(f"✓ Circular tree saved to: {output_path.with_suffix('.tree.pdf')} and {output_path.with_suffix('.tree.svg')}")
-    print(f"✓ Fiedler vector plot saved to: {fiedler_plot_path} and {fiedler_png_path}")
 
     # Always save the raw data
     tree.write(path=output_path.with_suffix(".nwk"), schema="newick")
@@ -171,7 +172,8 @@ def plot_tree_with_partition(
         for i, leaf in enumerate(leaf_nodes):
             f.write(f"{leaf.taxon.label},{int(partition_mask[i])},{fiedler_vector[i]:.6f}\n")
 
-    print(f"✓ Data files (.nwk, .fiedler.txt, .partition.txt) saved.")
+    # Consolidated output message
+    print(f"✓ Tree partition saved: {output_path.stem} (tree.pdf/svg, fiedler.pdf/png, .nwk, .partition.txt)")
 
 
 def plot_combined_tree_and_fiedler(
@@ -308,19 +310,22 @@ def plot_combined_tree_and_fiedler(
     # ========== Overall Title ==========
     if stats_dict:
         p_split = stats_dict.get('partition_split', ('N/A', 'N/A'))
-        suptitle = f"{title}\nσ₂={stats_dict.get('sigma2', 0):.4f}, Gap={stats_dict.get('spectral_gap', 0):.4f}, Coherence={stats_dict.get('coherence', 0):.4f}"
+        suptitle = f"{title}\nsigma2={stats_dict.get('sigma2', 0):.4f}, Gap={stats_dict.get('spectral_gap', 0):.4f}, Coherence={stats_dict.get('coherence', 0):.4f}"
     else:
         suptitle = title
 
     fig.suptitle(suptitle, fontsize=13, y=0.98)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    # Suppress matplotlib layout warnings during save
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    # Save combined plot
-    combined_plot_path = output_path.with_suffix('.combined.pdf')
-    combined_png_path = output_path.with_suffix('.combined.png')
-    plt.savefig(combined_plot_path, dpi=150, bbox_inches='tight')
-    plt.savefig(combined_png_path, dpi=150, bbox_inches='tight')
+        # Save combined plot
+        combined_plot_path = output_path.with_suffix('.combined.pdf')
+        combined_png_path = output_path.with_suffix('.combined.png')
+        plt.savefig(combined_plot_path, dpi=150, bbox_inches='tight')
+        plt.savefig(combined_png_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
 
-    print(f"✓ Combined tree+Fiedler plot saved to: {combined_plot_path} and {combined_png_path}")
+    print(f"✓ Combined plot saved: {output_path.stem}.combined.pdf/png")

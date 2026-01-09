@@ -3,7 +3,7 @@ import numpy as np
 
 from ..base import BaseSampler
 from .leverage_scores import compute_leverage_scores, compute_sampling_probabilities
-from .ialm_solver import ialm_solve
+from .ialm_solver import ialm_solve, get_last_result
 
 # Import from utils - from src/core/sampling/leveraged/ go up 3 levels to src/, then utils.logging
 # This matches the pattern: src/core/utils.py uses ..utils.logging (up 1 level from core to src)
@@ -47,6 +47,12 @@ class LeveragedSampler(BaseSampler):
         self.target_rank = target_rank
         self.ialm_max_iter = ialm_max_iter
         self.ialm_tol = ialm_tol
+        # Track which p-values have been logged (to log once per p, not per sample)
+        self._logged_p_values = set()
+    
+    def reset_logging(self):
+        """Reset logged p-values to allow re-logging in new experiments."""
+        self._logged_p_values = set()
     
     def sample(self, matrix: np.ndarray, p: float, seed: int = None, **kwargs) -> np.ndarray:
         """
@@ -95,17 +101,17 @@ class LeveragedSampler(BaseSampler):
         # Phase 1: Uniform sampling to estimate leverage scores
         phase1_budget = int(self.theta * total_budget)
         Omega1 = self._uniform_sample_upper_triangle(n, phase1_budget, rng)
+        phase1_actual = np.sum(Omega1) // 2  # Divide by 2 since symmetric mask counts both (i,j) and (j,i)
         
         # Compute leverage scores from Phase 1 observations
-        log_info('leveraged', f"Phase 1: Computing leverage scores from {phase1_budget} uniform samples...")
         row_leverage, col_leverage = compute_leverage_scores(
             matrix, Omega1, self.target_rank
         )
         
         # Phase 2: Non-uniform sampling based on leverage scores
         phase2_budget = total_budget - phase1_budget
+        phase2_actual = 0
         if phase2_budget > 0:
-            log_info('leveraged', f"Phase 2: Sampling {phase2_budget} entries based on leverage scores...")
             # Compute sampling probabilities
             p_matrix = compute_sampling_probabilities(
                 row_leverage, col_leverage, self.target_rank, n
@@ -116,14 +122,13 @@ class LeveragedSampler(BaseSampler):
                 n, phase2_budget, p_matrix, rng
             )
             
-            # Combine observation sets
+            # Combine observation sets (union removes duplicates)
             Omega = Omega1 | Omega2
+            phase2_actual = np.sum(Omega) // 2 - phase1_actual  # New entries from phase 2
         else:
             Omega = Omega1
         
         # Phase 3: IALM recovery
-        log_info('leveraged', f"Phase 3: IALM recovery from {np.sum(Omega)} observed entries...")
-        
         # Compute lambda parameter: λ = 1 / (24 * sqrt(n * log(n)))
         lambda_param = 1.0 / (24 * np.sqrt(n * np.log(n))) if n > 1 else 0.1
         
@@ -136,13 +141,40 @@ class LeveragedSampler(BaseSampler):
             tol=self.ialm_tol
         )
         
+        # Get diagnostic info from the solver
+        result_info = get_last_result()
+        
         # Ensure diagonal is 1.0 (self-similarity)
         np.fill_diagonal(L, 1.0)
         
         # Ensure symmetry (IALM might introduce small asymmetry due to numerical errors)
         L = (L + L.T) / 2
         
-        log_info('leveraged', f"Recovery complete. Rank estimate: {np.linalg.matrix_rank(L, tol=1e-6)}")
+        # Compute rank estimate
+        rank_estimate = np.linalg.matrix_rank(L, tol=1e-6)
+        
+        # Log once per p-value (not per bootstrap replicate)
+        p_key = round(p, 6)  # Round to avoid floating point comparison issues
+        if p_key not in self._logged_p_values:
+            self._logged_p_values.add(p_key)
+            
+            # Compute total unique sampled entries
+            total_sampled = np.sum(Omega) // 2  # Divide by 2 since symmetric
+            
+            # Build informative log message with phase breakdown
+            status = "✓" if result_info and result_info.converged else "⚠ max_iter"
+            iters = result_info.iterations if result_info else self.ialm_max_iter
+            
+            log_msg = (
+                f"p={p:.4f}: {total_sampled:,} samples "
+                f"(Phase1: {phase1_actual:,} uniform, Phase2: {phase2_actual:,} leveraged) → "
+                f"IALM {status} ({iters} iters), rank≈{rank_estimate}"
+            )
+            
+            if result_info and result_info.had_numerical_issues:
+                log_msg += " [numerical issues]"
+            
+            log_info('leveraged', log_msg, force=True)
         
         return L
     

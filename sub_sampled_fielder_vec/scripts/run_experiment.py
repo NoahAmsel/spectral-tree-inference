@@ -23,13 +23,13 @@ WIDE_SWEEP_P_VALUES = list(np.logspace(-4, 0, 20))
 # -----------------------------------------------------------------------------
 SWEEP_CONFIG: Dict[str, Any] = {
     "tree_model": "kingman_mean",
-    "taxa_values": [500, 1000, 3000, 5000,7000, 10000],
+    "taxa_values": [512, 1024],
     "sequence_length_values": [10000],
     "mutation_rate": 0.1,
     "bootstrap_reps": 20,
     "num_workers": 8,
     "use_middle_out": False,
-    "run_name_prefix": "kingman_mean_taxa_sweep_L10k_Ne1",
+    "run_name_prefix": "leveraged_test",
     "p_values": WIDE_SWEEP_P_VALUES,
     "tree_params": {
         "pop_size": 1.0,
@@ -37,6 +37,12 @@ SWEEP_CONFIG: Dict[str, Any] = {
     "coherence_k": 4,
     "num_gaps": 0,
     "guardrails_enabled": False,
+    # Sampling method configuration
+    "sampling_method": "leveraged",      # "uniform" or "leveraged"
+    "sampling_theta": 0.5,               # Phase 1 budget ratio (for leveraged only)
+    "sampling_target_rank": 2,            # SVD rank for leverage estimation (for leveraged only)
+    "sampling_ialm_max_iter": 100,       # IALM max iterations (for leveraged only)
+    "sampling_ialm_tol": 1e-6,           # IALM tolerance (for leveraged only)
 }
 
 
@@ -62,7 +68,13 @@ def main():
     if not prefix:
         mu_str = str(mutation_rate).replace(".", "p")
         pref_taxa = f"n{taxa_values[0]}" if len(taxa_values) == 1 else f"n{min(taxa_values)}-{max(taxa_values)}"
-        prefix = f"{tree_model}_{pref_taxa}_mu_{mu_str}"
+        sampling_method = config.get("sampling_method", "uniform")
+        prefix = f"{tree_model}_{pref_taxa}_mu_{mu_str}_{sampling_method}"
+    else:
+        # Append sampling method to prefix if not already included
+        sampling_method = config.get("sampling_method", "uniform")
+        if sampling_method not in prefix and sampling_method != "uniform":
+            prefix = f"{prefix}_{sampling_method}"
 
     ts = time.strftime("%Y%m%d-%H%M%S")
     base_dir_root = config.get(
@@ -83,6 +95,13 @@ def main():
             # Create subdirectory name for this config
             subdir_name = f"n{n_taxa}_L{seq_len}"
 
+            # Get sampling configuration
+            sampling_method = config.get("sampling_method", "uniform")
+            sampling_theta = config.get("sampling_theta", 0.3)
+            sampling_target_rank = config.get("sampling_target_rank", 2)
+            sampling_ialm_max_iter = config.get("sampling_ialm_max_iter", 100)
+            sampling_ialm_tol = config.get("sampling_ialm_tol", 1e-6)
+            
             cfg = custom_config(
                 num_taxa=n_taxa,
                 sequence_length=seq_len,
@@ -94,6 +113,12 @@ def main():
                 display_mode="progress",
                 num_workers=num_workers,
                 use_middle_out=use_middle_out,
+                # Sampling method parameters
+                sampling_method=sampling_method,
+                sampling_theta=sampling_theta,
+                sampling_target_rank=sampling_target_rank,
+                sampling_ialm_max_iter=sampling_ialm_max_iter,
+                sampling_ialm_tol=sampling_ialm_tol,
                 **tree_kwargs,
             )
 
@@ -105,6 +130,11 @@ def main():
 
             print(f"\n{'-'*80}")
             print(f"Launching experiment for {tree_model} tree: n={n_taxa}, L={seq_len}")
+            print(f"Sampling method: {sampling_method}")
+            if sampling_method == "leveraged":
+                print(f"  Phase 1 ratio (theta): {sampling_theta}")
+                print(f"  Target rank: {sampling_target_rank}")
+                print(f"  IALM max_iter: {sampling_ialm_max_iter}, tol: {sampling_ialm_tol}")
             runner = ExperimentRunner(cfg, base_dir=base_dir, subdir_name=subdir_name)
             run_dir, results = runner.run()
             multi_run_results.append({

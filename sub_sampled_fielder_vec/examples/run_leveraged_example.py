@@ -13,19 +13,19 @@ def main():
     
     # Create configuration with leveraged sampling
     cfg = custom_config(
-        num_taxa=512,                    # Number of taxa
-        sequence_length=1000,            # Sequence length
+        num_taxa=512,                     # Number of taxa (must be single int, not list)
+        sequence_length=10000,            # Sequence length
         mutation_rate=0.1,                # Mutation rate
-        tree_model="balanced_binary",    # Tree topology
-        p_values=[0.01, 0.05, 0.1, 0.5, 1.0],  # Sampling probabilities
-        bootstrap_reps=10,               # Bootstrap replicates (use more for real experiments)
+        tree_model="balanced_binary",     # Tree topology
+        p_values=[0.0001, 0.001, 0.01, 0.05, 0.1, 0.5, 1.0],  # Sampling probabilities
+        bootstrap_reps=10,                # Bootstrap replicates (use more for real experiments)
         run_name="leveraged_example",
         # Leveraged sampling parameters:
-        sampling_method="leveraged",     # Use leveraged method
-        sampling_theta=0.3,              # 30% for Phase 1 (uniform)
-        sampling_target_rank=2,          # Rank for SVD
-        sampling_ialm_max_iter=100,     # IALM iterations
-        sampling_ialm_tol=1e-6          # IALM tolerance
+        sampling_method="leveraged",      # Use leveraged method
+        sampling_theta=0.3,               # 30% for Phase 1 (uniform)
+        sampling_target_rank=2,           # Rank for SVD
+        sampling_ialm_max_iter=100,       # IALM iterations
+        sampling_ialm_tol=1e-6            # IALM tolerance
     )
     
     print("=" * 80)
