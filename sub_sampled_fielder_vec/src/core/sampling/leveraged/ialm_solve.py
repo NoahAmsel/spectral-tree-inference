@@ -1,89 +1,9 @@
-"""IALM solver for nuclear norm minimization with sparse noise."""
+"""Inexact Augmented Lagrange Multiplier (IALM) method for robust matrix completion."""
 import numpy as np
-import warnings
 from typing import Tuple
-from scipy.linalg import svd
-
-
-def soft_threshold(X: np.ndarray, tau: float) -> np.ndarray:
-    """
-    Element-wise soft thresholding operator.
-    
-    S_tau(x) = sign(x) * max(|x| - tau, 0)
-    
-    Used for L1-norm proximal operator: prox_{tau||·||_1}(X)
-    
-    Args:
-        X: Input matrix
-        tau: Threshold parameter
-        
-    Returns:
-        Soft-thresholded matrix
-    """
-    return np.sign(X) * np.maximum(np.abs(X) - tau, 0)
-
-
-def singular_value_threshold(X: np.ndarray, tau: float) -> Tuple[np.ndarray, bool]:
-    """
-    Singular value thresholding (SVT) operator.
-    
-    Proximal operator for nuclear norm: prox_{tau||·||_*}(X)
-    
-    Algorithm:
-        1. Compute SVD: X = U Σ V^T
-        2. Soft-threshold singular values: Σ_tau = max(Σ - tau, 0)
-        3. Reconstruct: X_tau = U Σ_tau V^T
-    
-    Args:
-        X: Input matrix (n x n)
-        tau: Threshold parameter
-        
-    Returns:
-        Tuple of (thresholded matrix, numerical_issue_flag)
-    """
-    # Suppress all numpy warnings during SVT - we handle issues explicitly
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        
-        # Check for numerical issues in input
-        if np.any(~np.isfinite(X)):
-            # Replace NaN/Inf with zeros to allow graceful degradation
-            X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
-            return X, True
-        
-        try:
-            U, s, Vt = svd(X, full_matrices=False)
-        except (np.linalg.LinAlgError, ValueError):
-            # SVD failed - return input with flag
-            return X, True
-        
-        # Check for numerical issues in SVD output
-        if np.any(~np.isfinite(s)) or np.any(~np.isfinite(U)) or np.any(~np.isfinite(Vt)):
-            return np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0), True
-        
-        # Soft-threshold singular values
-        s_thresh = np.maximum(s - tau, 0)
-        
-        # Reconstruct
-        result = U @ np.diag(s_thresh) @ Vt
-        
-        # Final check
-        if np.any(~np.isfinite(result)):
-            return np.nan_to_num(result, nan=0.0, posinf=0.0, neginf=0.0), True
-        
-        return result, False
-
-
-class IALMResult:
-    """Result container for IALM solver with diagnostic information."""
-    
-    def __init__(self, L: np.ndarray, S: np.ndarray, converged: bool, 
-                 iterations: int, had_numerical_issues: bool):
-        self.L = L
-        self.S = S
-        self.converged = converged
-        self.iterations = iterations
-        self.had_numerical_issues = had_numerical_issues
+from .soft_threshold import soft_threshold
+from .singular_value_threshold import singular_value_threshold
+from .ialm_result import IALMResult
 
 
 def ialm_solve(
@@ -99,14 +19,6 @@ def ialm_solve(
     Inexact Augmented Lagrange Multiplier (IALM) method for robust matrix completion.
     
     Solves: min_{L,S} ||L||_* + λ||S||_1  s.t.  P_Ω(L + S) = P_Ω(X)
-    
-    Algorithm (from paper):
-        Initialize: L_0 = 0, S_0 = 0, Y_0 = 0, μ_0 > 0
-        For k = 0, 1, 2, ...:
-            L_{k+1} = SVT(X - S_k - Y_k/μ_k, 1/μ_k)
-            S_{k+1} = soft_thresh(X - L_{k+1} - Y_k/μ_k, λ/μ_k)
-            Y_{k+1} = Y_k + μ_k * (X - L_{k+1} - S_{k+1})
-            μ_{k+1} = ρ * μ_k  (if not converged)
     
     Args:
         X: Observed matrix (n x n) - only entries in Omega are meaningful
@@ -208,9 +120,3 @@ def ialm_solve(
     ialm_solve._last_result = IALMResult(L, S, converged, final_iter, had_numerical_issues)
     
     return L, S
-
-
-def get_last_result() -> IALMResult:
-    """Get diagnostic information from the last IALM solve."""
-    return getattr(ialm_solve, '_last_result', None)
-

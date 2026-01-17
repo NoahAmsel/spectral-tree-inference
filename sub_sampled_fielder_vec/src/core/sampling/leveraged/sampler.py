@@ -2,8 +2,13 @@
 import numpy as np
 
 from ..base import BaseSampler
-from .leverage_scores import compute_leverage_scores, compute_sampling_probabilities
-from .ialm_solver import ialm_solve, get_last_result
+from .compute_leverage_scores import compute_leverage_scores
+from .compute_sampling_probabilities import compute_sampling_probabilities
+from .ialm_solve import ialm_solve
+from .get_last_result import get_last_result
+from .uniform_sampling import uniform_sample_upper_triangle
+from .nonuniform_sampling import nonuniform_sample_upper_triangle
+from .rng_utils import get_rng
 
 # Import from utils - from src/core/sampling/leveraged/ go up 3 levels to src/, then utils.logging
 # This matches the pattern: src/core/utils.py uses ..utils.logging (up 1 level from core to src)
@@ -32,23 +37,28 @@ class LeveragedSampler(BaseSampler):
         theta: float = 0.3,
         target_rank: int = 2,
         ialm_max_iter: int = 100,
-        ialm_tol: float = 1e-6
+        ialm_tol: float = 1e-6,
+        ialm_bypass_threshold: float = 0.1
     ):
         """
         Initialize leveraged sampler.
-        
+
         Args:
             theta: Phase 1 budget ratio (fraction of samples for uniform phase)
             target_rank: Rank r for SVD in leverage score computation
             ialm_max_iter: Maximum iterations for IALM solver
             ialm_tol: Convergence tolerance for IALM
+            ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
         """
         self.theta = theta
         self.target_rank = target_rank
         self.ialm_max_iter = ialm_max_iter
         self.ialm_tol = ialm_tol
+        self.ialm_bypass_threshold = ialm_bypass_threshold
         # Track which p-values have been logged (to log once per p, not per sample)
         self._logged_p_values = set()
+        # Store per-sample diagnostic metrics
+        self.last_sample_metrics = None
     
     def reset_logging(self):
         """Reset logged p-values to allow re-logging in new experiments."""
@@ -90,21 +100,15 @@ class LeveragedSampler(BaseSampler):
             return result
         
         # Initialize random generator
-        if seed is not None:
-            if hasattr(np.random, 'default_rng'):
-                rng = np.random.default_rng(seed)
-            else:
-                rng = np.random.RandomState(seed)
-        else:
-            rng = np.random
+        rng = get_rng(seed)
         
         # Phase 1: Uniform sampling to estimate leverage scores
         phase1_budget = int(self.theta * total_budget)
-        Omega1 = self._uniform_sample_upper_triangle(n, phase1_budget, rng)
+        Omega1 = uniform_sample_upper_triangle(n, phase1_budget, rng)
         phase1_actual = np.sum(Omega1) // 2  # Divide by 2 since symmetric mask counts both (i,j) and (j,i)
         
-        # Compute leverage scores from Phase 1 observations
-        row_leverage, col_leverage = compute_leverage_scores(
+        # Compute leverage scores from Phase 1 observations (also returns singular values)
+        row_leverage, col_leverage, phase1_singular_values = compute_leverage_scores(
             matrix, Omega1, self.target_rank
         )
         
@@ -118,19 +122,81 @@ class LeveragedSampler(BaseSampler):
             )
             
             # Sample from upper triangle according to probabilities
-            Omega2 = self._nonuniform_sample_upper_triangle(
-                n, phase2_budget, p_matrix, rng
+            # Restrict to Omega_1^c (complement of Phase 1 observations)
+            Omega2 = nonuniform_sample_upper_triangle(
+                n, phase2_budget, p_matrix, rng, Omega_1=Omega1
             )
             
-            # Combine observation sets (union removes duplicates)
+            # Omega = Omega_1 ∪ Omega_2 (disjoint by construction: Omega_2 ⊆ Omega_1^c)
             Omega = Omega1 | Omega2
-            phase2_actual = np.sum(Omega) // 2 - phase1_actual  # New entries from phase 2
+            phase2_actual = np.sum(Omega2) // 2  # All entries in Omega_2 are new
         else:
             Omega = Omega1
-        
+
+        # Compute theoretical minimum samples for Phase 1 (for r=2 symmetric matrices)
+        # Paper formula: 4*n*r*log(n), but for symmetric might be 2*n*r*log(n)
+        # Using conservative 4*n*r*log(n) pending verification
+        theoretical_min_phase1 = int(4 * n * self.target_rank * np.log(n)) if n > 1 else 10
+        phase1_sufficiency = phase1_actual / theoretical_min_phase1 if theoretical_min_phase1 > 0 else 0.0
+
+        # Leverage score diagnostics (for symmetric matrices, μ_i = ν_i)
+        leverage_scores = row_leverage  # Use row scores (col scores identical for symmetric)
+        leverage_max = float(np.max(leverage_scores))
+        leverage_std = float(np.std(leverage_scores))
+        leverage_sum = float(np.sum(leverage_scores))  # Should equal n
+        leverage_symmetry_error = float(np.linalg.norm(row_leverage - col_leverage))  # Should be ~0
+
+        # Store diagnostic metrics (before bypass or IALM)
+        self.last_sample_metrics = {
+            # Sampling budget
+            'phase1_budget': phase1_budget,
+            'phase1_actual': phase1_actual,
+            'phase2_budget': phase2_budget,
+            'phase2_actual': phase2_actual,
+            'theoretical_min_phase1': theoretical_min_phase1,
+            'phase1_sufficiency': phase1_sufficiency,
+
+            # Phase 1 SVD (first r singular values)
+            'phase1_singular_values': phase1_singular_values.tolist(),
+
+            # Leverage score stats
+            'leverage_max': leverage_max,
+            'leverage_std': leverage_std,
+            'leverage_sum': leverage_sum,
+            'leverage_symmetry_error': leverage_symmetry_error,
+
+            # IALM execution (will be updated after IALM if not bypassed)
+            'ialm_bypassed': False,
+            'ialm_iterations': 0,
+            'ialm_converged': False,
+        }
+
+        # Check if we should bypass IALM (data is dense enough)
+        if p >= self.ialm_bypass_threshold:
+            # Dense sampling - skip matrix completion, use sparse matrix directly
+            L = np.zeros_like(matrix)
+            L[Omega] = matrix[Omega]
+            L = (L + L.T) / 2  # Ensure symmetry
+            np.fill_diagonal(L, 1.0)
+
+            # Log bypass decision
+            total_sampled = np.sum(Omega) // 2
+            log_info('leveraged',
+                f"p={p:.4f}: Bypassing IALM (p ≥ {self.ialm_bypass_threshold:.2f}), "
+                f"using {total_sampled:,} samples directly"
+            )
+
+            # Update metrics for bypass case
+            self.last_sample_metrics['ialm_bypassed'] = True
+            self.last_sample_metrics['ialm_iterations'] = 0
+            self.last_sample_metrics['ialm_converged'] = True  # Trivially converged
+
+            return L
+
         # Phase 3: IALM recovery
-        # Compute lambda parameter: λ = 1 / (24 * sqrt(n * log(n)))
-        lambda_param = 1.0 / (24 * np.sqrt(n * np.log(n))) if n > 1 else 0.1
+        # Compute adaptive lambda parameter: λ = base × (1-p) to reduce denoising at high p
+        lambda_base = 1.0 / (24 * np.sqrt(n * np.log(n))) if n > 1 else 0.1
+        lambda_param = lambda_base * (1.0 - p)  # λ→0 as p→1 (less denoising for dense sampling)
         
         # Run IALM solver
         L, S = ialm_solve(
@@ -143,7 +209,12 @@ class LeveragedSampler(BaseSampler):
         
         # Get diagnostic info from the solver
         result_info = get_last_result()
-        
+
+        # Update IALM metrics
+        self.last_sample_metrics['ialm_bypassed'] = False
+        self.last_sample_metrics['ialm_iterations'] = result_info.iterations if result_info else self.ialm_max_iter
+        self.last_sample_metrics['ialm_converged'] = result_info.converged if result_info else False
+
         # Ensure diagonal is 1.0 (self-similarity)
         np.fill_diagonal(L, 1.0)
         
@@ -177,96 +248,3 @@ class LeveragedSampler(BaseSampler):
             log_info('leveraged', log_msg, force=True)
         
         return L
-    
-    def _uniform_sample_upper_triangle(
-        self,
-        n: int,
-        budget: int,
-        rng: np.random.Generator
-    ) -> np.ndarray:
-        """
-        Uniformly sample entries from upper triangle.
-        
-        Args:
-            n: Matrix dimension
-            budget: Number of entries to sample
-            rng: Random number generator
-            
-        Returns:
-            Boolean mask (n x n) with True for sampled entries
-        """
-        # Get all upper triangle indices (excluding diagonal)
-        upper_indices = []
-        for i in range(n):
-            for j in range(i + 1, n):
-                upper_indices.append((i, j))
-        
-        # Sample without replacement
-        if budget >= len(upper_indices):
-            # Sample all entries
-            sampled_indices = upper_indices
-        else:
-            if hasattr(rng, 'choice'):
-                sampled_idx = rng.choice(len(upper_indices), size=budget, replace=False)
-            else:
-                sampled_idx = np.random.choice(len(upper_indices), size=budget, replace=False)
-            sampled_indices = [upper_indices[i] for i in sampled_idx]
-        
-        # Create boolean mask
-        Omega = np.zeros((n, n), dtype=bool)
-        for i, j in sampled_indices:
-            Omega[i, j] = True
-            Omega[j, i] = True  # Symmetric
-        
-        return Omega
-    
-    def _nonuniform_sample_upper_triangle(
-        self,
-        n: int,
-        budget: int,
-        p_matrix: np.ndarray,
-        rng: np.random.Generator
-    ) -> np.ndarray:
-        """
-        Sample entries from upper triangle according to probability distribution.
-        
-        Args:
-            n: Matrix dimension
-            budget: Number of entries to sample
-            p_matrix: Probability matrix (n x n) - only upper triangle is used
-            rng: Random number generator
-            
-        Returns:
-            Boolean mask (n x n) with True for sampled entries
-        """
-        # Extract upper triangle probabilities
-        upper_triangle_mask = np.triu(np.ones((n, n), dtype=bool), k=1)
-        p_upper = p_matrix * upper_triangle_mask
-        
-        # Flatten to 1D for sampling
-        p_flat = p_upper[upper_triangle_mask]
-        indices_flat = np.where(upper_triangle_mask)
-        
-        # Normalize probabilities
-        p_flat = p_flat / np.sum(p_flat) if np.sum(p_flat) > 0 else p_flat
-        
-        # Sample according to probabilities (with replacement if budget > available)
-        n_upper = len(p_flat)
-        if budget >= n_upper:
-            # Sample all entries
-            sampled_idx = np.arange(n_upper)
-        else:
-            if hasattr(rng, 'choice'):
-                sampled_idx = rng.choice(n_upper, size=budget, replace=False, p=p_flat)
-            else:
-                sampled_idx = np.random.choice(n_upper, size=budget, replace=False, p=p_flat)
-        
-        # Create boolean mask
-        Omega = np.zeros((n, n), dtype=bool)
-        for idx in sampled_idx:
-            i, j = indices_flat[0][idx], indices_flat[1][idx]
-            Omega[i, j] = True
-            Omega[j, i] = True  # Symmetric
-        
-        return Omega
-
