@@ -12,6 +12,15 @@ class UniformSampler(BaseSampler):
     Uses optimized sparse/dense strategies based on sampling probability.
     """
     
+    def __init__(self, **kwargs):
+        """
+        Initialize uniform sampler.
+        
+        Args:
+            **kwargs: Ignored (for API compatibility with other samplers)
+        """
+        pass  # Uniform sampler has no configuration options
+    
     def sample(self, matrix: np.ndarray, p: float, seed: int = None, **kwargs) -> np.ndarray:
         """
         Subsample matrix entries uniformly with probability p.
