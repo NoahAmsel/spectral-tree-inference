@@ -6,7 +6,7 @@ Compare uniform vs leveraged sampling on identical matrices.
 
 ```bash
 cd sub_sampled_fielder_vec
-python scripts/comparison/test_compare.py
+python analysis/comparison/test_compare.py
 ```
 
 This runs both methods on n=500 with 3 bootstrap reps.
@@ -22,7 +22,7 @@ python scripts/merge_results.py $COMP_DIR/uniform
 python scripts/merge_results.py $COMP_DIR/leveraged
 
 # Generate comparison plots
-python scripts/comparison/plot_comparison.py $COMP_DIR
+python analysis/comparison/plot_comparison.py $COMP_DIR
 
 # Open plots
 open $COMP_DIR/comparison_plots/partition_agreement_comparison.png
@@ -32,7 +32,7 @@ open $COMP_DIR/comparison_plots/partition_agreement_comparison.png
 
 ```bash
 cd sub_sampled_fielder_vec
-python scripts/comparison/compare_methods.py
+python analysis/comparison/compare_methods.py
 ```
 
 **Parameters:**

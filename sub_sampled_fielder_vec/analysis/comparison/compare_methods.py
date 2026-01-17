@@ -30,10 +30,10 @@ from src.config.base_config import SamplingConfig
 COMPARISON_CONFIG: Dict[str, Any] = {
     # Run name suffix (creates: {timestamp}-method_comparison_{run_name})
     # Set to None or "" for default: {timestamp}-method_comparison
-    "run_name": "balanced_binary_500_1000_3000",
+    "run_name": "balanced_binary_512_1024_2048",
 
     "tree_model": "balanced_binary",
-    "taxa_values": [500, 1000, 3000],
+    "taxa_values": [512, 1024, 2048],  # Must be powers of 2 for balanced_binary
     "sequence_length": 10000,
     "mutation_rate": 0.1,
     "bootstrap_reps": 20,

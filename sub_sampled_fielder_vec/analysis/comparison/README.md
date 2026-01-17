@@ -22,7 +22,7 @@ Only the sampling/recovery method differs.
 ### Quick Test (Recommended First)
 ```bash
 cd sub_sampled_fielder_vec
-python scripts/comparison/test_compare.py
+python analysis/comparison/test_compare.py
 ```
 
 **Test parameters:**
@@ -35,7 +35,7 @@ python scripts/comparison/test_compare.py
 ### Full Comparison
 ```bash
 cd sub_sampled_fielder_vec
-python scripts/comparison/compare_methods.py
+python analysis/comparison/compare_methods.py
 ```
 
 **Full parameters:**

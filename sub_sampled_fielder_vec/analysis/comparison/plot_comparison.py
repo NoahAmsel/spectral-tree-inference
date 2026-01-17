@@ -1,10 +1,10 @@
 """Plot comparison between uniform and leveraged sampling results.
 
 Usage:
-    python scripts/comparison/plot_comparison.py {comparison_dir}
+    python analysis/comparison/plot_comparison.py {comparison_dir}
 
 Example:
-    python scripts/comparison/plot_comparison.py results/20260117-114348-method_comparison
+    python analysis/comparison/plot_comparison.py results/20260117-114348-method_comparison
 """
 import sys
 import json
