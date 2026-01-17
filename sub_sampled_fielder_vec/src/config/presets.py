@@ -154,6 +154,7 @@ def custom_config(
     sampling_target_rank: int = 2,
     sampling_ialm_max_iter: int = 100,
     sampling_ialm_tol: float = 1e-6,
+    sampling_ialm_bypass_threshold: float = 0.1,
     **kwargs
 ) -> StructuredConfig:
     """
@@ -181,6 +182,7 @@ def custom_config(
         sampling_target_rank: Rank for SVD in leverage estimation
         sampling_ialm_max_iter: Maximum IALM solver iterations
         sampling_ialm_tol: IALM convergence tolerance
+        sampling_ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
         **kwargs: Additional model-specific parameters (e.g., kappa, edge_length, etc.)
 
     Returns:
@@ -237,7 +239,8 @@ def custom_config(
         theta=sampling_theta,
         target_rank=sampling_target_rank,
         ialm_max_iter=sampling_ialm_max_iter,
-        ialm_tol=sampling_ialm_tol
+        ialm_tol=sampling_ialm_tol,
+        ialm_bypass_threshold=sampling_ialm_bypass_threshold
     )
     
     return StructuredConfig(

@@ -354,6 +354,7 @@ def sweep_for_params(
 
     # Initialize metric storage - all metrics for M, S, L_M, L_S
     # Plus new spectral metrics: lambda2/lambda3 eigenvalues, IPR, DK ratio
+    # Plus new leveraged sampling diagnostics
     metric_keys = [
         'operator_norm_error',
         'empirical_rank_M', 'empirical_rank_S', 'empirical_rank_L_M', 'empirical_rank_L_S',
@@ -362,7 +363,11 @@ def sweep_for_params(
         'min_separation_M', 'min_separation_S', 'min_separation_L_M', 'min_separation_L_S',
         # New spectral metrics
         'lambda2_L_M', 'lambda3_L_M', 'lambda2_L_S', 'lambda3_L_S',
-        'ipr_S', 'dk_ratio_S'
+        'ipr_S', 'dk_ratio_S',
+        # New leveraged sampling diagnostics
+        'phase1_s1', 'phase1_s2', 'phase1_s3',  # First 3 singular values from Phase 1 SVD
+        'leverage_max', 'leverage_std', 'leverage_sum', 'leverage_symmetry_error',
+        'ialm_iterations',  # Number of IALM iterations (0 if bypassed)
     ]
     metrics_dict: Dict[str, List[Tuple[float, float, float]]] = {
         key: [] for key in metric_keys
@@ -482,6 +487,45 @@ def sweep_for_params(
 
                 # Compute S once per bootstrap rep
                 S = _subsample_matrix_entries(M, p, seed=bootstrap_seed, builder=similarity_builder)
+
+                # NEW: Collect leveraged sampling metrics if available
+                if hasattr(similarity_builder, 'sampler') and hasattr(similarity_builder.sampler, 'last_sample_metrics'):
+                    metrics = similarity_builder.sampler.last_sample_metrics
+                    if metrics is not None:
+                        # Extract Phase 1 singular values (first 3)
+                        sv = metrics.get('phase1_singular_values', [])
+                        metric_values['phase1_s1'].append(sv[0] if len(sv) > 0 else float('nan'))
+                        metric_values['phase1_s2'].append(sv[1] if len(sv) > 1 else float('nan'))
+                        metric_values['phase1_s3'].append(sv[2] if len(sv) > 2 else float('nan'))
+
+                        # Extract leverage score diagnostics
+                        metric_values['leverage_max'].append(metrics.get('leverage_max', float('nan')))
+                        metric_values['leverage_std'].append(metrics.get('leverage_std', float('nan')))
+                        metric_values['leverage_sum'].append(metrics.get('leverage_sum', float('nan')))
+                        metric_values['leverage_symmetry_error'].append(metrics.get('leverage_symmetry_error', float('nan')))
+
+                        # Extract IALM iterations
+                        metric_values['ialm_iterations'].append(metrics.get('ialm_iterations', float('nan')))
+                    else:
+                        # No metrics available (e.g., uniform sampler)
+                        metric_values['phase1_s1'].append(float('nan'))
+                        metric_values['phase1_s2'].append(float('nan'))
+                        metric_values['phase1_s3'].append(float('nan'))
+                        metric_values['leverage_max'].append(float('nan'))
+                        metric_values['leverage_std'].append(float('nan'))
+                        metric_values['leverage_sum'].append(float('nan'))
+                        metric_values['leverage_symmetry_error'].append(float('nan'))
+                        metric_values['ialm_iterations'].append(float('nan'))
+                else:
+                    # Not a leveraged sampler - append NaN for all new metrics
+                    metric_values['phase1_s1'].append(float('nan'))
+                    metric_values['phase1_s2'].append(float('nan'))
+                    metric_values['phase1_s3'].append(float('nan'))
+                    metric_values['leverage_max'].append(float('nan'))
+                    metric_values['leverage_std'].append(float('nan'))
+                    metric_values['leverage_sum'].append(float('nan'))
+                    metric_values['leverage_symmetry_error'].append(float('nan'))
+                    metric_values['ialm_iterations'].append(float('nan'))
 
                 # Update running average of S (streaming - no storage!)
                 # Uses Welford's online algorithm for numerical stability
@@ -688,7 +732,11 @@ def sweep_for_params(
             'coherence_S', 'coherence_L_S',
             'min_separation_S', 'min_separation_L_S',
             'lambda2_L_S', 'lambda3_L_S',
-            'ipr_S', 'dk_ratio_S'
+            'ipr_S', 'dk_ratio_S',
+            # Leveraged sampling diagnostics (Phase A)
+            'phase1_s1', 'phase1_s2', 'phase1_s3',
+            'leverage_max', 'leverage_std', 'leverage_sum', 'leverage_symmetry_error',
+            'ialm_iterations'
         ]
         
         # Store constant metrics

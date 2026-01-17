@@ -813,6 +813,307 @@ def plot_faceted_by_sequence_length(
     return output_path
 
 
+def _extract_model_name(dirname: str) -> str:
+    """Extract model name from directory like '20251227-152754-kingman_mean_taxa_sweep_L10k_Ne1'"""
+    import re
+    
+    # Model name mappings
+    model_mappings = {
+        "kingman": "Kingman Coalescent",
+        "birthdeath": "Birth-Death",
+        "caterpillar": "Caterpillar",
+    }
+    
+    # Extract the model name from directory name
+    # Pattern: look for common model names in the directory name
+    dirname_lower = dirname.lower()
+    for key, value in model_mappings.items():
+        if key in dirname_lower:
+            return value
+    
+    # If no match, try to extract the first meaningful word after timestamp
+    # Pattern: YYYYMMDD-HHMMSS-<model_name>... or YYYYMMDD-HHMMSS-<model_name>_...
+    match = re.search(r'\d{8}-\d{6}-([a-z]+)', dirname_lower)
+    if match:
+        model_word = match.group(1)
+        # Capitalize first letter
+        return model_word.capitalize()
+    
+    # Fallback: return a default
+    return "Tree Model"
+
+
+def plot_taxa_sweep(
+    json_path: str,
+    output_path: str = "partition_agreement.png",
+    model_name: Optional[str] = None,
+    subtitle: Optional[str] = None,
+    xlabel: str = r"$p$",
+    ylabel: str = "Partition agreement (%)",
+    dpi: int = 600,
+):
+    """
+    Create a single-panel plot for taxa sweep results (single L value).
+    
+    Args:
+        json_path: Path to JSON file with grid results (columns: num_taxa, sequence_length, p, partition_agreement_M, etc.)
+        output_path: Path to save the plot
+        model_name: Model name for the title (e.g., "Kingman Coalescent")
+        subtitle: Subtitle with details (e.g., "L = 10000, 10 bootstrap reps")
+        xlabel: Label for x-axis
+        ylabel: Label for y-axis
+        dpi: DPI for the plot
+    """
+    import json
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FixedLocator, FixedFormatter
+    from matplotlib import rcParams
+    from cycler import cycler
+    
+    # --- MATLAB-ish palette + trimmed sizes ---
+    matlab_colors = [
+        (0.0000, 0.4470, 0.7410),
+        (0.8500, 0.3250, 0.0980),
+        (0.9290, 0.6940, 0.1250),
+        (0.4940, 0.1840, 0.5560),
+        (0.4660, 0.6740, 0.1880),
+        (0.3010, 0.7450, 0.9330),
+        (0.6350, 0.0780, 0.1840),
+    ]
+    rcParams.update({
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+        "axes.prop_cycle": cycler("color", matlab_colors),
+        "axes.linewidth": 0.7,
+        "lines.linewidth": 1.2,
+        "lines.markersize": 4.2,
+        "xtick.direction": "out",
+        "ytick.direction": "out",
+        "xtick.major.width": 0.6,
+        "ytick.major.width": 0.6,
+        "xtick.labelsize": 7,
+        "ytick.labelsize": 7,
+        "axes.labelsize": 8,
+        "legend.fontsize": 7,
+        "figure.dpi": dpi, "savefig.dpi": dpi,
+    })
+    
+    def _format_p_value(value: float) -> str:
+        if value >= 0.1:
+            return f"{value:.2f}"
+        if value >= 0.01:
+            return f"{value:.3f}"
+        return f"{value:.2g}"
+
+    def _taxa_sort_key(label: str):
+        try:
+            return (0, int(label.split("=")[1]))
+        except (ValueError, IndexError):
+            return (1, label)
+
+    # --- load data ---
+    with open(json_path, "r") as f:
+        data = json.load(f)
+    
+    if "columns" not in data or "rows" not in data:
+        raise ValueError("JSON must have 'columns' and 'rows' keys")
+    
+    rows = data["rows"]
+    
+    # Get unique sequence lengths and taxa values
+    seq_lengths = sorted(set(r["sequence_length"] for r in rows))
+    taxa_values = sorted(set(r["num_taxa"] for r in rows))
+    
+    # For single-L sweeps, we expect only one sequence length
+    if len(seq_lengths) > 1:
+        raise ValueError(f"Expected single sequence length, found {len(seq_lengths)}: {seq_lengths}")
+    
+    seq_len = seq_lengths[0]
+    
+    # Build series for each taxa value
+    series = {}
+    for n_taxa in taxa_values:
+        key = f"n={n_taxa}"
+        series[key] = {"x": [], "mean": [], "std": []}
+        
+        # Extract rows for this taxa value
+        relevant_rows = [r for r in rows if r["num_taxa"] == n_taxa]
+        
+        for r in relevant_rows:
+            series[key]["x"].append(float(r["p"]))
+            # Prefer partition_agreement_M (averaged f vs M), fall back to sign_agreement
+            val = r.get("partition_agreement_M", r.get("sign_agreement", r.get("median", r.get("mean", 0))))
+            series[key]["mean"].append(float(val))
+            series[key]["std"].append(float(r.get("std", 0)))
+        
+        # Sort by x
+        if not series[key]["x"]:
+            continue
+            
+        arr = np.array(list(zip(series[key]["x"], 
+                                series[key]["mean"],
+                                series[key]["std"])), dtype=float)
+        arr = arr[arr[:, 0].argsort()]
+        
+        # Fill NaN values with 50% for p < 1e-3 (left side of plot)
+        x_vals = arr[:, 0]
+        y_vals = arr[:, 1]
+        std_vals = arr[:, 2]
+        
+        nan_mask = np.isnan(y_vals)
+        left_mask = x_vals < 1e-3
+        fill_mask = nan_mask & left_mask
+        y_vals[fill_mask] = 50.0
+        std_vals[fill_mask] = 0.0
+        
+        series[key]["x"] = x_vals.tolist()
+        series[key]["mean"] = y_vals.tolist()
+        series[key]["std"] = std_vals.tolist()
+    
+    # Create single figure
+    fig, ax = plt.subplots(1, 1, figsize=(4.8, 3.2))
+    
+    z_band, z_line = 1, 2
+    line_colors = {}
+    filtered_series = {}
+
+    # Plot each taxa line
+    for name, s in series.items():
+        x = np.asarray(s["x"])
+        y = np.asarray(s["mean"])
+        sd = np.asarray(s["std"])
+        m = x >= 1e-3
+        x, y, sd = x[m], y[m], sd[m]
+
+        filtered_series[name] = {"x": x.tolist(), "mean": y.tolist()}
+
+        line, = ax.plot(
+            x,
+            y,
+            "-",
+            marker="o",
+            markerfacecolor="white",
+            markeredgewidth=0.9,
+            label=name,
+            zorder=z_line,
+        )
+        color = line.get_color()
+        line_colors[name] = color
+
+        if x.size:
+            ax.fill_between(
+                x,
+                y - sd,
+                y + sd,
+                color=color,
+                alpha=0.08,
+                linewidth=0,
+                zorder=z_band,
+            )
+
+    # Compute and plot phase transition thresholds
+    thresholds = compute_phase_transition_thresholds(filtered_series)
+    annotation_entries = []
+
+    for name, threshold in thresholds.items():
+        if not threshold:
+            continue
+        p_val, y_val = threshold
+        color = line_colors.get(name)
+        if color is None:
+            continue
+        ax.scatter(
+            [p_val],
+            [y_val],
+            color=color,
+            edgecolors="white",
+            linewidths=0.6,
+            zorder=z_line + 1,
+            s=22,
+        )
+        annotation_entries.append((name, p_val, color))
+
+    annotation_entries.sort(key=lambda entry: _taxa_sort_key(entry[0]))
+
+    if annotation_entries:
+        base_x = 0.98
+        base_y = 0.05
+        line_height = 0.055
+
+        for idx, (label, p_val, color) in enumerate(annotation_entries):
+            ax.text(
+                base_x,
+                base_y + idx * line_height,
+                f"{label} p50={_format_p_value(p_val)}",
+                transform=ax.transAxes,
+                ha="right",
+                va="bottom",
+                fontsize=6,
+                color=color,
+            )
+    
+    # Set axes properties
+    ax.set_xscale("log")
+    ax.set_xlim(1e-3, 1e0)
+    ax.set_ylim(20, 102)
+    
+    # Labeled powers only
+    ticks = [1e-3, 1e-2, 1e-1, 1e0]
+    labels = [r"$10^{-3}$", r"$10^{-2}$", r"$10^{-1}$", r"$10^{0}$"]
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_major_formatter(FixedFormatter(labels))
+    ax.minorticks_off()
+    
+    # Sparser y ticks
+    ax.set_yticks([20, 40, 60, 80, 100])
+    
+    ax.set_xlabel(xlabel, fontsize=8)
+    ax.set_ylabel(ylabel, fontsize=8)
+    
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    
+    # Add legend in lower right corner, single column
+    ax.legend(
+        loc="lower right",
+        ncol=1,
+        frameon=True,
+        fancybox=False,
+        facecolor="white",
+        edgecolor=(0.85, 0.85, 0.85),
+        borderpad=0.4,
+        handlelength=1.2,
+        handletextpad=0.5,
+    )
+    
+    # Set title and subtitle with proper spacing
+    if model_name:
+        ax.set_title(model_name, fontsize=11, pad=15)
+        if subtitle:
+            # Add subtitle using text with increased spacing
+            # Use LaTeX rendering for mathematical symbols
+            ax.text(0.5, 1.05, subtitle, transform=ax.transAxes,
+                   ha="center", va="bottom", fontsize=9,
+                   style="italic", color="gray")
+    elif subtitle:
+        ax.set_title(subtitle, fontsize=9, pad=10)
+    
+    # Adjust layout - increase top margin to accommodate subtitle
+    top_margin = 0.88 if (model_name and subtitle) else 0.92
+    fig.subplots_adjust(
+        bottom=0.12,
+        left=0.12,
+        right=0.95,
+        top=top_margin,
+    )
+
+    fig.savefig(output_path, bbox_inches="tight", dpi=dpi)
+    plt.close(fig)
+    print(f"Taxa sweep plot saved to: {output_path}")
+    return output_path
+
+
 if __name__ == "__main__":
     # Example usage - you can modify these paths as needed
     

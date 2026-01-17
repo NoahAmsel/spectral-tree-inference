@@ -111,13 +111,7 @@ def parse_args() -> argparse.Namespace:
         "--plot-path",
         type=Path,
         default=None,
-        help="Optional override for the single-column plot output path.",
-    )
-    parser.add_argument(
-        "--grid-plot-path",
-        type=Path,
-        default=None,
-        help="Optional override for the grid-layout plot output path (default: adds _grid suffix).",
+        help="Optional override for the plot output path (defaults to <run_dir>/partition_agreement.png).",
     )
     return parser.parse_args()
 
@@ -144,29 +138,40 @@ def main() -> None:
         plot_path = (
             args.plot_path.expanduser().resolve()
             if args.plot_path
-            else run_dir / "partition_agreement_faceted.png"
+            else run_dir / "partition_agreement.png"
         )
-        grid_plot_path = (
-            args.grid_plot_path.expanduser().resolve()
-            if args.grid_plot_path
-            else plot_path.with_name(f"{plot_path.stem}_grid{plot_path.suffix}")
-        )
-        run_title = run_dir.name
         os.environ.setdefault("MPLBACKEND", "Agg")
-        from src.utils.plotting import plot_faceted_by_sequence_length
-        plot_faceted_by_sequence_length(
+        from src.utils.plotting import plot_taxa_sweep, _extract_model_name
+        
+        # Extract model name from directory
+        model_name = _extract_model_name(run_dir.name)
+        
+        # Read config for subtitle with all parameters
+        config_path = run_dir / "sweep_config.json"
+        if config_path.exists():
+            with config_path.open("r") as f:
+                sweep_config = json.load(f)
+            seq_len = sweep_config["sequence_length_values"][0]
+            mu = sweep_config["mutation_rate"]
+            ne = sweep_config.get("tree_params", {}).get("pop_size", "N/A")
+            bootstrap_reps = sweep_config.get("bootstrap_reps", "N/A")
+            subtitle = f"$L = {seq_len}$, $\\mu = {mu}$, $N_e = {ne}$, {bootstrap_reps} bootstrap reps"
+        else:
+            # Fallback: Get sequence length from merged data
+            seq_lengths = sorted(set(r.get("sequence_length", 0) for r in merged["rows"]))
+            if seq_lengths:
+                seq_len = seq_lengths[0]
+                subtitle = f"$L = {seq_len}$"
+            else:
+                subtitle = None
+        
+        plot_taxa_sweep(
             json_path=str(output_json),
             output_path=str(plot_path),
-            run_title=run_title,
+            model_name=model_name,
+            subtitle=subtitle,
         )
-        print(f"Wrote faceted plot to {plot_path}")
-        plot_faceted_by_sequence_length(
-            json_path=str(output_json),
-            output_path=str(grid_plot_path),
-            run_title=run_title,
-            facets_per_row=2,
-        )
-        print(f"Wrote grid faceted plot to {grid_plot_path}")
+        print(f"Wrote taxa sweep plot to {plot_path}")
 
 
 if __name__ == "__main__":
