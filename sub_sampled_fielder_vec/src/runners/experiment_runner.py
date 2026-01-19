@@ -27,13 +27,13 @@ from .bootstrap_sweep import sweep_for_params
 
 # Add spectral_analysis to path for tree plotting
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
-SPECTRAL_ANALYSIS_PATH = PACKAGE_ROOT / "spectral_analysis" / "target_quality_anlysis" / "visualization"
+SPECTRAL_ANALYSIS_PATH = PACKAGE_ROOT / "analysis" / "spectral_analysis" / "target_quality_anlysis" / "visualization"
 if str(SPECTRAL_ANALYSIS_PATH) not in sys.path:
     sys.path.insert(0, str(SPECTRAL_ANALYSIS_PATH))
 from tree_plots import plot_tree_with_partition, plot_combined_tree_and_fiedler
 
 # Add spectral_analysis to path for partition validation
-SPECTRAL_ANALYSIS_OUTPUT_PATH = PACKAGE_ROOT / "spectral_analysis" / "target_quality_anlysis" / "output"
+SPECTRAL_ANALYSIS_OUTPUT_PATH = PACKAGE_ROOT / "analysis" / "spectral_analysis" / "target_quality_anlysis" / "output"
 if str(SPECTRAL_ANALYSIS_OUTPUT_PATH) not in sys.path:
     sys.path.insert(0, str(SPECTRAL_ANALYSIS_OUTPUT_PATH))
 from partition_validity import check_partition_valid_in_tree
