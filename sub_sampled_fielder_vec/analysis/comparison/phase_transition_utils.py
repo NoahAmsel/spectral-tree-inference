@@ -104,7 +104,7 @@ def fit_sigmoid_with_interpolation_fallback(p_vals: np.ndarray, agreements: np.n
         return params, p_star_sigmoid
 
     # Fallback: use linear interpolation in log-space
-    print(f"  Using interpolation fallback (sigmoid fit gave p*={p_star_sigmoid:.4f})")
+    # (Diagnostic message removed)
 
     # Find points bracketing threshold
     below_threshold = agreements < threshold

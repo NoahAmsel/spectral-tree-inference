@@ -169,7 +169,7 @@ fiedler = compute_fielder_vector(recovered_matrix)
 ### SamplingConfig Parameters
 
 - **`method`**: `"uniform"` or `"leveraged"` (default: `"uniform"`)
-- **`theta`**: Phase 1 budget ratio for leveraged sampling (default: `0.3`)
+- **`theta`**: Phase 1 budget ratio for leveraged sampling (default: `0.7`)
   - Fraction of total samples used for uniform Phase 1
   - Remaining `1-theta` used for Phase 2 (leveraged sampling)
 - **`target_rank`**: Rank `r` for SVD in leverage score computation (default: `2`)
