@@ -153,10 +153,22 @@ def extract_config(run_dir: Path) -> Optional[Dict[str, Any]]:
         with config_file.open() as f:
             return json.load(f)
 
+    # Try sweep_config.json for sweep/solo runs
+    config_file = run_dir / "sweep_config.json"
+    if config_file.exists():
+        with config_file.open() as f:
+            return json.load(f)
+
     # Try parent directory
     parent_config = run_dir.parent / "config.json"
     if parent_config.exists():
         with parent_config.open() as f:
+            return json.load(f)
+
+    # Try sweep_config.json in parent directory
+    parent_sweep_config = run_dir.parent / "sweep_config.json"
+    if parent_sweep_config.exists():
+        with parent_sweep_config.open() as f:
             return json.load(f)
 
     return None
@@ -197,11 +209,10 @@ def to_dataframe(
         row_list = run_data.get("rows", [])
 
         for row in row_list:
-            # Create row dict with explicit n_taxa and sequence_length
-            df_row = {"num_taxa": n_taxa, "sequence_length": seq_len}
-            for col in columns:
-                df_row[col] = row.get(col)
-            rows.append(df_row)
+            # Use the row dict directly and add metadata
+            row["num_taxa"] = n_taxa
+            row["sequence_length"] = seq_len
+            rows.append(row)
 
     if not rows:
         return pd.DataFrame()
@@ -214,6 +225,19 @@ def to_dataframe(
         df = df.sort_values(["sequence_length", "num_taxa"])
 
     return df
+
+
+def load_single_run_dataframe(run_dir: Path) -> pd.DataFrame:
+    """Load single experiment run as a DataFrame.
+
+    Args:
+        run_dir: Single run directory containing n{X}_L{Y} subdirectories
+
+    Returns:
+        DataFrame with all rows from the experiment
+    """
+    data = load_experiment_results(run_dir)
+    return to_dataframe(data, method=None)
 
 
 def load_comparison_dataframe(comp_dir: Path) -> Dict[str, pd.DataFrame]:
