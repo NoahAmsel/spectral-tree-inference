@@ -38,7 +38,8 @@ class LeveragedSampler(BaseSampler):
         target_rank: int = 2,
         ialm_max_iter: int = 100,
         ialm_tol: float = 1e-6,
-        ialm_bypass_threshold: float = 0.1
+        ialm_bypass_threshold: float = 0.1,
+        force_leveraged: bool = False
     ):
         """
         Initialize leveraged sampler.
@@ -49,12 +50,15 @@ class LeveragedSampler(BaseSampler):
             ialm_max_iter: Maximum iterations for IALM solver
             ialm_tol: Convergence tolerance for IALM
             ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
+            force_leveraged: If True, always use leveraged sampling even when Phase 1
+                           budget is theoretically insufficient. Useful for experimentation.
         """
         self.theta = theta
         self.target_rank = target_rank
         self.ialm_max_iter = ialm_max_iter
         self.ialm_tol = ialm_tol
         self.ialm_bypass_threshold = ialm_bypass_threshold
+        self.force_leveraged = force_leveraged
         # Track which p-values have been logged (to log once per p, not per sample)
         self._logged_p_values = set()
         # Store per-sample diagnostic metrics
@@ -101,9 +105,50 @@ class LeveragedSampler(BaseSampler):
         
         # Initialize random generator
         rng = get_rng(seed)
-        
+
+        # Compute theoretical minimum samples for Phase 1 (from matrix completion theory)
+        # Paper requirement: m₁ ≥ C·n·r·log(n) for reliable leverage score estimation
+        # For symmetric rank-r matrices: 4·n·r·log(n) is conservative
+        theoretical_min_phase1 = int(4 * n * self.target_rank * np.log(n)) if n > 1 else 10
+
         # Phase 1: Uniform sampling to estimate leverage scores
-        phase1_budget = int(self.theta * total_budget)
+        phase1_budget_naive = int(self.theta * total_budget)
+        
+        if self.force_leveraged:
+            # Force leveraged sampling: use naive budget even if below theoretical minimum
+            phase1_budget = phase1_budget_naive
+            # Ensure at least 1 sample for Phase 1
+            if phase1_budget < 1:
+                phase1_budget = 1
+        else:
+            # Use max(theta*total, min_required) to ensure meaningful leverage scores
+            phase1_budget = max(phase1_budget_naive, theoretical_min_phase1)
+
+        # Check if total budget is sufficient for leveraged sampling
+        if phase1_budget >= total_budget:
+            if self.force_leveraged:
+                # Even when forced, we need some budget for Phase 2
+                # Use 90% for Phase 1, 10% for Phase 2
+                phase1_budget = max(1, int(0.9 * total_budget))
+                log_info('leveraged',
+                    f"p={p:.4f}: Force leveraged mode - using {phase1_budget:,}/{total_budget:,} for Phase 1 "
+                    f"(theoretical min: {theoretical_min_phase1:,})"
+                )
+            else:
+                # Phase 1 would consume entire budget - fall back to uniform sampling
+                # This happens when p is too small for leveraged sampling to be beneficial
+                log_info('leveraged',
+                    f"p={p:.4f}: Phase 1 requires {phase1_budget:,} samples but total budget is {total_budget:,}. "
+                    f"Falling back to uniform sampling (leveraged sampling requires p ≥ {theoretical_min_phase1/n_upper:.6f})"
+                )
+                # Use uniform sampler logic instead (uniform_sample_upper_triangle imported at module level)
+                Omega = uniform_sample_upper_triangle(n, total_budget, rng)
+                L = np.zeros_like(matrix)
+                L[Omega] = matrix[Omega]
+                L = (L + L.T) / 2
+                np.fill_diagonal(L, 1.0)
+                return L
+
         Omega1 = uniform_sample_upper_triangle(n, phase1_budget, rng)
         phase1_actual = np.sum(Omega1) // 2  # Divide by 2 since symmetric mask counts both (i,j) and (j,i)
         
@@ -133,10 +178,7 @@ class LeveragedSampler(BaseSampler):
         else:
             Omega = Omega1
 
-        # Compute theoretical minimum samples for Phase 1 (for r=2 symmetric matrices)
-        # Paper formula: 4*n*r*log(n), but for symmetric might be 2*n*r*log(n)
-        # Using conservative 4*n*r*log(n) pending verification
-        theoretical_min_phase1 = int(4 * n * self.target_rank * np.log(n)) if n > 1 else 10
+        # Compute Phase 1 sufficiency ratio (already computed theoretical_min above)
         phase1_sufficiency = phase1_actual / theoretical_min_phase1 if theoretical_min_phase1 > 0 else 0.0
 
         # Leverage score diagnostics (for symmetric matrices, μ_i = ν_i)
@@ -194,9 +236,19 @@ class LeveragedSampler(BaseSampler):
             return L
 
         # Phase 3: IALM recovery
-        # Compute adaptive lambda parameter: λ = base × (1-p) to reduce denoising at high p
-        lambda_base = 1.0 / (24 * np.sqrt(n * np.log(n))) if n > 1 else 0.1
-        lambda_param = lambda_base * (1.0 - p)  # λ→0 as p→1 (less denoising for dense sampling)
+        # Compute adaptive lambda parameter from paper's Theorem 3.2
+        # Theory: λ = 1/(4√mn) × √(mn/|Ω|) = 1/(4√|Ω|)
+        # For symmetric n×n with |Ω| = p·n²/2:
+        #   λ = 1/(4√(p·n²/2)) = 1/(2n√(2p))
+        #
+        # Simplified: λ = 1 / (n · √(2p))
+        # This ensures λ→0 as p→1 (less denoising for dense sampling)
+        # and λ increases as p→0 (more aggressive denoising for sparse sampling)
+        total_samples = np.sum(Omega) // 2  # Actual sampled entries (symmetric)
+        if total_samples > 0:
+            lambda_param = 1.0 / (n * np.sqrt(2 * p)) if p > 0 else 0.1
+        else:
+            lambda_param = 0.1  # Fallback for edge case
         
         # Run IALM solver
         L, S = ialm_solve(

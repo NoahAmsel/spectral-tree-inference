@@ -26,9 +26,18 @@ def compute_leverage_scores(X: np.ndarray, Omega: np.ndarray, r: int) -> Tuple[n
     """
     n = X.shape[0]
 
-    # Extract observed entries: P_Omega(X)
+    # Compute uniform sampling probability for Inverse Probability Weighting (IPW)
+    # This corrects the spectral bias from zero-filling at low sampling rates
+    n_upper = n * (n - 1) // 2  # Upper triangle entries
+    n_observed = np.sum(Omega) // 2  # Divide by 2 since symmetric
+    p_uniform = n_observed / n_upper if n_upper > 0 else 1.0
+
+    # Extract observed entries with Inverse Probability Weighting: P_Omega(X) / p
+    # This ensures E[X_observed] = X (unbiased spectral estimator)
+    # Without IPW: E[X_observed] = p·X (biased, singular vectors localize on few entries)
     X_observed = np.zeros_like(X)
-    X_observed[Omega] = X[Omega]
+    if p_uniform > 0:
+        X_observed[Omega] = X[Omega] / p_uniform  # IPW scaling
 
     # Convert to sparse matrix for efficient SVD (at low p, matrix is 99%+ zeros)
     X_sparse = csr_matrix(X_observed)

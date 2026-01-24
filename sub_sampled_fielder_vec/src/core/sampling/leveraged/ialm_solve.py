@@ -63,26 +63,37 @@ def ialm_solve(
     # Main IALM loop
     converged = False
     final_iter = max_iter
-    
+    prev_constraint_violation = float('inf')  # Track for adaptive penalty update
+
     for k in range(max_iter):
         # Store previous values for convergence check
         L_prev = L.copy()
         S_prev = S.copy()
-        
-        # Update L: L_{k+1} = SVT(X - S_k - Y_k/μ_k, 1/μ_k)
-        # But we only observe entries in Omega, so:
-        # We need to fill in unobserved entries with current estimate
-        X_estimate = L + S + Y / mu
-        X_estimate = P_Omega(X) + (1 - Omega) * X_estimate  # Observed: use X, unobserved: use estimate
-        
-        L, issue = singular_value_threshold(X_estimate - S - Y / mu, 1.0 / mu)
+
+        # IALM Update Step (corrected formulation)
+        # The algorithm minimizes: ||L||_* + λ||S||_1 subject to P_Ω(L + S) = P_Ω(X)
+        #
+        # Key insight: On Ω, constraint forces L+S=X (use observations)
+        #              On Ω^c, no constraint (use current estimates)
+        #
+        # Correct L-update: SVT applied to matrix that equals:
+        #   - On Ω: X - S_k - Y_k/μ_k (use observations minus current S and Lagrange term)
+        #   - On Ω^c: L_k + S_k - S_k - Y_k/μ_k = L_k - Y_k/μ_k (maintain current estimate)
+        #
+        # Build the argument for SVT:
+        Z = L - Y / mu  # Start with current estimate minus Lagrange term
+        Z = P_Omega(X - S - Y / mu) + (1 - Omega) * Z  # Observed: use X-S-Y/μ, unobserved: L-Y/μ
+
+        L, issue = singular_value_threshold(Z, 1.0 / mu)
         if issue:
             had_numerical_issues = True
-        
-        # Update S: S_{k+1} = soft_thresh(X - L_{k+1} - Y_k/μ_k, λ/μ_k)
-        # Again, only update observed entries
-        S_update = soft_threshold(X_estimate - L - Y / mu, lambda_param / mu)
-        S = P_Omega(S_update)  # Only keep observed entries
+
+        # Update S: S_{k+1} = soft_thresh on observed entries only
+        # Correct S-update: Apply soft-threshold to:
+        #   - On Ω: X - L_{k+1} - Y_k/μ_k (residual after L update)
+        #   - On Ω^c: 0 (S is sparse, only non-zero on observed entries)
+        S_arg = P_Omega(X - L - Y / mu)  # Only compute on observed entries
+        S = soft_threshold(S_arg, lambda_param / mu)  # Soft-threshold, will preserve sparsity
         
         # Update Lagrange multiplier: Y_{k+1} = Y_k + μ_k * (X - L_{k+1} - S_{k+1})
         # Constraint: P_Omega(L + S) = P_Omega(X)
@@ -112,9 +123,22 @@ def ialm_solve(
             S = np.nan_to_num(S, nan=0.0, posinf=0.0, neginf=0.0)
             final_iter = k + 1
             break
-        
-        # Update penalty parameter
-        mu = rho * mu
+
+        # Adaptive penalty parameter update
+        # Theory: Increase μ only when making progress on constraint violation
+        # This prevents numerical overflow and oscillation in ill-conditioned cases
+        #
+        # Standard IALM: μ_{k+1} = ρ·μ_k (always increase)
+        # Adaptive: μ_{k+1} = ρ·μ_k if ||residual|| < 0.25·||prev_residual|| (good progress)
+        #           μ_{k+1} = μ_k otherwise (stalled - don't make problem harder)
+        #
+        # Benefit: Prevents μ → ∞ when convergence stalls, improves stability
+        if constraint_violation < 0.25 * prev_constraint_violation:
+            # Good progress on constraint - increase penalty
+            mu = rho * mu
+        # else: Keep current μ (don't increase if not making progress)
+
+        prev_constraint_violation = constraint_violation
     
     # Store result info for logging (accessible via module-level tracking)
     ialm_solve._last_result = IALMResult(L, S, converged, final_iter, had_numerical_issues)
