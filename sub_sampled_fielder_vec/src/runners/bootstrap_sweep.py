@@ -244,7 +244,9 @@ def sweep_for_params(
         theta=cfg.sampling.theta,
         target_rank=cfg.sampling.target_rank,
         ialm_max_iter=cfg.sampling.ialm_max_iter,
-        ialm_tol=cfg.sampling.ialm_tol
+        ialm_tol=cfg.sampling.ialm_tol,
+        ialm_bypass_threshold=cfg.sampling.ialm_bypass_threshold,
+        force_leveraged=cfg.sampling.force_leveraged
     )
     log_info('bootstrap', f"Using sampling method: {cfg.sampling.method}")
 

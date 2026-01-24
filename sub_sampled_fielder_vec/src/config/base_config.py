@@ -176,6 +176,7 @@ class SamplingConfig(BaseModel):
         ialm_max_iter: Maximum iterations for IALM solver
         ialm_tol: Convergence tolerance for IALM
         ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
+        force_leveraged: Force leveraged sampling even when Phase 1 budget is insufficient
     """
     method: Literal["uniform", "leveraged"] = "uniform"
     theta: float = Field(default=0.3, gt=0.0, lt=1.0, description="Phase 1 budget ratio")
@@ -183,6 +184,7 @@ class SamplingConfig(BaseModel):
     ialm_max_iter: int = Field(default=100, ge=1, description="IALM maximum iterations")
     ialm_tol: float = Field(default=1e-6, gt=0.0, description="IALM convergence tolerance")
     ialm_bypass_threshold: float = Field(default=0.1, gt=0.0, le=1.0, description="Skip IALM when p >= threshold")
+    force_leveraged: bool = Field(default=False, description="Force leveraged sampling even when Phase 1 budget is insufficient")
     
     class Config:
         extra = "forbid"

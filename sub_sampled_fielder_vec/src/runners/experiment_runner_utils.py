@@ -89,6 +89,8 @@ def get_sampling_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "sampling_target_rank": config.get("sampling_target_rank", 2),
         "sampling_ialm_max_iter": config.get("sampling_ialm_max_iter", 100),
         "sampling_ialm_tol": config.get("sampling_ialm_tol", 1e-6),
+        "sampling_ialm_bypass_threshold": config.get("sampling_ialm_bypass_threshold", 0.1),
+        "sampling_force_leveraged": config.get("sampling_force_leveraged", False),
     }
 
 
@@ -124,6 +126,8 @@ def create_experiment_config(
         sampling_target_rank=sampling_config["sampling_target_rank"],
         sampling_ialm_max_iter=sampling_config["sampling_ialm_max_iter"],
         sampling_ialm_tol=sampling_config["sampling_ialm_tol"],
+        sampling_ialm_bypass_threshold=sampling_config["sampling_ialm_bypass_threshold"],
+        sampling_force_leveraged=sampling_config["sampling_force_leveraged"],
         **tree_kwargs,
     )
 
@@ -168,6 +172,8 @@ def run_single_experiment(
         print(f"  Phase 1 ratio (theta): {sampling_config['sampling_theta']}")
         print(f"  Target rank: {sampling_config['sampling_target_rank']}")
         print(f"  IALM max_iter: {sampling_config['sampling_ialm_max_iter']}, tol: {sampling_config['sampling_ialm_tol']}")
+        print(f"  IALM bypass threshold: {sampling_config['sampling_ialm_bypass_threshold']}")
+        print(f"  Force leveraged: {sampling_config['sampling_force_leveraged']}")
     
     runner = ExperimentRunner(cfg, base_dir=str(base_dir), subdir_name=subdir_name)
     run_dir, results = runner.run()
