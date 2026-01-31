@@ -94,6 +94,12 @@ def show_main_menu() -> str:
         for i, cache_entry in enumerate(cached, 1):
             print_cached_matrix(i, cache_entry['metadata'])
         print()
+    else:
+        # No cached matrices yet - show helpful message
+        from src.utils.interactive_ui import Colors
+        print(f"{Colors.YELLOW}💡 No cached matrices yet{Colors.RESET}")
+        print(f"{Colors.YELLOW}   Matrices will be cached after your first experiment run{Colors.RESET}")
+        print()
 
     # New matrix option
     print_option("n", "Create new matrix configuration")

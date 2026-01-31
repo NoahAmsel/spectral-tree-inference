@@ -12,6 +12,8 @@ A modular framework for analyzing Fiedler vector quality under sub-sampling, usi
 
 **This framework tests**: Does averaging Fiedler vectors from subsampled data preserve STDR's partition quality?
 
+**Core question**: As we increase n (number of taxa), can we use fewer matrix entries (lower p)? In other words, does the total number of entries needed scale sub-quadratically with n?
+
 ## How Experiments Work
 
 **Process**:

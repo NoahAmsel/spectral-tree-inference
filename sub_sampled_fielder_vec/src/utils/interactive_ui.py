@@ -119,18 +119,26 @@ def get_choice(prompt: str, valid_choices: List[str], case_sensitive: bool = Fal
         if choice in valid_choices:
             return choice
 
-        print(f"{Colors.RED}Invalid choice. Please choose from: {', '.join(valid_choices)}{Colors.RESET}")
+        print(f"{Colors.RED}Not an option, try again. Valid choices: {', '.join(valid_choices)}{Colors.RESET}")
 
 
 def confirm(prompt: str = "Continue?", default: bool = True) -> bool:
     """Ask for yes/no confirmation."""
     default_str = "Y/n" if default else "y/N"
-    response = get_input(f"{prompt} [{default_str}]", default="y" if default else "n")
 
-    if response is None:
-        return default
+    while True:
+        response = get_input(f"{prompt} [{default_str}]", default="y" if default else "n")
 
-    return response.lower() in ['y', 'yes']
+        if response is None:
+            return default
+
+        response_lower = response.lower()
+        if response_lower in ['y', 'yes']:
+            return True
+        elif response_lower in ['n', 'no']:
+            return False
+        else:
+            print(f"{Colors.RED}Not an option, try again. Enter 'y' or 'n'{Colors.RESET}")
 
 
 def print_error(message: str):
