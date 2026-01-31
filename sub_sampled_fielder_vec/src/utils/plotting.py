@@ -191,7 +191,8 @@ def plot_fiedler_vectors(
     output_path: str = "fiedler_vectors.png",
     dpi: int = 600,
     figsize: tuple = (10, 6),
-    include_metadata: bool = True
+    include_metadata: bool = True,
+    fiedler_ref: np.ndarray = None
 ):
     """
     Plot the true Fiedler vectors for each taxa count.
@@ -204,6 +205,7 @@ def plot_fiedler_vectors(
         run_title: Optional figure title (e.g., run directory name)
         figsize: Figure size (width, height)
         include_metadata: If True, read config.json and include L and μ in title
+        fiedler_ref: Optional Fiedler vector to plot (if provided, will not load from disk)
     """
     import os
     import numpy as np
@@ -253,38 +255,62 @@ def plot_fiedler_vectors(
             except Exception as e:
                 print(f"Warning: Could not read config.json: {e}")
 
-    # Find all Fiedler vector files
-    fiedler_files = []
-    for filename in os.listdir(run_dir):
-        if filename.startswith("fiedler_ref") and filename.endswith(".npy"):
-            fiedler_files.append(filename)
+    # If fiedler_ref is provided directly, use it
+    if fiedler_ref is not None:
+        # Single Fiedler vector provided in memory
+        fiedler_vectors = [fiedler_ref]
+        taxa_counts = [len(fiedler_ref)]  # Infer taxa count from vector length
 
-    if not fiedler_files:
-        print(f"No Fiedler vector files found in {run_dir}")
-        return None
-    
-    # Sort files by taxa count
-    def extract_taxa_count(filename):
-        if filename == "fiedler_ref.npy":
-            # Single taxa run - try to get taxa count from config
-            config_path = os.path.join(run_dir, "config.json")
-            if os.path.exists(config_path):
-                import json
+        # Try to get actual taxa count from config
+        config_path = os.path.join(run_dir, "config.json")
+        if os.path.exists(config_path):
+            try:
                 with open(config_path, 'r') as f:
                     config = json.load(f)
-                return config.get('num_taxa', 0)
-            return 0
-        else:
-            # Multi-taxa run - extract from filename
-            try:
-                return int(filename.split('_n=')[1].split('.npy')[0])
+                taxa_counts = [config.get('num_taxa', len(fiedler_ref))]
             except:
+                pass
+    else:
+        # Fall back to loading from disk (for backward compatibility / standalone plotting)
+        fiedler_files = []
+        for filename in os.listdir(run_dir):
+            if filename.startswith("fiedler_ref") and filename.endswith(".npy"):
+                fiedler_files.append(filename)
+
+        if not fiedler_files:
+            print(f"No Fiedler vector files found in {run_dir} and no fiedler_ref provided")
+            return None
+
+        # Sort files by taxa count
+        def extract_taxa_count(filename):
+            if filename == "fiedler_ref.npy":
+                # Single taxa run - try to get taxa count from config
+                config_path = os.path.join(run_dir, "config.json")
+                if os.path.exists(config_path):
+                    import json
+                    with open(config_path, 'r') as f:
+                        config = json.load(f)
+                    return config.get('num_taxa', 0)
                 return 0
-    
-    fiedler_files.sort(key=extract_taxa_count)
-    
+            else:
+                # Multi-taxa run - extract from filename
+                try:
+                    return int(filename.split('_n=')[1].split('.npy')[0])
+                except:
+                    return 0
+
+        fiedler_files.sort(key=extract_taxa_count)
+
+        # Load vectors from disk
+        fiedler_vectors = []
+        taxa_counts = []
+        for filename in fiedler_files:
+            fiedler_path = os.path.join(run_dir, filename)
+            fiedler_vectors.append(np.load(fiedler_path))
+            taxa_counts.append(extract_taxa_count(filename))
+
     # Create subplots in a single column
-    n_files = len(fiedler_files)
+    n_files = len(fiedler_vectors)
     if n_files == 1:
         fig, ax = plt.subplots(1, 1, figsize=figsize)
         axes = [ax]
@@ -296,16 +322,9 @@ def plot_fiedler_vectors(
             axes = [axes]
         else:
             axes = axes.flatten() if n_files > 1 else [axes]
-    
-    for i, filename in enumerate(fiedler_files):
+
+    for i, (fiedler_vector, taxa_count) in enumerate(zip(fiedler_vectors, taxa_counts)):
         ax = axes[i] if i < len(axes) else axes[-1]
-        
-        # Load Fiedler vector
-        fiedler_path = os.path.join(run_dir, filename)
-        fiedler_vector = np.load(fiedler_path)
-        
-        # Get taxa count
-        taxa_count = extract_taxa_count(filename)
         
         # Plot the Fiedler vector
         x = np.arange(len(fiedler_vector))
@@ -323,9 +342,9 @@ def plot_fiedler_vectors(
         y_min, y_max = fiedler_vector.min(), fiedler_vector.max()
         y_range = y_max - y_min
         ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
-    
+
     # Hide unused subplots
-    for i in range(len(fiedler_files), len(axes)):
+    for i in range(len(fiedler_vectors), len(axes)):
         axes[i].set_visible(False)
 
     # Add overall figure title with metadata if available

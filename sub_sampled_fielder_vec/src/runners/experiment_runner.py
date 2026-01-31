@@ -142,15 +142,15 @@ class ExperimentRunner:
             result_source=result_source_list,
             metrics_dict=metrics_dict
         )
-        np.save(os.path.join(self.run_dir, "fiedler_ref.npy"), fiedler_ref)
-        
+
         plot_from_json_simple(
             json_path=os.path.join(self.run_dir, "results.json"),
             output_path=os.path.join(self.run_dir, "plot_single.png")
         )
         plot_fiedler_vectors(
             run_dir=self.run_dir,
-            output_path=os.path.join(self.run_dir, "fiedler_vectors.png")
+            output_path=os.path.join(self.run_dir, "fiedler_vectors.png"),
+            fiedler_ref=fiedler_ref
         )
         
         # Generate tree partition visualizations if partition is available
@@ -275,8 +275,7 @@ class ExperimentRunner:
             all_partition_split_M[n_taxa] = split_M
             all_partition_split_S[n_taxa] = split_S
             all_result_source[n_taxa] = result_src
-            np.save(os.path.join(self.run_dir, f"fiedler_ref_n={n_taxa}.npy"), fiedler_ref)
-            
+
             # Generate tree partition visualizations for this n_taxa if partition is available
             if partition_ref is not None and tree is not None:
                 log_info('experiment', f"Generating tree partition visualizations for n={n_taxa}...", force=True)
@@ -445,7 +444,6 @@ class ExperimentRunner:
             all_reference_partition_quality[(n_taxa, seq_len)] = ref_quality
             all_sigma2_avg_M[(n_taxa, seq_len)] = sigma2_M
             all_sigma2_avg_S[(n_taxa, seq_len)] = sigma2_S
-            np.save(os.path.join(self.run_dir, f"fiedler_ref_n={n_taxa}_L={seq_len}.npy"), fiedler_ref)
 
             # Save incremental grid results after each combination
             save_grid_results(

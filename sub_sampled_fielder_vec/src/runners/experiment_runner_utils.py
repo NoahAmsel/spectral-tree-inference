@@ -109,7 +109,7 @@ def create_experiment_config(
 ) -> Any:
     """Create and configure experiment config object."""
     sampling_config = get_sampling_config(config)
-    
+
     cfg = custom_config(
         num_taxa=n_taxa,
         sequence_length=seq_len,
@@ -128,6 +128,7 @@ def create_experiment_config(
         sampling_ialm_tol=sampling_config["sampling_ialm_tol"],
         sampling_ialm_bypass_threshold=sampling_config["sampling_ialm_bypass_threshold"],
         sampling_force_leveraged=sampling_config["sampling_force_leveraged"],
+        use_persistent_cache=config.get("use_persistent_cache", False),
         **tree_kwargs,
     )
 

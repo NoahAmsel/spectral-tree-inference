@@ -156,6 +156,7 @@ def custom_config(
     sampling_ialm_tol: float = 1e-6,
     sampling_ialm_bypass_threshold: float = 0.1,
     sampling_force_leveraged: bool = False,
+    use_persistent_cache: bool = False,
     **kwargs
 ) -> StructuredConfig:
     """
@@ -185,6 +186,7 @@ def custom_config(
         sampling_ialm_tol: IALM convergence tolerance
         sampling_ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
         sampling_force_leveraged: Force leveraged sampling even when Phase 1 budget is insufficient
+        use_persistent_cache: Enable disk-based caching of experiment data (tree, observations, matrices)
         **kwargs: Additional model-specific parameters (e.g., kappa, edge_length, etc.)
 
     Returns:
@@ -245,7 +247,10 @@ def custom_config(
         ialm_bypass_threshold=sampling_ialm_bypass_threshold,
         force_leveraged=sampling_force_leveraged
     )
-    
+
+    # Build cache config
+    cache = CacheConfig(use_persistent_cache=use_persistent_cache)
+
     return StructuredConfig(
         tree=TreeConfig(model=tree_model, params=tree_params),
         sequence=SequenceConfig(model=seq_model, len=sequence_length, params=seq_params),
@@ -259,5 +264,6 @@ def custom_config(
             use_middle_out=use_middle_out
         ),
         sampling=sampling,
-        metrics=metrics
+        metrics=metrics,
+        cache=cache
     )
