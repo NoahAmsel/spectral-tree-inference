@@ -79,14 +79,41 @@ def print_cached_matrix(index: int, metadata: Dict[str, Any]):
 
 
 def print_config_summary(config: Dict[str, Any], prefix: str = "  →"):
-    """Print config summary in one line."""
+    """Print comprehensive config summary showing matrix and experiment parameters."""
+    # Matrix parameters
     n = config.get('n_taxa', config.get('taxa_values', [None])[0])
     L = config.get('seq_len', config.get('sequence_length_values', [None])[0])
     mu = config.get('mutation_rate', '?')
     model = config.get('tree_model', '?')
-    bootstrap_reps = config.get('bootstrap_reps', '?')
 
-    print(f"{prefix} n={n}, L={L}, μ={mu}, {model}, {bootstrap_reps} bootstraps")
+    # Experiment parameters
+    bootstrap_reps = config.get('bootstrap_reps', '?')
+    sampling_method = config.get('sampling_method', '?')
+    display_mode = config.get('display_mode', '?')
+
+    # P-values info
+    p_values = config.get('p_values', [])
+    if p_values:
+        p_min = min(p_values)
+        p_max = max(p_values)
+        p_count = len(p_values)
+        p_info = f"{p_count} points [{p_min:.1e}-{p_max:.1e}]"
+    else:
+        p_info = "?"
+
+    # Matrix line
+    print(f"{prefix} {Colors.BOLD}Matrix:{Colors.RESET} n={n}, L={L}, μ={mu}, {model}")
+
+    # Experiment line
+    print(f"{prefix} {Colors.BOLD}Experiment:{Colors.RESET} {bootstrap_reps} bootstraps, p={p_info}, {display_mode} mode")
+
+    # Sampling line
+    if sampling_method == 'leveraged':
+        theta = config.get('sampling_theta', '?')
+        rank = config.get('sampling_target_rank', '?')
+        print(f"{prefix} {Colors.BOLD}Sampling:{Colors.RESET} leveraged (θ={theta}, rank={rank})")
+    else:
+        print(f"{prefix} {Colors.BOLD}Sampling:{Colors.RESET} {sampling_method}")
 
 
 def get_input(prompt: str, default: Optional[str] = None, color: str = Colors.CYAN) -> str:
@@ -120,6 +147,43 @@ def get_choice(prompt: str, valid_choices: List[str], case_sensitive: bool = Fal
             return choice
 
         print(f"{Colors.RED}Not an option, try again. Valid choices: {', '.join(valid_choices)}{Colors.RESET}")
+
+
+def get_menu_choice(prompt: str, options: List[str], default_index: int = 0) -> str:
+    """
+    Present numbered menu and get user choice.
+
+    Args:
+        prompt: Question to ask user
+        options: List of option strings to choose from
+        default_index: Index of default option (0-based)
+
+    Returns:
+        Selected option string
+    """
+    # Display menu
+    print(f"\n{Colors.CYAN}{prompt}{Colors.RESET}")
+    for i, option in enumerate(options, 1):
+        if i - 1 == default_index:
+            print(f"  {Colors.GREEN}[{i}]{Colors.RESET} {Colors.BOLD}{option}{Colors.RESET} (default)")
+        else:
+            print(f"  {Colors.CYAN}[{i}]{Colors.RESET} {option}")
+
+    # Get choice
+    while True:
+        choice = get_input("Choice", default=str(default_index + 1))
+
+        if choice is None:
+            return options[default_index]
+
+        try:
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx < len(options):
+                return options[choice_idx]
+            else:
+                print(f"{Colors.RED}Invalid choice. Enter 1-{len(options)}{Colors.RESET}")
+        except ValueError:
+            print(f"{Colors.RED}Invalid input. Enter a number 1-{len(options)}{Colors.RESET}")
 
 
 def confirm(prompt: str = "Continue?", default: bool = True) -> bool:

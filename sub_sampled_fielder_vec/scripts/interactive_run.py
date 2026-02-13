@@ -23,7 +23,7 @@ import numpy as np
 
 from src.utils.interactive_ui import (
     print_logo, print_header, print_option, print_cached_matrix,
-    print_config_summary, get_input, get_choice, confirm,
+    print_config_summary, get_input, get_choice, get_menu_choice, confirm,
     print_error, print_success, print_warning, print_divider
 )
 from src.utils.persistent_cache import list_cached_experiments
@@ -90,6 +90,9 @@ def show_main_menu() -> str:
     # Show cached matrices
     cached = list_cached_matrices()
     if cached:
+        # Sort by n_taxa (ascending order: smallest to largest)
+        cached = sorted(cached, key=lambda x: x['metadata'].get('n_taxa', 0))
+
         print_header("Cached Matrices")
         for i, cache_entry in enumerate(cached, 1):
             print_cached_matrix(i, cache_entry['metadata'])
@@ -147,18 +150,27 @@ def build_config_from_cache(cache_metadata: Dict[str, Any]) -> Dict[str, Any]:
         print("Custom p-values not yet implemented - using defaults")
         config["p_values"] = list(np.logspace(-4, 0, 20))
 
+    # Display mode
+    display_mode = get_menu_choice("Display mode:", ["progress", "debug"], default_index=0)
+    config["display_mode"] = display_mode
+
     # Sampling method
-    sampling = get_choice("Sampling method [uniform/leveraged]", ['uniform', 'leveraged'])
+    sampling = get_menu_choice("Sampling method:", ['uniform', 'leveraged'], default_index=1)
     config["sampling_method"] = sampling
 
     if sampling == "leveraged":
         config["sampling_theta"] = float(get_input("Theta (phase 1 ratio)", default="0.7"))
         config["sampling_target_rank"] = int(get_input("Target rank", default="2"))
+        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=True)
+        config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
 
     # Other defaults
     config["use_middle_out"] = False
     config["guardrails_enabled"] = False
     config["run_name_prefix"] = get_input("Run name prefix (optional)", default="")
+
+    # Enable persistent cache to use the cached matrix
+    config["use_persistent_cache"] = True
 
     return config
 
@@ -204,8 +216,10 @@ def create_new_config() -> Dict[str, Any]:
         p_values = list(np.logspace(-4, 0, 20))
 
     # Sampling method
-    print("\nSampling methods: uniform, leveraged")
-    sampling_method = get_input("sampling_method", default="uniform")
+    sampling_method = get_menu_choice("Sampling method:", ["uniform", "leveraged"], default_index=1)
+
+    # Display mode
+    display_mode = get_menu_choice("Display mode:", ["progress", "debug"], default_index=0)
 
     config = {
         "tree_model": tree_model,
@@ -218,6 +232,7 @@ def create_new_config() -> Dict[str, Any]:
         "p_values": p_values,
         "use_middle_out": False,
         "sampling_method": sampling_method,
+        "display_mode": display_mode,
         "guardrails_enabled": False,
         "run_name_prefix": get_input("run_name_prefix (optional)", default=""),
     }
@@ -226,8 +241,10 @@ def create_new_config() -> Dict[str, Any]:
     if sampling_method == "leveraged":
         config["sampling_theta"] = float(get_input("sampling_theta", default="0.7"))
         config["sampling_target_rank"] = int(get_input("sampling_target_rank", default="2"))
+        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=True)
         config["sampling_ialm_max_iter"] = int(get_input("IALM max_iter", default="500"))
         config["sampling_ialm_tol"] = float(get_input("IALM tolerance", default="1e-4"))
+        config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
 
     # Enable persistent cache for new matrices
     config["use_persistent_cache"] = True
@@ -321,6 +338,8 @@ def main():
             try:
                 cache_idx = int(choice) - 1
                 cached = list_cached_matrices()
+                # Sort by n_taxa to match menu display order
+                cached = sorted(cached, key=lambda x: x['metadata'].get('n_taxa', 0))
                 if 0 <= cache_idx < len(cached):
                     cache_entry = cached[cache_idx]
                     config = build_config_from_cache(cache_entry['metadata'])
