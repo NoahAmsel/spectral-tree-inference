@@ -19,12 +19,47 @@ import numpy as np
 from .logging import log_info, log_warning
 
 
+def _params_to_string(params: Dict[str, Any]) -> str:
+    """
+    Convert parameter dict to deterministic, filesystem-safe string.
+
+    Args:
+        params: Dictionary of parameters (e.g., {"pop_size": 1.0, "edge_length": 2.0})
+
+    Returns:
+        Sorted, compact string representation (e.g., "edge_length1.0_pop_size2.0")
+    """
+    if not params:
+        return ""
+
+    # Sort keys for deterministic ordering
+    sorted_keys = sorted(params.keys())
+
+    # Build compact string
+    parts = []
+    for key in sorted_keys:
+        value = params[key]
+        # Format floats to 3 decimal places, keep ints as-is
+        if isinstance(value, float):
+            value_str = f"{value:.3f}".replace(".", "p")  # Use 'p' instead of '.' for filesystem safety
+        elif isinstance(value, (list, tuple)):
+            # For lists/tuples, join with underscores
+            value_str = "_".join(str(v) for v in value)
+        else:
+            value_str = str(value)
+        parts.append(f"{key}{value_str}")
+
+    return "_".join(parts)
+
+
 def _get_cache_key(
     n_taxa: int,
     seq_len: int,
     mutation_rate: float,
     tree_model_name: str,
-    seq_model_name: str
+    seq_model_name: str,
+    tree_params: Optional[Dict[str, Any]] = None,
+    seq_params: Optional[Dict[str, Any]] = None
 ) -> str:
     """
     Generate deterministic cache key from experiment parameters.
@@ -37,19 +72,41 @@ def _get_cache_key(
         mutation_rate: Mutation rate
         tree_model_name: Name of tree model (e.g., "balanced_binary")
         seq_model_name: Name of sequence model (e.g., "Jukes_Cantor")
+        tree_params: Tree-specific parameters (e.g., {"pop_size": 1.0} for kingman_mean)
+        seq_params: Sequence-specific parameters (e.g., {"kappa": 2.0} for HKY)
 
     Returns:
         Cache key string (safe for filesystem)
 
     Example:
-        >>> _get_cache_key(8192, 1000, 0.1, "balanced_binary", "Jukes_Cantor")
-        'n8192_L1000_mu0.100_balanced_binary_Jukes_Cantor'
+        >>> _get_cache_key(512, 10000, 0.1, "kingman_mean", "JC69",
+        ...                tree_params={"pop_size": 1.0})
+        'n512_L10000_mu0.100_kingman_mean_pop_size1p0_JC69'
     """
     # Format mutation rate with 3 decimal places for consistency
     mu_str = f"{mutation_rate:.3f}"
 
-    # Create filesystem-safe key
-    cache_key = f"n{n_taxa}_L{seq_len}_mu{mu_str}_{tree_model_name}_{seq_model_name}"
+    # Build base key
+    cache_key = f"n{n_taxa}_L{seq_len}_mu{mu_str}_{tree_model_name}"
+
+    # Add tree parameters (excluding num_taxa which is already in the key)
+    if tree_params:
+        # Filter out redundant params
+        filtered_tree_params = {k: v for k, v in tree_params.items() if k != "num_taxa"}
+        if filtered_tree_params:
+            tree_param_str = _params_to_string(filtered_tree_params)
+            cache_key += f"_{tree_param_str}"
+
+    # Add sequence model name
+    cache_key += f"_{seq_model_name}"
+
+    # Add sequence parameters (excluding mutation_rate which is already in the key)
+    if seq_params:
+        # Filter out redundant params
+        filtered_seq_params = {k: v for k, v in seq_params.items() if k != "mutation_rate"}
+        if filtered_seq_params:
+            seq_param_str = _params_to_string(filtered_seq_params)
+            cache_key += f"_{seq_param_str}"
 
     return cache_key
 

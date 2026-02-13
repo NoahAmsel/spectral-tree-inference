@@ -132,7 +132,9 @@ def _get_or_generate_experiment_data(
             seq_len=seq_len,
             mutation_rate=cfg.sequence.params["mutation_rate"],
             tree_model_name=cfg.tree.model,
-            seq_model_name=cfg.sequence.model
+            seq_model_name=cfg.sequence.model,
+            tree_params=cfg.tree.params,
+            seq_params=cfg.sequence.params
         )
 
         cached = load_experiment_data(cache_key)
@@ -172,7 +174,9 @@ def _get_or_generate_experiment_data(
             'seq_len': seq_len,
             'mutation_rate': cfg.sequence.params["mutation_rate"],
             'tree_model': cfg.tree.model,
+            'tree_params': cfg.tree.params,
             'seq_model': cfg.sequence.model,
+            'seq_params': cfg.sequence.params,
             'seed': cfg.experiment.seed
         }
 
