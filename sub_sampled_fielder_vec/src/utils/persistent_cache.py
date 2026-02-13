@@ -326,13 +326,25 @@ def _deserialize_tree(tree_npz) -> Any:
     Returns:
         Tree object (or serialized representation)
     """
-    # Return the raw data - we mainly need it for completeness
-    # The actual reconstruction logic can be added later if needed
+    # Import dendropy for tree reconstruction
+    import dendropy
+
     if 'adjacency_matrix' in tree_npz:
+        # TODO: Reconstruct tree from adjacency matrix if needed
         return tree_npz['adjacency_matrix']
     elif 'newick' in tree_npz:
-        return tree_npz['newick'][0]
+        # Reconstruct DendroPy Tree from Newick string
+        newick_str = str(tree_npz['newick'][0])
+        tree = dendropy.Tree.get(data=newick_str, schema="newick")
+        return tree
     elif 'tree_str' in tree_npz:
-        return tree_npz['tree_str'][0]
+        # Try to parse as Newick string
+        tree_str = str(tree_npz['tree_str'][0])
+        try:
+            tree = dendropy.Tree.get(data=tree_str, schema="newick")
+            return tree
+        except:
+            # If parsing fails, return the string
+            return tree_str
     else:
         return None

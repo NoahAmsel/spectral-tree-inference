@@ -27,6 +27,7 @@ tests/RAxML_result.dendropy_raxml
 sub_sampled_fielder_vec/results/
 sub_sampled_fielder_vec/**/*.png
 sub_sampled_fielder_vec/.claude/
+sub_sampled_fielder_vec/src/cache/
 
 # Personal IDE configuration
 WARP.md

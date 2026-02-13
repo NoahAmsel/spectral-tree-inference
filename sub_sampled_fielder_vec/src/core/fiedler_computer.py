@@ -4,7 +4,7 @@ import scipy.linalg
 from scipy.sparse import csr_matrix, diags, issparse
 from scipy.sparse.linalg import eigsh
 
-from ..utils.logging import suppress_warnings, log_warning, log_info
+from ..utils.logging import suppress_warnings, log_warning, log_info, is_progress_mode
 
 
 class FiedlerVectorComputer:
@@ -181,9 +181,11 @@ class FiedlerVectorComputer:
         # Optimization #3: Connectivity check
         # If the 2nd eigenvalue is ≈ 0 (< 1e-9), this indicates disconnected graph components
         if eigvals[idx[1]] < 1e-9:
-            log_warning('fiedler',
-                f"Second eigenvalue ({eigvals[idx[1]]:.2e}) is near zero - graph may have disconnected components. "
-                f"Fiedler vector may not represent a valid cut.")
+            # Only log in debug mode - expected behavior for low p-values
+            if not is_progress_mode():
+                log_warning('fiedler',
+                    f"Second eigenvalue ({eigvals[idx[1]]:.2e}) is near zero - graph may have disconnected components. "
+                    f"Fiedler vector may not represent a valid cut.")
 
         fiedler_vector = eigvecs[:, idx[1]]
 
