@@ -15,7 +15,7 @@ The framework uses **Pydantic v2** models for type-safe, validated configuration
 - `tree: TreeConfig` - Tree model parameters
 - `sequence: SequenceConfig` - Sequence model parameters
 - `experiment: ExperimentConfig` - Experiment parameters (p-values, bootstrap reps, etc.)
-- `sampling: SamplingConfig` - Sampling method (uniform/leveraged)
+- `sampling: SamplingConfig` - Sampling method (uniform/leveraged) with fallback control (Safe/Research modes)
 - `metrics: MetricsConfig` - Metrics computation parameters
 - `guardrails: GuardrailsConfig` - Validation constraints
 - `cache: CacheConfig` - Caching settings
@@ -116,18 +116,41 @@ Matrix sampling method configuration.
   - `"uniform"` - Uniform random sampling (default)
   - `"leveraged"` - Leveraged matrix completion sampling
 - `theta: float` - Phase 1 budget ratio (for leveraged, default: 0.3)
+  - Fraction of samples used for uniform Phase 1 leverage estimation
 - `target_rank: int` - SVD rank for leverage estimation (for leveraged, default: 2)
+  - Typically 2 for Fiedler vector applications
 - `ialm_max_iter: int` - IALM solver max iterations (for leveraged, default: 100)
 - `ialm_tol: float` - IALM convergence tolerance (for leveraged, default: 1e-6)
+- `ialm_bypass_threshold: float` - Skip IALM when p >= threshold (default: 0.1)
+  - Saves computation time when sampling is dense enough
+- `force_leveraged: bool` - Force leveraged sampling at very low p (default: False)
+  - When True, uses leveraged even when Phase 1 budget is theoretically insufficient
+- `allow_uniform_fallback: bool` - Allow fallback to uniform sampling (default: True)
+  - **Safe Mode** (True): Falls back to uniform when p too small
+  - **Research Mode** (False): Proceeds with leveraged using 90/10 split, no guardrails
+- `log_sampling_diagnostics: bool` - Save diagnostic data for analysis (default: False)
+  - Saves leverage scores and sampling probabilities to disk
 
-**Example**:
+**Example (Safe Mode)**:
 ```python
 sampling = SamplingConfig(
     method="leveraged",
     theta=0.3,
     target_rank=2,
     ialm_max_iter=100,
-    ialm_tol=1e-6
+    ialm_tol=1e-6,
+    allow_uniform_fallback=True  # Safe mode (default)
+)
+```
+
+**Example (Research Mode)**:
+```python
+sampling = SamplingConfig(
+    method="leveraged",
+    theta=0.3,
+    target_rank=2,
+    allow_uniform_fallback=False,  # Research mode - no guardrails
+    log_sampling_diagnostics=True   # Save diagnostics for analysis
 )
 ```
 

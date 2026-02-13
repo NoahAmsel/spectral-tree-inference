@@ -17,11 +17,15 @@ SWEEP_CONFIG: Dict[str, Any] = {
     "bootstrap_reps": 20,
     "p_values": list(np.logspace(-4, 0, 20)),
     # Add sampling configuration:
-    "sampling_method": "leveraged",  # or "uniform" (default)
-    "sampling_theta": 0.3,           # Phase 1 budget ratio
-    "sampling_target_rank": 2,        # SVD rank for leverage estimation
-    "sampling_ialm_max_iter": 100,    # IALM iterations
-    "sampling_ialm_tol": 1e-6,        # IALM tolerance
+    "sampling_method": "leveraged",              # or "uniform" (default)
+    "sampling_theta": 0.3,                       # Phase 1 budget ratio
+    "sampling_target_rank": 2,                   # SVD rank for leverage estimation
+    "sampling_ialm_max_iter": 100,               # IALM iterations
+    "sampling_ialm_tol": 1e-6,                   # IALM tolerance
+    "sampling_ialm_bypass_threshold": 0.1,       # Skip IALM when p >= 0.1
+    "sampling_force_leveraged": False,           # Force leveraged even at low p
+    "sampling_allow_uniform_fallback": True,     # Allow uniform fallback (False = research mode)
+    "log_sampling_diagnostics": False,           # Save leverage scores for analysis
 }
 ```
 
@@ -64,10 +68,9 @@ python scripts/run_experiment.py
 
 ```python
 from src.config.presets import custom_config
-from src.config.base_config import SamplingConfig
 from src.runners.experiment_runner import ExperimentRunner
 
-# Create config with leveraged sampling
+# Create config with leveraged sampling - all parameters
 cfg = custom_config(
     num_taxa=1024,
     sequence_length=1000,
@@ -75,16 +78,17 @@ cfg = custom_config(
     tree_model="balanced_binary",
     p_values=[0.01, 0.1, 0.5, 1.0],
     bootstrap_reps=50,
-    run_name="leveraged_experiment"
-)
-
-# Override sampling config to use leveraged method
-cfg.sampling = SamplingConfig(
-    method="leveraged",
-    theta=0.3,              # 30% of budget for Phase 1 (uniform sampling)
-    target_rank=2,          # Rank for SVD (typically 2 for Fiedler)
-    ialm_max_iter=100,      # IALM solver iterations
-    ialm_tol=1e-6           # IALM convergence tolerance
+    run_name="leveraged_experiment",
+    # Sampling parameters (all optional)
+    sampling_method="leveraged",                   # Use leveraged sampling
+    sampling_theta=0.3,                            # 30% of budget for Phase 1
+    sampling_target_rank=2,                        # Rank for SVD (typically 2 for Fiedler)
+    sampling_ialm_max_iter=100,                    # IALM solver iterations
+    sampling_ialm_tol=1e-6,                        # IALM convergence tolerance
+    sampling_ialm_bypass_threshold=0.1,            # Skip IALM when p >= 0.1
+    sampling_force_leveraged=False,                # Don't force at very low p
+    sampling_allow_uniform_fallback=True,          # Allow fallback (set False for research mode)
+    log_sampling_diagnostics=False,                # Save diagnostic data for analysis
 )
 
 # Run experiment
@@ -121,6 +125,38 @@ The leveraged sampling method implements Algorithm 1 from the paper "Leveraged M
    - L = low-rank matrix, S = sparse noise, Ω = observed entries
    - Returns recovered low-rank matrix L
 
+## Research Mode vs Safe Mode
+
+Leveraged sampling supports two operational modes:
+
+### Safe Mode (Default)
+- `allow_uniform_fallback=True`
+- **Behavior**: When p is too small for reliable leverage estimation, automatically falls back to uniform sampling
+- **Use case**: Production runs where you want guaranteed reasonable results
+- **Log message**: `"Falling back to uniform sampling (Phase 1 needs X but budget is Y)"`
+
+### Research Mode
+- `allow_uniform_fallback=False`
+- **Behavior**: Proceeds with leveraged sampling using 90/10 budget split even when theoretically insufficient
+- **Use case**: Research and experimentation to understand algorithm behavior at extreme p-values
+- **Log message**: `"Proceeding with leveraged sampling despite insufficient budget"`
+- **Rationale**: Removes guardrails to allow full experimentation without errors or forced fallbacks
+
+**Example: Enable Research Mode**
+```python
+# Interactive launcher
+python scripts/interactive_run.py
+# When prompted: "Allow fallback to uniform sampling for low p?" → No
+
+# Programmatic
+cfg = custom_config(
+    num_taxa=512,
+    sampling_method="leveraged",
+    sampling_allow_uniform_fallback=False,  # Research mode
+    # ... other params ...
+)
+```
+
 ## Configuration Parameters
 
 ### SamplingConfig Parameters
@@ -136,6 +172,16 @@ The leveraged sampling method implements Algorithm 1 from the paper "Leveraged M
   - More iterations = better recovery but slower
 - **`ialm_tol`**: IALM convergence tolerance (default: `1e-6`)
   - Smaller = more accurate but slower convergence
+- **`ialm_bypass_threshold`**: Skip IALM when p >= this threshold (default: `0.1`)
+  - For dense sampling (p ≥ 0.1), directly uses sparse matrix without IALM recovery
+  - Saves computation time when sampling is dense enough
+- **`force_leveraged`**: Force leveraged sampling even when Phase 1 budget is insufficient (default: `False`)
+  - When `True`, always uses leveraged sampling regardless of theoretical minimum requirements
+  - Useful for experimentation and research when you want to test behavior at very low p-values
+- **`allow_uniform_fallback`**: Allow fallback to uniform sampling when p is too small (default: `True`)
+  - When `True`: Falls back to uniform sampling with a warning when Phase 1 budget requirements cannot be met
+  - When `False`: Proceeds with leveraged sampling using 90/10 budget split (90% Phase 1, 10% Phase 2)
+  - **Research mode**: Set to `False` to remove guardrails and experiment freely
 
 ## Critical Fixes Applied
 
@@ -246,23 +292,37 @@ prev_constraint_violation = constraint_violation
 
 ### 6. Minimum Phase 1 Budget Enforcement ✅
 
-**File**: `src/core/sampling/leveraged/sampler.py:105-130`
+**File**: `src/core/sampling/leveraged/sampler.py:118-185`
 
 **Problem**: At low p, Phase 1 gets < 100 samples, giving garbage leverage scores.
 
-**Fix Applied**: Enforce theoretical minimum:
+**Fix Applied**: Enforce theoretical minimum with configurable fallback behavior:
 ```python
 theoretical_min_phase1 = int(4 * n * self.target_rank * np.log(n))
 phase1_budget_naive = int(self.theta * total_budget)
-phase1_budget = max(phase1_budget_naive, theoretical_min_phase1)
+
+if self.force_leveraged:
+    # Force leveraged: use naive budget even if below theoretical minimum
+    phase1_budget = max(1, phase1_budget_naive)
+else:
+    # Use max(theta*total, min_required) to ensure meaningful leverage scores
+    phase1_budget = max(phase1_budget_naive, theoretical_min_phase1)
 
 if phase1_budget >= total_budget:
-    # Phase 1 would consume entire budget - fall back to uniform
-    log_info('leveraged', f"p={p:.4f}: Falling back to uniform sampling...")
-    return uniform_sample_and_return(...)
+    if self.force_leveraged or not self.allow_uniform_fallback:
+        # Research mode: Proceed with whatever budget available (90/10 split)
+        phase1_budget = max(1, int(0.9 * total_budget))
+        log_info('bootstrap', f"Proceeding with leveraged sampling despite insufficient budget...")
+    else:
+        # Safe mode: Fall back to uniform sampling
+        log_info('bootstrap', f"p={p:.4f}: Falling back to uniform sampling...")
+        return uniform_sample_and_return(...)
 ```
 
-**Impact**: Graceful degradation - no crashes at low p, clear warning
+**Impact**:
+- **Default behavior**: Graceful degradation with uniform fallback
+- **Research mode** (`allow_uniform_fallback=False`): Removes guardrails, allows experimentation at very low p
+- **Custom exception**: `InsufficientBudgetError` prevents accidental catching by generic handlers
 
 ### 7. Corrected Lambda Parameter Formula ✅
 
@@ -279,6 +339,66 @@ lambda_param = 1.0 / (n * np.sqrt(2 * p))
 **Theory**: λ controls trade-off between sparse noise removal (S) and low-rank structure (L). Optimal λ ∝ 1/√|Ω| balances bias-variance.
 
 **Impact**: Better denoising at low p, correctly scales with sampling rate
+
+## Diagnostic Logging (New!)
+
+**Purpose**: Log detailed leverage sampling data for validation and exploration.
+
+### What Gets Logged
+
+For each p-value where leveraged sampling runs (p ≥ theoretical minimum):
+
+1. **Estimated leverage scores** (n_taxa,) - from Phase 1 uniform sampling
+2. **Phase 2 sampling probabilities** (n_taxa × n_taxa, sparse) - only non-zero for sampled entries
+
+**No ground truth computed** during runs - compute in analysis notebooks for efficiency.
+
+### Enabling
+
+**Interactive launcher**:
+```bash
+python scripts/interactive_run.py
+# When prompted: "Log sampling diagnostics (for analysis)?" → Yes
+```
+
+**Config file**:
+```python
+cfg.sampling.log_sampling_diagnostics = True
+```
+
+**Script-based**:
+```python
+SWEEP_CONFIG = {
+    "sampling_method": "leveraged",
+    "log_sampling_diagnostics": True,  # Add this flag
+    # ... other config ...
+}
+```
+
+### Data Format
+
+**Location**: `{run_dir}/sampling_data/p_{p:.4f}.npz`
+
+```python
+import numpy as np
+
+data = np.load("sampling_data/p_0.1438.npz")
+leverage_scores = data['leverage_scores']         # (n,) array
+phase2_probs_sampled = data['phase2_probs_sampled']  # (n,n) sparse matrix
+```
+
+### Exploration Notebook
+
+**File**: `analysis/notebooks/leverage_sampling_explorer.ipynb`
+
+**Visualization**:
+1. Full similarity matrix heatmap
+2. True vs estimated leverage scores (scatter with correlation)
+3. Phase 2 sampling probabilities heatmap
+
+**Key insight**: At low p-values (near threshold), correlation may be ~0, validating theoretical minimum requirements!
+
+**See**: [ANALYSIS_GUIDES.md - Leverage Sampling Explorer](ANALYSIS_GUIDES.md#leverage-sampling-explorer) for full details.
 
 ## Diagnostic Framework
 
@@ -357,6 +477,37 @@ The diagnostic notebook answers 5 key questions:
   - Using `target_rank=2` (sufficient for Fiedler vector)
   - Enabling parallel execution with `num_workers > 1`
 
+## Configuration Flow
+
+Understanding how parameters flow through the system (8 layers):
+
+```
+User Input (interactive_run.py or SWEEP_CONFIG)
+    ↓
+JSON Config (saved to disk, last_run.json)
+    ↓
+Extraction (experiment_runner_utils.py:get_sampling_config())
+    ↓
+Builder (experiment_runner_utils.py:create_experiment_config())
+    ↓
+Preset Factory (presets.py:custom_config())
+    ↓
+Dataclass (base_config.py:SamplingConfig)
+    ↓
+Runner Instantiation (bootstrap_sweep.py:SimilarityMatrixBuilder())
+    ↓
+Sampler (leveraged/sampler.py:LeveragedSampler())
+```
+
+**Key Files**:
+1. `scripts/interactive_run.py:164,244` - UI collection
+2. `src/runners/experiment_runner_utils.py:94` - Extraction from JSON
+3. `src/runners/experiment_runner_utils.py:133` - Passing to builder
+4. `src/config/presets.py:159,191,251` - `custom_config()` signature
+5. `src/config/base_config.py:190` - `SamplingConfig` dataclass
+6. `src/runners/bootstrap_sweep.py:256` - Sampler instantiation
+7. `src/core/sampling/leveraged/sampler.py:40-70` - Final usage
+
 ## Troubleshooting
 
 ### Import Errors
@@ -378,8 +529,32 @@ For very large matrices:
 - Reduce `bootstrap_reps` for initial testing
 - Enable persistent cache: `cfg.cache.use_persistent_cache = True`
 
-### Low p Fallback
-At very low p (< 0.001), the algorithm automatically falls back to uniform sampling with a warning message. This is expected behavior when Phase 1 budget requirements cannot be met.
+### Low p Behavior
+
+**Default (Safe Mode)**:
+At very low p (theoretical minimum not met), the algorithm automatically falls back to uniform sampling with warning:
+```
+"p=0.0001: Falling back to uniform sampling (Phase 1 needs 12,543 but budget is 2,621)"
+```
+
+**Research Mode** (`allow_uniform_fallback=False`):
+Instead of falling back, proceeds with leveraged sampling using 90/10 split:
+```
+"p=0.0001: Proceeding with leveraged sampling despite insufficient budget (using 2,358/2,621 for Phase 1)"
+```
+
+**When to use Research Mode**:
+- Investigating algorithm behavior at extreme low-p regimes
+- Experimenting without guardrails or restrictions
+- Generating diagnostic data for all p-values
+
+### Parameter Not Taking Effect
+
+If a sampling parameter isn't working:
+1. **Check configuration threading**: Parameter must flow through all 8 layers (see Configuration Flow above)
+2. **Check last_run.json**: Verify parameter is saved correctly
+3. **Check logs**: Look for parameter values in experiment.log startup section
+4. **Restart interactive launcher**: Old sessions may cache stale configs
 
 ## Theoretical Guarantees (After Fixes)
 
@@ -407,7 +582,14 @@ With all fixes applied, the algorithm now satisfies:
 1. `src/core/sampling/leveraged/compute_leverage_scores.py` - IPW fix
 2. `src/core/sampling/leveraged/ialm_solve.py` - IALM equations + adaptive μ
 3. `src/core/sampling/leveraged/singular_value_threshold.py` - Rank truncation + sparse SVD
-4. `src/core/sampling/leveraged/sampler.py` - Min budget + lambda formula
+4. `src/core/sampling/leveraged/sampler.py` - Min budget + lambda formula + custom exception + fallback behavior
+
+### Configuration System Files (for `allow_uniform_fallback`):
+1. `scripts/interactive_run.py:164,244` - UI prompt for fallback preference + cache sorting fix
+2. `src/runners/experiment_runner_utils.py:94,133` - Config extraction and passing
+3. `src/config/presets.py:159,191,251` - `custom_config()` signature
+4. `src/config/base_config.py:190` - `SamplingConfig` dataclass field
+5. `src/runners/bootstrap_sweep.py:256` - Sampler instantiation
 
 ## See Also
 

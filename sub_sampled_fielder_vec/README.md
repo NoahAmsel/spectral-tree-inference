@@ -37,32 +37,63 @@ The results are plots of agreement % as a function of sampling rate p. We want t
 
 ## Quick Start
 
-### 1. Configure a Sweep
+### Option 1: Interactive Launcher (Recommended)
+
+The interactive launcher provides a menu-driven interface with persistent caching and easy re-runs:
+
+```bash
+python scripts/interactive_run.py
+```
+
+**Features**:
+- 🔄 Re-run last configuration
+- 💾 Select from cached matrices (instant loading!)
+- 🆕 Create new matrix configuration
+- 📊 Automatic plotting and diagnostics
+
+**Example workflow**:
+1. Choose "Create new matrix configuration"
+2. Enter parameters (or press Enter for defaults)
+3. Experiment runs and saves to `results/<timestamp>-<run_name>/`
+4. Next time: Select cached matrix for instant loading!
+
+### Option 2: Script-Based Configuration
+
 Edit `scripts/run_experiment.py` and update `SWEEP_CONFIG`:
 
 ```python
 SWEEP_CONFIG = {
     "tree_model": "balanced_binary",
     "taxa_values": [1024, 2048],
-    "sequence_length": 1000,
+    "sequence_length": 10000,
     "mutation_rate": 0.1,
-    "p_values": [0.01, 0.1, 0.5, 1.0],
-    "bootstrap_reps": 50,
+    "p_values": list(np.logspace(-4, 0, 20)),
+    "bootstrap_reps": 10,
     "run_name_prefix": "my_experiment",
+    "sampling_method": "leveraged",  # or "uniform"
+    "log_sampling_diagnostics": True,  # Enable diagnostic logging
 }
 ```
 
-### 2. Launch Experiments
+Launch experiments:
 ```bash
 python scripts/run_experiment.py
 ```
 
-Results are saved to `results/<timestamp>-<run_name>/`
+### Results Structure
 
-### 3. Inspect Results
-- JSON tables: `results/<ts-run_name>/results*.json`
-- Plots: `plot_single.png`, `plot_multi_taxa.png`
-- Reference vectors: `fiedler_ref*.npy`
+```
+results/<timestamp>-<run_name>/
+├── n{taxa}_L{seq_len}/
+│   ├── results.json              # Main metrics
+│   ├── config.json               # Configuration used
+│   ├── fiedler_vectors.png       # Fiedler vector plots
+│   ├── partition_agreement.png   # Agreement curves
+│   ├── sampling_data/            # Diagnostic data (if enabled)
+│   │   ├── p_0.1438.npz         # Leverage scores + sampling probs
+│   │   └── ...
+│   └── experiment.log
+```
 
 ## Documentation
 

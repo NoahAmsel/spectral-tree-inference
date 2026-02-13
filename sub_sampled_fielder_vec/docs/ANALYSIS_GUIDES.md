@@ -482,6 +482,168 @@ analysis_results/{timestamp}-{experiment_name}_stability_K{num_trials}/
 - NumRank ≈ n (full rank, noisy)
 - Unbalanced partition (e.g., 10|90)
 
+## Leverage Sampling Explorer
+
+**File**: `analysis/notebooks/leverage_sampling_explorer.ipynb`
+
+**Purpose**: Validate leverage sampling by comparing estimated leverage scores (from Phase 1) against ground truth computed from the full similarity matrix.
+
+**Research Question**: Does Phase 1 uniform sampling provide reliable leverage score estimates? How does estimation quality depend on the sampling budget p?
+
+### Quick Start
+
+```bash
+cd sub_sampled_fielder_vec/analysis/notebooks
+jupyter notebook leverage_sampling_explorer.ipynb
+```
+
+**Edit Cell 2** - Configuration:
+```python
+# Path to experiment output directory
+EXPERIMENT_PATH = "../../results/20260208-221342-balanced_binary_n1024_mu_0p1_leveraged/n1024_L10000"
+
+# P-value to analyze
+P_VALUE = 0.1438  # Must have corresponding sampling_data/p_{p:.4f}.npz file
+
+# Figure size
+FIGURE_WIDTH = 18
+FIGURE_HEIGHT = 5
+```
+
+**Run** all cells (Kernel → Restart & Run All)
+
+### Requirements
+
+**Experiment must have**:
+1. Used `sampling_method="leveraged"`
+2. Enabled `log_sampling_diagnostics=True`
+3. At least one p-value ≥ theoretical minimum (where leveraged sampling runs)
+
+**Check if diagnostics exist**:
+```bash
+ls results/{your_experiment}/n{taxa}_L{seq_len}/sampling_data/
+# Should see: p_0.1438.npz, p_0.2336.npz, etc.
+```
+
+### What It Computes
+
+1. **Load Data**:
+   - Full similarity matrix M from persistent cache
+   - Estimated leverage scores from Phase 1 sampling
+   - Phase 2 sampling probabilities (sparse)
+
+2. **Compute Ground Truth**:
+   - Run SVD on full matrix M (rank=2)
+   - Compute true leverage scores: μᵢ = ||Uᵢ||² (row norms of top-2 left singular vectors)
+
+3. **Compare**:
+   - Correlation between true and estimated scores
+   - Mean absolute error (MAE)
+   - Top-k most important taxa (by true leverage)
+
+### Visualization
+
+**Three-panel figure**:
+
+| Plot | Shows | Interpretation |
+|------|-------|----------------|
+| **A: Similarity Matrix** | Full M heatmap | Ground truth data |
+| **B: Leverage Comparison** | Scatter: true vs estimated scores | Correlation validates Phase 1 quality |
+| **C: Sampling Probabilities** | Heatmap of Phase 2 probs (sparse) | Which entries were prioritized? |
+
+**Scatter Plot Features**:
+- Red diagonal line = perfect correlation
+- Correlation coefficient displayed in title
+- Each point = one taxon
+
+### Output
+
+**Summary Statistics**:
+```
+============================================================
+SUMMARY STATISTICS
+============================================================
+Correlation (true vs estimated): 0.8423
+Mean absolute error: 2.3451
+Max absolute error: 15.2341
+
+Phase 2 sampling coverage:
+  Total entries sampled: 18560
+  Sampling rate: 3.54%
+
+Top 5 taxa by true leverage score:
+  1. Taxa 277: true=10.9833, estimated=9.1234
+  2. Taxa 295: true=10.4828, estimated=8.9012
+  ...
+```
+
+### Interpreting Results
+
+**High correlation (≥ 0.7)**:
+- ✅ Phase 1 budget is sufficient
+- ✅ Leverage-based sampling makes sense
+- ✅ High-leverage entries are correctly prioritized
+
+**Low correlation (< 0.3)**:
+- ⚠️ Phase 1 budget too small
+- ⚠️ p-value near theoretical minimum
+- ⚠️ Consider higher p or larger θ (Phase 1 ratio)
+
+**Medium correlation (0.3-0.7)**:
+- 🔄 Partial signal detected
+- 🔄 May benefit from increased Phase 1 budget
+- 🔄 Check if p is just above threshold
+
+### Example Findings
+
+**From n=1024, p=0.1438 experiment**:
+- Correlation: -0.0728 (nearly zero!)
+- Sampling rate: 3.54%
+- **Interpretation**: At this threshold p-value, Phase 1 uniform sampling with only 3.54% coverage doesn't reliably estimate leverage scores
+- **Validates**: Theoretical minimum budget requirement (4·n·r·log(n))
+
+**Try higher p-values** (e.g., p=0.6158) to see correlation improve with denser sampling.
+
+### Common Issues
+
+**"No cached matrix found"**:
+- First run creates cache - subsequent runs load instantly
+- Check `src/cache/` directory exists
+
+**"Sampling diagnostics not found"**:
+- Ensure `log_sampling_diagnostics=True` in config
+- Check p-value is high enough for leveraged sampling to run
+- For n=1024: need p ≥ 0.108
+
+**Import errors**:
+- Notebook uses `importlib.util` to bypass package `__init__.py` issues
+- Should work from `analysis/notebooks/` directory
+
+### Advanced Usage
+
+**Compare multiple p-values**:
+
+Loop over all available diagnostic files:
+```python
+import glob
+sampling_files = glob.glob("../../results/my_experiment/*/sampling_data/p_*.npz")
+
+for file in sampling_files:
+    p_val = float(file.split("p_")[1].split(".npz")[0])
+    # ... load and analyze ...
+```
+
+**Export data for custom analysis**:
+```python
+# After running notebook cells:
+np.savez("leverage_analysis.npz",
+    leverage_true=leverage_true,
+    leverage_estimated=leverage_estimated,
+    correlation=correlation,
+    phase2_probs=phase2_probs_sampled
+)
+```
+
 ## See Also
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Codebase structure
