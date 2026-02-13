@@ -22,6 +22,11 @@ if str(_src_dir) not in sys.path:
 from utils.logging import log_info
 
 
+class InsufficientBudgetError(Exception):
+    """Raised when leveraged sampling budget is insufficient and fallback is disabled."""
+    pass
+
+
 class LeveragedSampler(BaseSampler):
     """
     Leveraged matrix completion sampler.
@@ -39,7 +44,8 @@ class LeveragedSampler(BaseSampler):
         ialm_max_iter: int = 100,
         ialm_tol: float = 1e-6,
         ialm_bypass_threshold: float = 0.1,
-        force_leveraged: bool = False
+        force_leveraged: bool = False,
+        allow_uniform_fallback: bool = True
     ):
         """
         Initialize leveraged sampler.
@@ -52,6 +58,8 @@ class LeveragedSampler(BaseSampler):
             ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
             force_leveraged: If True, always use leveraged sampling even when Phase 1
                            budget is theoretically insufficient. Useful for experimentation.
+            allow_uniform_fallback: If True, fall back to uniform sampling when p is too
+                                   small for leveraged sampling. If False, raise an error.
         """
         self.theta = theta
         self.target_rank = target_rank
@@ -59,6 +67,7 @@ class LeveragedSampler(BaseSampler):
         self.ialm_tol = ialm_tol
         self.ialm_bypass_threshold = ialm_bypass_threshold
         self.force_leveraged = force_leveraged
+        self.allow_uniform_fallback = allow_uniform_fallback
         # Track which p-values have been logged (to log once per p, not per sample)
         self._logged_p_values = set()
         # Store per-sample diagnostic metrics
@@ -126,27 +135,53 @@ class LeveragedSampler(BaseSampler):
 
         # Check if total budget is sufficient for leveraged sampling
         if phase1_budget >= total_budget:
-            if self.force_leveraged:
-                # Even when forced, we need some budget for Phase 2
+            if self.force_leveraged or not self.allow_uniform_fallback:
+                # Force leveraged or fallback disabled: proceed with whatever budget available
                 # Use 90% for Phase 1, 10% for Phase 2
                 phase1_budget = max(1, int(0.9 * total_budget))
-                log_info('leveraged',
-                    f"p={p:.4f}: Force leveraged mode - using {phase1_budget:,}/{total_budget:,} for Phase 1 "
-                    f"(theoretical min: {theoretical_min_phase1:,})"
-                )
+                if p not in self._logged_p_values:
+                    log_info('bootstrap',
+                        f"  p={p:.4f}: Proceeding with leveraged sampling despite insufficient budget "
+                        f"(using {phase1_budget:,}/{total_budget:,} for Phase 1, theoretical min: {theoretical_min_phase1:,})"
+                    )
+                    self._logged_p_values.add(p)
             else:
-                # Phase 1 would consume entire budget - fall back to uniform sampling
-                # This happens when p is too small for leveraged sampling to be beneficial
-                log_info('leveraged',
-                    f"p={p:.4f}: Phase 1 requires {phase1_budget:,} samples but total budget is {total_budget:,}. "
-                    f"Falling back to uniform sampling (leveraged sampling requires p ≥ {theoretical_min_phase1/n_upper:.6f})"
-                )
-                # Use uniform sampler logic instead (uniform_sample_upper_triangle imported at module level)
+                # Fallback to uniform sampling when budget insufficient
+                if p not in self._logged_p_values:
+                    log_info('bootstrap',
+                        f"  p={p:.4f}: Falling back to uniform sampling "
+                        f"(Phase 1 needs {phase1_budget:,} but budget is {total_budget:,}, requires p ≥ {theoretical_min_phase1/n_upper:.6f})"
+                    )
+                    self._logged_p_values.add(p)
+                # Use uniform sampler logic instead
                 Omega = uniform_sample_upper_triangle(n, total_budget, rng)
                 L = np.zeros_like(matrix)
                 L[Omega] = matrix[Omega]
                 L = (L + L.T) / 2
                 np.fill_diagonal(L, 1.0)
+
+                # Set minimal metrics for uniform fallback case
+                self.last_sample_metrics = {
+                    'phase1_budget': 0,
+                    'phase1_actual': 0,
+                    'phase2_budget': 0,
+                    'phase2_actual': 0,
+                    'theoretical_min_phase1': theoretical_min_phase1,
+                    'phase1_sufficiency': 0.0,
+                    'phase1_singular_values': [],
+                    'leverage_max': float('nan'),
+                    'leverage_std': float('nan'),
+                    'leverage_sum': float('nan'),
+                    'leverage_symmetry_error': float('nan'),
+                    'leverage_scores': None,
+                    'phase2_sampling_probs': None,
+                    'phase2_sampled_indices': [],
+                    'ialm_bypassed': True,
+                    'ialm_iterations': 0,
+                    'ialm_converged': True,
+                    'fallback_to_uniform': True  # Flag to indicate uniform fallback
+                }
+
                 return L
 
         Omega1 = uniform_sample_upper_triangle(n, phase1_budget, rng)
@@ -160,18 +195,24 @@ class LeveragedSampler(BaseSampler):
         # Phase 2: Non-uniform sampling based on leverage scores
         phase2_budget = total_budget - phase1_budget
         phase2_actual = 0
+        p_matrix = None
+        phase2_sampled_indices = []
         if phase2_budget > 0:
             # Compute sampling probabilities
             p_matrix = compute_sampling_probabilities(
                 row_leverage, col_leverage, self.target_rank, n
             )
-            
+
             # Sample from upper triangle according to probabilities
             # Restrict to Omega_1^c (complement of Phase 1 observations)
             Omega2 = nonuniform_sample_upper_triangle(
                 n, phase2_budget, p_matrix, rng, Omega_1=Omega1
             )
-            
+
+            # Extract Phase 2 sampled indices (i,j) where i < j from upper triangle
+            phase2_rows, phase2_cols = np.where(np.triu(Omega2, k=1))
+            phase2_sampled_indices = list(zip(phase2_rows.tolist(), phase2_cols.tolist()))
+
             # Omega = Omega_1 ∪ Omega_2 (disjoint by construction: Omega_2 ⊆ Omega_1^c)
             Omega = Omega1 | Omega2
             phase2_actual = np.sum(Omega2) // 2  # All entries in Omega_2 are new
@@ -207,11 +248,27 @@ class LeveragedSampler(BaseSampler):
             'leverage_sum': leverage_sum,
             'leverage_symmetry_error': leverage_symmetry_error,
 
+            # NEW: Full leverage scores array and Phase 2 sampling details
+            'leverage_scores': leverage_scores,  # (n,) array - estimated from Phase 1
+            'phase2_sampling_probs': p_matrix,  # (n,n) array - sampling probabilities, or None if phase2_budget=0
+            'phase2_sampled_indices': phase2_sampled_indices,  # list of (i,j) tuples sampled in Phase 2
+
             # IALM execution (will be updated after IALM if not bypassed)
             'ialm_bypassed': False,
             'ialm_iterations': 0,
             'ialm_converged': False,
         }
+
+        # Log successful leveraged sampling setup (only log once per p-value)
+        if p not in self._logged_p_values:
+            log_info('bootstrap',
+                f"  p={p:.4f}: Using leveraged sampling "
+                f"(Phase1: {phase1_actual:,}/{phase1_budget:,}, Phase2: {phase2_actual:,}/{phase2_budget:,})"
+            )
+            log_info('bootstrap',
+                f"    Leverage scores: max={leverage_max:.3f}, std={leverage_std:.3f}, sum={leverage_sum:.1f}"
+            )
+            self._logged_p_values.add(p)
 
         # Check if we should bypass IALM (data is dense enough)
         if p >= self.ialm_bypass_threshold:
@@ -223,10 +280,11 @@ class LeveragedSampler(BaseSampler):
 
             # Log bypass decision
             total_sampled = np.sum(Omega) // 2
-            log_info('leveraged',
-                f"p={p:.4f}: Bypassing IALM (p ≥ {self.ialm_bypass_threshold:.2f}), "
-                f"using {total_sampled:,} samples directly"
-            )
+            if p not in self._logged_p_values:
+                log_info('bootstrap',
+                    f"    IALM bypassed (p ≥ {self.ialm_bypass_threshold:.2f}), using {total_sampled:,} samples directly"
+                )
+                self._logged_p_values.add(p)
 
             # Update metrics for bypass case
             self.last_sample_metrics['ialm_bypassed'] = True
@@ -276,27 +334,20 @@ class LeveragedSampler(BaseSampler):
         # Compute rank estimate
         rank_estimate = np.linalg.matrix_rank(L, tol=1e-6)
         
-        # Log once per p-value (not per bootstrap replicate)
+        # Log IALM completion once per p-value (not per bootstrap replicate)
         p_key = round(p, 6)  # Round to avoid floating point comparison issues
         if p_key not in self._logged_p_values:
             self._logged_p_values.add(p_key)
-            
-            # Compute total unique sampled entries
-            total_sampled = np.sum(Omega) // 2  # Divide by 2 since symmetric
-            
-            # Build informative log message with phase breakdown
-            status = "✓" if result_info and result_info.converged else "⚠ max_iter"
+
+            # Build informative log message with IALM status
+            status = "converged" if result_info and result_info.converged else "max_iter"
             iters = result_info.iterations if result_info else self.ialm_max_iter
-            
-            log_msg = (
-                f"p={p:.4f}: {total_sampled:,} samples "
-                f"(Phase1: {phase1_actual:,} uniform, Phase2: {phase2_actual:,} leveraged) → "
-                f"IALM {status} ({iters} iters), rank≈{rank_estimate}"
+
+            log_info('bootstrap',
+                f"    IALM {status} in {iters} iters, rank≈{rank_estimate}"
             )
-            
+
             if result_info and result_info.had_numerical_issues:
-                log_msg += " [numerical issues]"
-            
-            log_info('leveraged', log_msg, force=True)
+                log_info('bootstrap', "    ⚠ IALM had numerical issues")
         
         return L

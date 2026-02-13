@@ -91,6 +91,8 @@ def get_sampling_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "sampling_ialm_tol": config.get("sampling_ialm_tol", 1e-6),
         "sampling_ialm_bypass_threshold": config.get("sampling_ialm_bypass_threshold", 0.1),
         "sampling_force_leveraged": config.get("sampling_force_leveraged", False),
+        "sampling_allow_uniform_fallback": config.get("sampling_allow_uniform_fallback", True),
+        "log_sampling_diagnostics": config.get("log_sampling_diagnostics", False),
     }
 
 
@@ -128,6 +130,8 @@ def create_experiment_config(
         sampling_ialm_tol=sampling_config["sampling_ialm_tol"],
         sampling_ialm_bypass_threshold=sampling_config["sampling_ialm_bypass_threshold"],
         sampling_force_leveraged=sampling_config["sampling_force_leveraged"],
+        sampling_allow_uniform_fallback=sampling_config["sampling_allow_uniform_fallback"],
+        log_sampling_diagnostics=sampling_config["log_sampling_diagnostics"],
         use_persistent_cache=config.get("use_persistent_cache", False),
         **tree_kwargs,
     )

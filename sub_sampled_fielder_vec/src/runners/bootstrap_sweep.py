@@ -32,6 +32,7 @@ from ..utils.summaries import save_single_results, save_json
 from ..utils.random_entries import _get_cached_similarity_matrix, _subsample_matrix_entries, compute_fiedler_from_similarity, compute_fiedler_from_laplacian
 from ..core.similarity_builder import SimilarityMatrixBuilder
 from ..utils.logging import log_info, log_warning, create_progress_bar, suppress_warnings, is_progress_mode
+from ..utils.sampling_logger import save_sampling_diagnostics
 from ..utils.persistent_cache import (
     _get_cache_key,
     save_experiment_data,
@@ -246,7 +247,8 @@ def sweep_for_params(
         ialm_max_iter=cfg.sampling.ialm_max_iter,
         ialm_tol=cfg.sampling.ialm_tol,
         ialm_bypass_threshold=cfg.sampling.ialm_bypass_threshold,
-        force_leveraged=cfg.sampling.force_leveraged
+        force_leveraged=cfg.sampling.force_leveraged,
+        allow_uniform_fallback=cfg.sampling.allow_uniform_fallback
     )
     log_info('bootstrap', f"Using sampling method: {cfg.sampling.method}")
 
@@ -420,7 +422,7 @@ def sweep_for_params(
     failed_p_values = []
 
     for p_idx, p in enumerate(cfg.experiment.p_values):
-        log_info('bootstrap', f"Processing p-value {p_idx+1}/{len(cfg.experiment.p_values)}: p={p:.4g}")
+        log_info('bootstrap', f"Processing p-value {p_idx+1}/{len(cfg.experiment.p_values)}: p={p:.4g}", force=True)
 
         agreements_for_p: List[float] = []
 
@@ -601,7 +603,7 @@ def sweep_for_params(
                     bootstrap_pbar.update(1)
             
             # After bootstrap loop: Average the aligned vectors
-            log_info('bootstrap', f"Completed {cfg.experiment.bootstrap_reps} bootstrap iterations for p={p:.4g}")
+            log_info('bootstrap', f"Completed {cfg.experiment.bootstrap_reps} bootstrap iterations for p={p:.4g}", force=True)
             if len(aligned_vectors) > 0 and S_avg is not None:
                 v_avg = np.mean(aligned_vectors, axis=0)
 
@@ -685,6 +687,35 @@ def sweep_for_params(
             if bootstrap_pbar:
                 bootstrap_pbar.close()
 
+        # Save sampling diagnostics if enabled (leveraged sampling only)
+        if (cfg.sampling.log_sampling_diagnostics and
+            cfg.sampling.method == "leveraged" and
+            hasattr(similarity_builder, 'sampler') and
+            hasattr(similarity_builder.sampler, 'last_sample_metrics')):
+
+            metrics = similarity_builder.sampler.last_sample_metrics
+            if metrics is not None:
+                leverage_scores = metrics.get('leverage_scores')
+                phase2_sampled_indices = metrics.get('phase2_sampled_indices')
+                phase2_sampling_probs = metrics.get('phase2_sampling_probs')
+                fallback = metrics.get('fallback_to_uniform', False)
+
+                if fallback:
+                    # Sampler fell back to uniform sampling (p too small)
+                    # No leverage scores to save
+                    pass
+                elif leverage_scores is not None:
+                    try:
+                        save_sampling_diagnostics(
+                            run_dir=run_dir,
+                            p_value=p,
+                            leverage_scores=leverage_scores,
+                            sampled_indices=phase2_sampled_indices if phase2_sampled_indices else [],
+                            prob_matrix=phase2_sampling_probs
+                        )
+                    except Exception as e:
+                        log_warning('bootstrap', f"Failed to save sampling diagnostics for p={p:.4g}: {e}")
+
         # Store all metrics
         sign_agreements.append(float(sign_agreement))
         partition_agreement_M.append(float(partition_agr_M))
@@ -698,7 +729,7 @@ def sweep_for_params(
         
         split_M_str = f"{partition_split_M[0]}-{partition_split_M[1]}" if partition_split_M else "N/A"
         split_S_str = f"{partition_split_S[0]}-{partition_split_S[1]}" if partition_split_S else "N/A"
-        log_info('bootstrap', f"p={p:.4g} results: sign={sign_agreement:.2f}%, part_M={partition_agr_M:.2f}%, part_S={partition_agr_S:.2f}%, dot={dot_prod:.4f}, σ2_M={sigma2_avg_M:.4f}, σ2_S={sigma2_avg_S:.4f}, split_M={split_M_str}, split_S={split_S_str}, source={result_source}")
+        log_info('bootstrap', f"p={p:.4g} results: sign={sign_agreement:.2f}%, part_M={partition_agr_M:.2f}%, part_S={partition_agr_S:.2f}%, dot={dot_prod:.4f}, σ2_M={sigma2_avg_M:.4f}, σ2_S={sigma2_avg_S:.4f}, split_M={split_M_str}, split_S={split_S_str}, source={result_source}", force=True)
 
         # Update parent progress bar via callback
         if progress_callback:
@@ -871,9 +902,56 @@ def sweep_for_params(
                 error_summary = error_msg.split(':')[0] if ':' in error_msg else error_msg
                 log_info('bootstrap', f"  p={p_val:.4g}: {error_summary}")
 
+    # Print sampling summary for leveraged sampling experiments
+    if cfg.sampling.method == "leveraged" and hasattr(similarity_builder, 'sampler'):
+        # Count how many p-values used leveraged vs uniform sampling
+        n_leveraged = 0
+        n_uniform_fallback = 0
+        n_ialm_bypassed = 0
+        n_ialm_converged = 0
+        n_ialm_max_iter = 0
+
+        # Analyze result_source_list and metrics
+        for i, p in enumerate(cfg.experiment.p_values):
+            if result_source_list[i] in ['computed']:
+                # Check metrics for this p-value
+                if 'leverage_max' in metrics_dict and i < len(metrics_dict['leverage_max']):
+                    leverage_mean = metrics_dict['leverage_max'][i][0]  # (mean, median, std)
+                    if np.isnan(leverage_mean):
+                        n_uniform_fallback += 1
+                    else:
+                        n_leveraged += 1
+                        # Check IALM status
+                        if 'ialm_iterations' in metrics_dict and i < len(metrics_dict['ialm_iterations']):
+                            ialm_iters = metrics_dict['ialm_iterations'][i][0]
+                            if ialm_iters == 0:
+                                n_ialm_bypassed += 1
+                            elif ialm_iters < cfg.sampling.ialm_max_iter:
+                                n_ialm_converged += 1
+                            else:
+                                n_ialm_max_iter += 1
+
+        # Calculate theoretical minimum p
+        n_taxa = n_taxa
+        n_upper = n_taxa * (n_taxa - 1) // 2
+        theoretical_min_phase1 = int(4 * n_taxa * cfg.sampling.target_rank * np.log(n_taxa))
+        p_min = theoretical_min_phase1 / n_upper
+
+        log_info('bootstrap', "\n" + "="*60, force=True)
+        log_info('bootstrap', "Sampling Summary:", force=True)
+        log_info('bootstrap', f"  Method: leveraged (theta={cfg.sampling.theta}, rank={cfg.sampling.target_rank})", force=True)
+        log_info('bootstrap', f"  Minimum p for leveraged: {p_min:.6f} ({p_min*100:.2f}%)", force=True)
+        log_info('bootstrap', f"  P-values using leveraged sampling: {n_leveraged}/{len(cfg.experiment.p_values)}", force=True)
+        log_info('bootstrap', f"  P-values falling back to uniform: {n_uniform_fallback}/{len(cfg.experiment.p_values)}", force=True)
+        if n_leveraged > 0:
+            log_info('bootstrap', f"  IALM bypassed (high p): {n_ialm_bypassed}", force=True)
+            log_info('bootstrap', f"  IALM converged: {n_ialm_converged}", force=True)
+            if n_ialm_max_iter > 0:
+                log_info('bootstrap', f"  IALM hit max_iter: {n_ialm_max_iter}", force=True)
+        log_info('bootstrap', "="*60, force=True)
+
     return (fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S,
             dot_products, metrics_dict, reference_partition_quality,
             sigma2_avg_M_list, sigma2_avg_S_list,
             partition_split_M_list, partition_split_S_list, result_source_list,
             tree, partition_ref)
-

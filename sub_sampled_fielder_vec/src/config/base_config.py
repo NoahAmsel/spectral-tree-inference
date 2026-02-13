@@ -177,6 +177,8 @@ class SamplingConfig(BaseModel):
         ialm_tol: Convergence tolerance for IALM
         ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
         force_leveraged: Force leveraged sampling even when Phase 1 budget is insufficient
+        allow_uniform_fallback: Allow fallback to uniform sampling when p is too small for leveraged (default: True)
+        log_sampling_diagnostics: Save detailed sampling diagnostics (leverage scores, Phase 2 probabilities) for analysis
     """
     method: Literal["uniform", "leveraged"] = "uniform"
     theta: float = Field(default=0.3, gt=0.0, lt=1.0, description="Phase 1 budget ratio")
@@ -185,7 +187,9 @@ class SamplingConfig(BaseModel):
     ialm_tol: float = Field(default=1e-6, gt=0.0, description="IALM convergence tolerance")
     ialm_bypass_threshold: float = Field(default=0.1, gt=0.0, le=1.0, description="Skip IALM when p >= threshold")
     force_leveraged: bool = Field(default=False, description="Force leveraged sampling even when Phase 1 budget is insufficient")
-    
+    allow_uniform_fallback: bool = Field(default=True, description="Allow fallback to uniform sampling when p is too small")
+    log_sampling_diagnostics: bool = Field(default=False, description="Save detailed sampling diagnostics for analysis")
+
     class Config:
         extra = "forbid"
 
