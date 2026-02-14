@@ -244,15 +244,31 @@ def sweep_for_params(
     log_info('bootstrap', f"n={n_taxa}, L={seq_len} preparing experiment data…")
 
     # Create similarity builder with configured sampling method
+    # Build method-specific kwargs (avoid passing IALM params to HLDT)
+    method_kwargs = {
+        'theta': cfg.sampling.theta,
+        'target_rank': cfg.sampling.target_rank,
+        'allow_uniform_fallback': cfg.sampling.allow_uniform_fallback
+    }
+
+    if cfg.sampling.method == "leveraged":
+        # IALM-specific parameters
+        method_kwargs.update({
+            'ialm_max_iter': cfg.sampling.ialm_max_iter,
+            'ialm_tol': cfg.sampling.ialm_tol,
+            'ialm_bypass_threshold': cfg.sampling.ialm_bypass_threshold,
+            'force_leveraged': cfg.sampling.force_leveraged
+        })
+    elif cfg.sampling.method == "hldt":
+        # HLDT-specific parameters
+        method_kwargs.update({
+            'tau_floor_multiplier': cfg.sampling.tau_floor_multiplier,
+            'force_hldt': cfg.sampling.force_leveraged  # Reuse force_leveraged flag
+        })
+
     similarity_builder = SimilarityMatrixBuilder(
         method=cfg.sampling.method,
-        theta=cfg.sampling.theta,
-        target_rank=cfg.sampling.target_rank,
-        ialm_max_iter=cfg.sampling.ialm_max_iter,
-        ialm_tol=cfg.sampling.ialm_tol,
-        ialm_bypass_threshold=cfg.sampling.ialm_bypass_threshold,
-        force_leveraged=cfg.sampling.force_leveraged,
-        allow_uniform_fallback=cfg.sampling.allow_uniform_fallback
+        **method_kwargs
     )
     log_info('bootstrap', f"Using sampling method: {cfg.sampling.method}")
 
@@ -691,15 +707,18 @@ def sweep_for_params(
             if bootstrap_pbar:
                 bootstrap_pbar.close()
 
-        # Save sampling diagnostics if enabled (leveraged sampling only)
+        # Save sampling diagnostics if enabled (leveraged/hldt sampling only)
         if (cfg.sampling.log_sampling_diagnostics and
-            cfg.sampling.method == "leveraged" and
+            cfg.sampling.method in ["leveraged", "hldt"] and
             hasattr(similarity_builder, 'sampler') and
             hasattr(similarity_builder.sampler, 'last_sample_metrics')):
 
             metrics = similarity_builder.sampler.last_sample_metrics
             if metrics is not None:
-                leverage_scores = metrics.get('leverage_scores')
+                # Handle different key names for leverage scores
+                # - LeveragedSampler uses 'leverage_scores'
+                # - HLDTSampler uses 'leverage_scores_raw' and 'leverage_scores_regularized'
+                leverage_scores = metrics.get('leverage_scores') or metrics.get('leverage_scores_regularized')
                 phase2_sampled_indices = metrics.get('phase2_sampled_indices')
                 phase2_sampling_probs = metrics.get('phase2_sampling_probs')
                 fallback = metrics.get('fallback_to_uniform', False)
@@ -906,8 +925,8 @@ def sweep_for_params(
                 error_summary = error_msg.split(':')[0] if ':' in error_msg else error_msg
                 log_info('bootstrap', f"  p={p_val:.4g}: {error_summary}")
 
-    # Print sampling summary for leveraged sampling experiments
-    if cfg.sampling.method == "leveraged" and hasattr(similarity_builder, 'sampler'):
+    # Print sampling summary for leveraged/hldt sampling experiments
+    if cfg.sampling.method in ["leveraged", "hldt"] and hasattr(similarity_builder, 'sampler'):
         # Count how many p-values used leveraged vs uniform sampling
         n_leveraged = 0
         n_uniform_fallback = 0
@@ -943,15 +962,20 @@ def sweep_for_params(
 
         log_info('bootstrap', "\n" + "="*60, force=True)
         log_info('bootstrap', "Sampling Summary:", force=True)
-        log_info('bootstrap', f"  Method: leveraged (theta={cfg.sampling.theta}, rank={cfg.sampling.target_rank})", force=True)
-        log_info('bootstrap', f"  Minimum p for leveraged: {p_min:.6f} ({p_min*100:.2f}%)", force=True)
-        log_info('bootstrap', f"  P-values using leveraged sampling: {n_leveraged}/{len(cfg.experiment.p_values)}", force=True)
+        log_info('bootstrap', f"  Method: {cfg.sampling.method} (theta={cfg.sampling.theta}, rank={cfg.sampling.target_rank})", force=True)
+        log_info('bootstrap', f"  Minimum p for {cfg.sampling.method}: {p_min:.6f} ({p_min*100:.2f}%)", force=True)
+        log_info('bootstrap', f"  P-values using {cfg.sampling.method} sampling: {n_leveraged}/{len(cfg.experiment.p_values)}", force=True)
         log_info('bootstrap', f"  P-values falling back to uniform: {n_uniform_fallback}/{len(cfg.experiment.p_values)}", force=True)
-        if n_leveraged > 0:
+
+        # Show method-specific statistics
+        if cfg.sampling.method == "leveraged" and n_leveraged > 0:
             log_info('bootstrap', f"  IALM bypassed (high p): {n_ialm_bypassed}", force=True)
             log_info('bootstrap', f"  IALM converged: {n_ialm_converged}", force=True)
             if n_ialm_max_iter > 0:
                 log_info('bootstrap', f"  IALM hit max_iter: {n_ialm_max_iter}", force=True)
+        elif cfg.sampling.method == "hldt" and n_leveraged > 0:
+            log_info('bootstrap', f"  HLDT single-shot estimator used for all {cfg.sampling.method} p-values", force=True)
+
         log_info('bootstrap', "="*60, force=True)
 
     return (fiedler_ref, sign_agreements, partition_agreement_M, partition_agreement_S,
