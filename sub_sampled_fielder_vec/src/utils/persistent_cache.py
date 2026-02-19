@@ -165,6 +165,7 @@ def save_experiment_data(
         - similarity_matrix.npz: Full M matrix
         - fiedler_ref.npz: Reference Fiedler vector
         - metadata.json: Experiment parameters
+        - .complete: Sentinel file indicating successful cache write
     """
     cache_dir = _get_cache_dir(cache_key)
 
@@ -186,6 +187,11 @@ def save_experiment_data(
         metadata_path = cache_dir / "metadata.json"
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=2)
+
+        # Write sentinel file to mark cache as complete
+        # This MUST be the last operation to ensure atomicity
+        complete_marker = cache_dir / ".complete"
+        complete_marker.touch()
 
         log_info('cache', f"Saved experiment data to cache: {cache_key}")
 
@@ -215,6 +221,7 @@ def load_experiment_data(cache_key: str) -> Optional[Dict[str, Any]]:
 
     # Check if all required files exist
     required_files = [
+        ".complete",  # Sentinel file - checked first for fast fail on incomplete cache
         "tree.npz",
         "observations.npz",
         "similarity_matrix.npz",
@@ -287,6 +294,11 @@ def list_cached_experiments() -> List[Dict[str, Any]]:
         if not cache_dir.is_dir():
             continue
 
+        # Only include cache entries that have been fully written
+        complete_marker = cache_dir / ".complete"
+        if not complete_marker.exists():
+            continue
+
         metadata_path = cache_dir / "metadata.json"
         if not metadata_path.exists():
             continue
@@ -346,6 +358,53 @@ def clear_cache(cache_key: Optional[str] = None) -> None:
                 log_warning('cache', f"Failed to clear cache {cache_key}: {e}")
         else:
             log_info('cache', f"Cache not found: {cache_key}")
+
+
+def clean_incomplete_caches() -> int:
+    """
+    Remove incomplete cache entries (those missing .complete sentinel file).
+
+    This is useful for cleaning up caches from interrupted experiments.
+
+    Side effect: Deletes incomplete cache directories from disk.
+
+    Returns:
+        Number of incomplete cache entries removed
+
+    Example:
+        >>> num_cleaned = clean_incomplete_caches()
+        >>> print(f"Removed {num_cleaned} incomplete cache entries")
+    """
+    base_dir = Path(__file__).parent.parent
+    cache_root = base_dir / "cache"
+
+    if not cache_root.exists():
+        log_info('cache', "No cache directory found")
+        return 0
+
+    removed_count = 0
+    import shutil
+
+    for cache_dir in cache_root.iterdir():
+        if not cache_dir.is_dir():
+            continue
+
+        complete_marker = cache_dir / ".complete"
+        if not complete_marker.exists():
+            # This is an incomplete cache entry - remove it
+            try:
+                shutil.rmtree(cache_dir)
+                log_info('cache', f"Removed incomplete cache: {cache_dir.name}")
+                removed_count += 1
+            except Exception as e:
+                log_warning('cache', f"Failed to remove incomplete cache {cache_dir.name}: {e}")
+
+    if removed_count > 0:
+        log_info('cache', f"Cleaned up {removed_count} incomplete cache entries")
+    else:
+        log_info('cache', "No incomplete cache entries found")
+
+    return removed_count
 
 
 def _serialize_tree(tree: Any) -> Dict[str, np.ndarray]:
