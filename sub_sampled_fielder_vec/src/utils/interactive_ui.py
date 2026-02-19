@@ -149,6 +149,51 @@ def get_choice(prompt: str, valid_choices: List[str], case_sensitive: bool = Fal
         print(f"{Colors.RED}Not an option, try again. Valid choices: {', '.join(valid_choices)}{Colors.RESET}")
 
 
+def get_multi_choice(prompt: str, valid_choices: List[str], case_sensitive: bool = False) -> List[str]:
+    """
+    Get multiple user choices from valid options (comma-separated).
+
+    Examples:
+        >>> get_multi_choice("Choice", ["1", "2", "3", "n", "q"])
+        User enters: "1,3"
+        Returns: ["1", "3"]
+
+        >>> get_multi_choice("Choice", ["1", "2", "3", "n", "q"])
+        User enters: "n"
+        Returns: ["n"]
+
+    Args:
+        prompt: Question to ask user
+        valid_choices: List of valid options
+        case_sensitive: Whether choices are case-sensitive
+
+    Returns:
+        List of selected choices (single item if no comma, multiple if comma-separated)
+    """
+    while True:
+        choice_str = get_input(prompt)
+
+        if choice_str is None:
+            continue
+
+        # Split by comma and strip whitespace
+        choices = [c.strip() for c in choice_str.split(',')]
+
+        if not case_sensitive:
+            choices = [c.lower() for c in choices]
+            valid_choices_lower = [c.lower() for c in valid_choices]
+        else:
+            valid_choices_lower = valid_choices
+
+        # Validate all choices
+        invalid = [c for c in choices if c not in valid_choices_lower]
+        if invalid:
+            print(f"{Colors.RED}Invalid choices: {', '.join(invalid)}. Valid: {', '.join(valid_choices)}{Colors.RESET}")
+            continue
+
+        return choices
+
+
 def get_menu_choice(prompt: str, options: List[str], default_index: int = 0) -> str:
     """
     Present numbered menu and get user choice.

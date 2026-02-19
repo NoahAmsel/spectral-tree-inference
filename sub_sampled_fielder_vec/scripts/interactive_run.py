@@ -4,9 +4,14 @@ Interactive launcher for STDR experiments.
 
 Provides a user-friendly menu system for:
 - Re-running last configuration
-- Selecting cached matrices
+- Selecting cached matrices (single or batch with comma separation)
 - Creating new matrix configurations
 - Running experiments
+
+Features:
+- Single selection: Type "1" to run one cached matrix
+- Batch selection: Type "1,3,5" to run multiple matrices in one sweep
+- Batch mode requires compatible parameters (same tree_model, seq_len, mutation_rate)
 
 No more editing SWEEP_CONFIG - everything is interactive!
 """
@@ -23,10 +28,10 @@ import numpy as np
 
 from src.utils.interactive_ui import (
     print_logo, print_header, print_option, print_cached_matrix,
-    print_config_summary, get_input, get_choice, get_menu_choice, confirm,
+    print_config_summary, get_input, get_choice, get_multi_choice, get_menu_choice, confirm,
     print_error, print_success, print_warning, print_divider
 )
-from src.utils.persistent_cache import list_cached_experiments
+from src.utils.persistent_cache import list_cached_experiments, clean_incomplete_caches
 from src.runners.experiment_runner_utils import (
     extract_config_values,
     generate_run_prefix,
@@ -76,8 +81,15 @@ def list_cached_matrices() -> List[Dict[str, Any]]:
     return list_cached_experiments()
 
 
-def show_main_menu() -> str:
-    """Display main menu and get user choice."""
+def show_main_menu() -> tuple[List[str], List[Dict[str, Any]]]:
+    """
+    Display main menu and get user choice(s).
+
+    Returns:
+        Tuple of (choices, cached_matrices)
+        - choices: List of selected options (single item or multiple for batch)
+        - cached_matrices: List of all cached matrices for indexing
+    """
     print_header("Main Menu")
 
     # Show last run option
@@ -90,10 +102,15 @@ def show_main_menu() -> str:
     # Show cached matrices
     cached = list_cached_matrices()
     if cached:
-        # Sort by n_taxa (ascending order: smallest to largest)
-        cached = sorted(cached, key=lambda x: x['metadata'].get('n_taxa', 0))
+        # Sort by tree_model first (alphabetically), then by n_taxa (ascending)
+        cached = sorted(cached, key=lambda x: (
+            x['metadata'].get('tree_model', ''),
+            x['metadata'].get('n_taxa', 0)
+        ))
 
         print_header("Cached Matrices")
+        print("  💡 Tip: Select multiple with commas (e.g., '1,3,5' for batch run)")
+        print()
         for i, cache_entry in enumerate(cached, 1):
             print_cached_matrix(i, cache_entry['metadata'])
         print()
@@ -116,8 +133,8 @@ def show_main_menu() -> str:
     if cached:
         valid_choices.extend([str(i) for i in range(1, len(cached) + 1)])
 
-    choice = get_choice("Choice", valid_choices)
-    return choice
+    choices = get_multi_choice("Choice", valid_choices)
+    return choices, cached
 
 
 def build_config_from_cache(cache_metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -155,13 +172,19 @@ def build_config_from_cache(cache_metadata: Dict[str, Any]) -> Dict[str, Any]:
     config["display_mode"] = display_mode
 
     # Sampling method
-    sampling = get_menu_choice("Sampling method:", ['uniform', 'leveraged'], default_index=1)
+    sampling = get_menu_choice("Sampling method:", ['uniform', 'leveraged', 'lds'], default_index=2)
     config["sampling_method"] = sampling
 
     if sampling == "leveraged":
         config["sampling_theta"] = float(get_input("Theta (phase 1 ratio)", default="0.7"))
         config["sampling_target_rank"] = int(get_input("Target rank", default="2"))
-        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=True)
+        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
+        config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
+    elif sampling == "lds":
+        config["sampling_theta"] = float(get_input("Theta (phase 1 ratio)", default="0.3"))
+        config["sampling_target_rank"] = int(get_input("Target rank", default="2"))
+        config["sampling_tau_floor_multiplier"] = float(get_input("Tau floor multiplier", default="1.0"))
+        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
         config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
 
     # Other defaults
@@ -175,15 +198,116 @@ def build_config_from_cache(cache_metadata: Dict[str, Any]) -> Dict[str, Any]:
     return config
 
 
+def build_batch_config_from_caches(cache_entries: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Build experiment config from multiple cached matrices for batch run.
+
+    All caches must have compatible parameters (same tree_model, seq_len, mutation_rate).
+    Collects all unique n_taxa values for batch processing.
+
+    Args:
+        cache_entries: List of cache entry dicts with 'metadata' keys
+
+    Returns:
+        Config dict with lists of taxa_values for batch processing
+    """
+    if not cache_entries:
+        raise ValueError("No cache entries provided for batch config")
+
+    # Extract metadata from all entries
+    metadatas = [entry['metadata'] for entry in cache_entries]
+
+    # Validate compatibility - all must have same tree_model, seq_len, mutation_rate
+    first = metadatas[0]
+    tree_model = first.get('tree_model')
+    seq_len = first.get('seq_len')
+    mutation_rate = first.get('mutation_rate')
+
+    for i, meta in enumerate(metadatas[1:], 2):
+        if meta.get('tree_model') != tree_model:
+            print_error(f"Incompatible tree_model: cache 1 has '{tree_model}', cache {i} has '{meta.get('tree_model')}'")
+            raise ValueError("Cannot batch caches with different tree models")
+        if meta.get('seq_len') != seq_len:
+            print_error(f"Incompatible seq_len: cache 1 has {seq_len}, cache {i} has {meta.get('seq_len')}")
+            raise ValueError("Cannot batch caches with different sequence lengths")
+        if meta.get('mutation_rate') != mutation_rate:
+            print_error(f"Incompatible mutation_rate: cache 1 has {mutation_rate}, cache {i} has {meta.get('mutation_rate')}")
+            raise ValueError("Cannot batch caches with different mutation rates")
+
+    # Collect unique n_taxa values
+    taxa_values = sorted(set(meta.get('n_taxa') for meta in metadatas))
+
+    # Build config with batch values
+    config = {
+        "tree_model": tree_model,
+        "taxa_values": taxa_values,
+        "sequence_length_values": [seq_len],
+        "mutation_rate": mutation_rate,
+    }
+
+    print_header("Batch Experiment Configuration")
+    print(f"Running batch across {len(taxa_values)} cached matrices:")
+    for n in taxa_values:
+        print(f"  • n={n}")
+    print()
+
+    # Prompt for experiment parameters (once for all matrices)
+    config["bootstrap_reps"] = int(get_input("Bootstrap replicates", default="10"))
+    config["num_workers"] = int(get_input("Number of workers", default="8"))
+
+    # P-values configuration
+    use_default_p = confirm("Use default p-values (20 points logspace)?", default=True)
+    if use_default_p:
+        config["p_values"] = list(np.logspace(-4, 0, 20))
+    else:
+        print("Custom p-values not yet implemented - using defaults")
+        config["p_values"] = list(np.logspace(-4, 0, 20))
+
+    # Display mode
+    display_mode = get_menu_choice("Display mode:", ["progress", "debug"], default_index=0)
+    config["display_mode"] = display_mode
+
+    # Sampling method
+    sampling = get_menu_choice("Sampling method:", ['uniform', 'leveraged', 'lds'], default_index=2)
+    config["sampling_method"] = sampling
+
+    if sampling == "leveraged":
+        config["sampling_theta"] = float(get_input("Theta (phase 1 ratio)", default="0.7"))
+        config["sampling_target_rank"] = int(get_input("Target rank", default="2"))
+        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
+        config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
+    elif sampling == "lds":
+        config["sampling_theta"] = float(get_input("Theta (phase 1 ratio)", default="0.3"))
+        config["sampling_target_rank"] = int(get_input("Target rank", default="2"))
+        config["sampling_tau_floor_multiplier"] = float(get_input("Tau floor multiplier", default="1.0"))
+        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
+        config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
+
+    # Other defaults
+    config["use_middle_out"] = False
+    config["guardrails_enabled"] = False
+    config["run_name_prefix"] = get_input("Run name prefix (optional)", default="")
+
+    # Enable persistent cache to use cached matrices
+    config["use_persistent_cache"] = True
+
+    return config
+
+
 def create_new_config() -> Dict[str, Any]:
     """Create new experiment configuration interactively."""
     print_header("Create New Matrix Configuration")
     print("Press Enter to keep default values")
+    print("💡 Tip: Use commas for batch runs (e.g., '512,1024,2048')")
     print()
 
-    # Basic matrix parameters
-    n_taxa = int(get_input("n_taxa (number of taxa)", default="2048"))
-    seq_len = int(get_input("sequence_length", default="10000"))
+    # Basic matrix parameters - accept comma-separated values
+    n_taxa_input = get_input("n_taxa (number of taxa, comma-separated for batch)", default="2048")
+    taxa_values = [int(x.strip()) for x in n_taxa_input.split(',')]
+
+    seq_len_input = get_input("sequence_length (comma-separated for batch)", default="10000")
+    sequence_length_values = [int(x.strip()) for x in seq_len_input.split(',')]
+
     mutation_rate = float(get_input("mutation_rate", default="0.1"))
 
     # Tree model
@@ -193,11 +317,16 @@ def create_new_config() -> Dict[str, Any]:
     # Tree-specific parameters
     tree_params = {}
     if tree_model == "balanced_binary":
-        # Check if n_taxa is power of 2
-        if n_taxa & (n_taxa - 1) != 0:
-            print_error(f"balanced_binary requires n_taxa to be power of 2, got {n_taxa}")
-            n_taxa = 2 ** int(np.log2(n_taxa))
-            print_warning(f"Adjusting to nearest power of 2: {n_taxa}")
+        # Check if all n_taxa values are powers of 2
+        adjusted = []
+        for n in taxa_values:
+            if n & (n - 1) != 0:
+                adjusted_n = 2 ** int(np.log2(n))
+                print_warning(f"balanced_binary requires power of 2: {n} → {adjusted_n}")
+                adjusted.append(adjusted_n)
+            else:
+                adjusted.append(n)
+        taxa_values = adjusted
         tree_params["edge_length"] = float(get_input("edge_length", default="1.0"))
     elif tree_model in ["kingman", "kingman_mean"]:
         tree_params["pop_size"] = float(get_input("pop_size (Ne)", default="1.0"))
@@ -216,15 +345,23 @@ def create_new_config() -> Dict[str, Any]:
         p_values = list(np.logspace(-4, 0, 20))
 
     # Sampling method
-    sampling_method = get_menu_choice("Sampling method:", ["uniform", "leveraged"], default_index=1)
+    sampling_method = get_menu_choice("Sampling method:", ["uniform", "leveraged", "lds"], default_index=2)
 
     # Display mode
     display_mode = get_menu_choice("Display mode:", ["progress", "debug"], default_index=0)
 
+    # Show batch summary if multiple values
+    if len(taxa_values) > 1 or len(sequence_length_values) > 1:
+        print_header("Batch Configuration Summary")
+        print(f"  n_taxa: {taxa_values}")
+        print(f"  seq_len: {sequence_length_values}")
+        print(f"  Total experiments: {len(taxa_values) * len(sequence_length_values)}")
+        print()
+
     config = {
         "tree_model": tree_model,
-        "taxa_values": [n_taxa],
-        "sequence_length_values": [seq_len],
+        "taxa_values": taxa_values,
+        "sequence_length_values": sequence_length_values,
         "mutation_rate": mutation_rate,
         "tree_params": tree_params,
         "bootstrap_reps": bootstrap_reps,
@@ -241,9 +378,15 @@ def create_new_config() -> Dict[str, Any]:
     if sampling_method == "leveraged":
         config["sampling_theta"] = float(get_input("sampling_theta", default="0.7"))
         config["sampling_target_rank"] = int(get_input("sampling_target_rank", default="2"))
-        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=True)
+        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
         config["sampling_ialm_max_iter"] = int(get_input("IALM max_iter", default="500"))
         config["sampling_ialm_tol"] = float(get_input("IALM tolerance", default="1e-4"))
+        config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
+    elif sampling_method == "lds":
+        config["sampling_theta"] = float(get_input("sampling_theta", default="0.3"))
+        config["sampling_target_rank"] = int(get_input("sampling_target_rank", default="2"))
+        config["sampling_tau_floor_multiplier"] = float(get_input("tau_floor_multiplier", default="1.0"))
+        config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
         config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
 
     # Enable persistent cache for new matrices
@@ -310,15 +453,19 @@ def main():
     # Print logo
     print_logo()
 
+    # Clean up incomplete cache entries from interrupted experiments
+    clean_incomplete_caches()
+
     while True:
         # Show main menu
-        choice = show_main_menu()
+        choices, cached = show_main_menu()
 
-        if choice == 'q':
+        # Single choice - check for special commands
+        if len(choices) == 1 and choices[0] == 'q':
             print_success("Goodbye!")
             sys.exit(0)
 
-        elif choice == 'r':
+        elif len(choices) == 1 and choices[0] == 'r':
             # Re-run last configuration
             last_run = load_last_run()
             if last_run:
@@ -328,24 +475,40 @@ def main():
             else:
                 print_error("No last run found")
 
-        elif choice == 'n':
+        elif len(choices) == 1 and choices[0] == 'n':
             # Create new configuration
             config = create_new_config()
             run_experiment(config)
 
         else:
-            # Choice is a number - load from cache
+            # Choices are numbers - load from cache (single or batch)
             try:
-                cache_idx = int(choice) - 1
-                cached = list_cached_matrices()
-                # Sort by n_taxa to match menu display order
-                cached = sorted(cached, key=lambda x: x['metadata'].get('n_taxa', 0))
-                if 0 <= cache_idx < len(cached):
-                    cache_entry = cached[cache_idx]
+                # Convert choices to cache indices
+                cache_indices = [int(choice) - 1 for choice in choices]
+
+                # Validate all indices
+                invalid = [i for i in cache_indices if i < 0 or i >= len(cached)]
+                if invalid:
+                    print_error(f"Invalid cache selection(s): {[i+1 for i in invalid]}")
+                    continue
+
+                # Get selected cache entries
+                selected_caches = [cached[i] for i in cache_indices]
+
+                # Single or batch?
+                if len(selected_caches) == 1:
+                    # Single cache - use existing flow
+                    cache_entry = selected_caches[0]
                     config = build_config_from_cache(cache_entry['metadata'])
                     run_experiment(config)
                 else:
-                    print_error("Invalid cache selection")
+                    # Batch mode - multiple caches selected
+                    try:
+                        config = build_batch_config_from_caches(selected_caches)
+                        run_experiment(config)
+                    except ValueError as e:
+                        print_error(str(e))
+                        continue
             except ValueError:
                 print_error("Invalid choice")
 
