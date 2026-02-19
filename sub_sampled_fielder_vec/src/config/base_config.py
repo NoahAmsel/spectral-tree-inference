@@ -170,19 +170,25 @@ class SamplingConfig(BaseModel):
     """Sampling method configuration.
 
     Attributes:
-        method: Sampling method ("uniform" or "leveraged")
-        theta: Phase 1 budget ratio for leveraged sampling (0 < theta < 1)
+        method: Sampling method ("uniform", "leveraged", or "hldt")
+               - uniform: Simple uniform sampling (baseline)
+               - leveraged: IALM-based matrix completion (high accuracy, slow)
+               - hldt: HLDT debiased estimator (high speed, good accuracy)
+        theta: Phase 1 budget ratio for leveraged/hldt sampling (0 < theta < 1)
         target_rank: Rank r for SVD in leverage score computation
-        ialm_max_iter: Maximum iterations for IALM solver
-        ialm_tol: Convergence tolerance for IALM
-        ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
-        force_leveraged: Force leveraged sampling even when Phase 1 budget is insufficient
-        allow_uniform_fallback: Allow fallback to uniform sampling when p is too small for leveraged (default: True)
-        log_sampling_diagnostics: Save detailed sampling diagnostics (leverage scores, Phase 2 probabilities) for analysis
+        tau_floor_multiplier: Multiplier for regularization floor in HLDT (default: 1.0)
+                             τ_floor = multiplier × mean(leverage_scores)
+        ialm_max_iter: Maximum iterations for IALM solver (leveraged method only)
+        ialm_tol: Convergence tolerance for IALM (leveraged method only)
+        ialm_bypass_threshold: Skip IALM when p >= this threshold (leveraged method only)
+        force_leveraged: Force leveraged/lds sampling even when Phase 1 budget is insufficient
+        allow_uniform_fallback: Allow fallback to uniform sampling when p is too small (default: True)
+        log_sampling_diagnostics: Save detailed sampling diagnostics for analysis
     """
-    method: Literal["uniform", "leveraged"] = "uniform"
+    method: Literal["uniform", "leveraged", "lds"] = "uniform"
     theta: float = Field(default=0.3, gt=0.0, lt=1.0, description="Phase 1 budget ratio")
     target_rank: int = Field(default=2, ge=1, description="SVD rank for leverage estimation")
+    tau_floor_multiplier: float = Field(default=1.0, gt=0.0, description="LDS regularization floor multiplier")
     ialm_max_iter: int = Field(default=100, ge=1, description="IALM maximum iterations")
     ialm_tol: float = Field(default=1e-6, gt=0.0, description="IALM convergence tolerance")
     ialm_bypass_threshold: float = Field(default=0.1, gt=0.0, le=1.0, description="Skip IALM when p >= threshold")
