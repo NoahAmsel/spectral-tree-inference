@@ -6,23 +6,50 @@ from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 
 
-def compute_leverage_scores(X: np.ndarray, Omega: np.ndarray, r: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def compute_leverage_scores(
+    X: np.ndarray,
+    Omega: np.ndarray,
+    r: int,
+    apply_regularization: bool = False
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
     """
     Compute row and column leverage scores from rank-r SVD of observed entries.
-    
+
     Phase 1 of leveraged sampling: Estimate importance of each row/column
     by computing leverage scores from a low-rank approximation.
-    
+
+    HLDT Extension - Regularization Floor:
+    --------------------------------------
+    When apply_regularization=True, adds a regularization floor τ_floor to prevent
+    "zero-score lockout" where taxa missed in Phase 1 get zero sampling probability
+    in Phase 2.
+
+    Mathematical Justification:
+        Without regularization: If taxon i missed in Phase 1 → μᵢ = 0 → pᵢ = 0 → never sampled
+        With regularization: μ'ᵢ = μᵢ + τ_floor where τ_floor = mean(μ) ensures pᵢ > 0
+
+    This is critical for STDR where missing an entire taxon can cause catastrophic
+    tree reconstruction failure.
+
     Args:
         X: Full matrix (n x n) - only entries in Omega are used
         Omega: Boolean mask (n x n) indicating observed entries
         r: Target rank for SVD (typically 2 for Fiedler vector)
-        
+        apply_regularization: If True, add regularization floor to leverage scores
+                             (default False for backward compatibility with LeveragedSampler)
+
     Returns:
-        Tuple of (row_leverage_scores, column_leverage_scores, singular_values)
-        - row_leverage_scores: (n,) array with μ_i = (n/r) * ||U[i, :]||²
-        - column_leverage_scores: (n,) array with ν_j = (n/r) * ||V[j, :]||²
+        Tuple of (row_raw, col_raw, row_reg, col_reg, singular_values, tau_floor):
+        - row_raw: (n,) array with raw μᵢ = (n/r) * ||U[i, :]||²
+        - col_raw: (n,) array with raw νⱼ = (n/r) * ||V[j, :]||²
+        - row_reg: (n,) array with regularized μ'ᵢ = μᵢ + τ_floor
+        - col_reg: (n,) array with regularized ν'ⱼ = νⱼ + τ_floor
         - singular_values: (r,) array with top r singular values from Phase 1 SVD
+        - tau_floor: Float, regularization floor value (0.0 if not applied)
+
+    Note:
+        When apply_regularization=False (default), row_reg = row_raw and col_reg = col_raw
+        (no regularization applied, returned for API consistency).
     """
     n = X.shape[0]
 
@@ -47,9 +74,19 @@ def compute_leverage_scores(X: np.ndarray, Omega: np.ndarray, r: int) -> Tuple[n
     if n > 1000:
         # Use sklearn's TruncatedSVD (supports sparse matrices efficiently)
         svd_model = TruncatedSVD(n_components=r, random_state=42)
-        # Fit on sparse matrix (much faster for low-density matrices)
-        U = svd_model.fit_transform(X_sparse)
-        s = svd_model.singular_values_
+
+        # CRITICAL FIX: fit_transform() returns U*Σ, NOT orthonormal U
+        # Without normalization, leverage scores are scaled by σ² → billion-scale values
+        U_sigma = svd_model.fit_transform(X_sparse)  # Shape: (n, r), contains U*Σ
+        s = svd_model.singular_values_  # Shape: (r,)
+
+        # Normalize columns by singular values to recover orthonormal U
+        # Handle near-zero singular values for numerical stability
+        s_safe = s.copy()
+        s_safe[s_safe < 1e-12] = 1.0
+        U = U_sigma / s_safe[None, :]  # Broadcasting: (n, r) / (1, r) → (n, r)
+
+        # V is already orthonormal (svd_model.components_ returns Vt directly)
         Vt = svd_model.components_
         V = Vt.T
     else:
@@ -71,5 +108,32 @@ def compute_leverage_scores(X: np.ndarray, Omega: np.ndarray, r: int) -> Tuple[n
     col_norms_sq = np.sum(V ** 2, axis=1)  # (n,)
     col_leverage = (n / r) * col_norms_sq
 
-    # Also return singular values for diagnostic tracking
-    return row_leverage, col_leverage, s[:r]
+    # Store raw leverage scores
+    row_leverage_raw = row_leverage
+    col_leverage_raw = col_leverage
+
+    # Apply regularization floor if requested
+    if apply_regularization:
+        # Compute regularization floor as mean of estimated leverage scores
+        # Theory: leverage scores sum to n, so mean should be 1.0 in perfect estimation
+        # In practice, use empirical mean to account for estimation error from Phase 1
+        tau_floor = np.mean(row_leverage_raw)
+
+        # Edge case: If mean is very small (Phase 1 severely underpowered),
+        # use fallback of 1.0 (theoretical expected value)
+        if tau_floor < 1e-12:
+            tau_floor = 1.0
+
+        # Add floor to all leverage scores
+        # This ensures all taxa have non-zero sampling probability in Phase 2
+        row_leverage_reg = row_leverage_raw + tau_floor
+        col_leverage_reg = col_leverage_raw + tau_floor
+    else:
+        # No regularization: return raw scores as "regularized" for API consistency
+        tau_floor = 0.0
+        row_leverage_reg = row_leverage_raw
+        col_leverage_reg = col_leverage_raw
+
+    # Return both raw and regularized scores for diagnostic purposes
+    # Also return singular values for Phase 1 quality tracking
+    return row_leverage_raw, col_leverage_raw, row_leverage_reg, col_leverage_reg, s[:r], tau_floor
