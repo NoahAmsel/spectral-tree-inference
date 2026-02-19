@@ -188,8 +188,10 @@ class LeveragedSampler(BaseSampler):
         phase1_actual = np.sum(Omega1) // 2  # Divide by 2 since symmetric mask counts both (i,j) and (j,i)
         
         # Compute leverage scores from Phase 1 observations (also returns singular values)
-        row_leverage, col_leverage, phase1_singular_values = compute_leverage_scores(
-            matrix, Omega1, self.target_rank
+        # Note: apply_regularization=False for LeveragedSampler (uses raw scores)
+        # HLDT sampler will use apply_regularization=True
+        row_leverage_raw, col_leverage_raw, row_leverage, col_leverage, phase1_singular_values, tau_floor = compute_leverage_scores(
+            matrix, Omega1, self.target_rank, apply_regularization=False
         )
         
         # Phase 2: Non-uniform sampling based on leverage scores
@@ -268,6 +270,19 @@ class LeveragedSampler(BaseSampler):
             log_info('bootstrap',
                 f"    Leverage scores: max={leverage_max:.3f}, std={leverage_std:.3f}, sum={leverage_sum:.1f}"
             )
+
+            # Warn if Phase 1 quality is below theoretical minimum
+            if phase1_actual < theoretical_min_phase1:
+                log_info('bootstrap',
+                    f"  ⚠ IALM Phase 1 Quality: p={p:.4f} has only {phase1_actual:,}/{theoretical_min_phase1:,} "
+                    f"samples ({phase1_sufficiency:.1%} of theoretical minimum)",
+                    force=True
+                )
+                log_info('bootstrap',
+                    f"    → Leverage estimates will be noisy, affecting IALM recovery quality",
+                    force=True
+                )
+
             self._logged_p_values.add(p)
 
         # Check if we should bypass IALM (data is dense enough)
