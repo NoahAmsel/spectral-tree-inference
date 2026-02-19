@@ -340,6 +340,102 @@ lambda_param = 1.0 / (n * np.sqrt(2 * p))
 
 **Impact**: Better denoising at low p, correctly scales with sampling rate
 
+## Phase 1 Quality Tracking (NEW)
+
+Both IALM and HLDT leveraged sampling methods rely on **Phase 1** (uniform sampling) to estimate leverage scores. When Phase 1 has insufficient samples, leverage estimates become noisy, reducing the quality of Phase 2 (leveraged) sampling.
+
+### What is `phase1_sufficiency`?
+
+**Definition**: Ratio of actual Phase 1 samples to theoretical minimum
+```python
+phase1_sufficiency = phase1_actual / theoretical_min_phase1
+```
+
+Where `theoretical_min_phase1 = 4 × n × r × log(n)` comes from matrix completion theory.
+
+### Interpretation
+
+| Sufficiency | Quality | What It Means |
+|-------------|---------|---------------|
+| **< 10%** | Very noisy | Leverage estimates are essentially random; IALM recovery quality significantly degraded |
+| **10-50%** | Noisy | Leverage estimates have high variance; some benefit over uniform but limited |
+| **≥ 50%** | Good | Leverage estimates are reasonably accurate |
+| **≥ 100%** | Excellent | Meets or exceeds theoretical requirement |
+
+### Runtime Warnings
+
+When `phase1_actual < theoretical_min_phase1`, you'll see:
+
+```
+  p=0.0100: Using leveraged sampling (Phase1: 1,234/5,000, Phase2: 8,000/15,000)
+    Leverage scores: max=12.345, std=2.134, sum=1024.0
+  ⚠ IALM Phase 1 Quality: p=0.0100 has only 1,234/10,000 samples (12.3% of theoretical minimum)
+    → Leverage estimates will be noisy, affecting IALM recovery quality
+```
+
+**These warnings are informational** - leveraged sampling continues to run, but you should be aware that:
+- Phase 2 sampling probabilities are less reliable
+- IALM recovery may not perform optimally
+- Results may be closer to uniform sampling quality
+
+### Aggregate Quality Report
+
+At the end of bootstrap sweeps, you'll see a summary across all p-values:
+
+```
+  Phase 1 Quality Summary:
+    Mean sufficiency: 18.5%
+    <10% (very noisy):  5/20 p-values
+    10-50% (noisy):     12/20 p-values
+    ≥50% (good):        3/20 p-values
+    ⚠ Most p-values ran with very noisy leverage estimates
+       Consider: increase theta (currently 0.3) or focus on higher p-values
+```
+
+### Improving Phase 1 Quality
+
+If you see low sufficiency warnings:
+
+1. **Increase `theta`** (Phase 1 budget ratio):
+   ```python
+   cfg.sampling.theta = 0.5  # Allocate 50% to Phase 1 (default: 0.3)
+   ```
+
+2. **Focus on higher p-values**:
+   - Skip very low p-values where `p < theoretical_min_phase1 / n_upper`
+   - Use `np.logspace()` with higher starting point
+
+3. **Reduce `target_rank`** (if using r > 2):
+   ```python
+   cfg.sampling.target_rank = 2  # Fiedler vector only needs rank-2
+   ```
+
+4. **Use Research Mode** to understand behavior at low quality:
+   ```python
+   cfg.sampling.allow_uniform_fallback = False  # Disable guardrails
+   ```
+
+### Tracked Metrics
+
+The `phase1_sufficiency` metric is automatically tracked in:
+- **experiment.log**: Runtime warnings when below threshold
+- **results.json**: Per-p-value sufficiency ratios
+- **Bootstrap summary**: Aggregate quality report across all p-values
+
+### IALM vs HLDT Quality Impact
+
+**IALM** (this method):
+- Phase 1 quality affects: Phase 2 sampling probabilities → IALM recovery quality
+- Low quality means IALM must work harder to recover structure
+- Iterative solver can partially compensate for poor leverage estimates
+
+**HLDT** (fast alternative):
+- Phase 1 quality affects: Leverage estimates directly used for debiasing weights
+- Debiased estimator remains **unbiased** regardless of Phase 1 quality
+- But high variance in leverage scores increases estimator variance
+
+**Key difference**: IALM has an iterative recovery phase that can partially compensate for noisy leverage scores, while HLDT's single-shot estimator is more sensitive to Phase 1 quality variance.
+
 ## Diagnostic Logging (New!)
 
 **Purpose**: Log detailed leverage sampling data for validation and exploration.

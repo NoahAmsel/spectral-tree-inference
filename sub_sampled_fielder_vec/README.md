@@ -97,13 +97,21 @@ results/<timestamp>-<run_name>/
 
 ## Documentation
 
-For detailed information, see the `docs/` directory:
+📚 **[Documentation Index](docs/INDEX.md)** - Complete navigation guide for all 16 documentation files
 
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Codebase structure, entry points, and data flow (start here for AI agents)
-- **[METRICS.md](docs/METRICS.md)** - All metrics and data formats
-- **[CONFIGURATION.md](docs/CONFIGURATION.md)** - Config system and parameters
-- **[LEVERAGED_SAMPLING.md](docs/LEVERAGED_SAMPLING.md)** - Leveraged matrix completion sampling guide
-- **[ANALYSIS_GUIDES.md](docs/ANALYSIS_GUIDES.md)** - How to use analysis notebooks and tools
+### Quick Links
+
+- **[INTERACTIVE_GUIDE.md](docs/INTERACTIVE_GUIDE.md)** - Interactive launcher guide (start here!)
+- **[LDS_SAMPLING.md](docs/LDS_SAMPLING.md)** - Fast LDS (Leveraged Debiased Sampler) (10-100x speedup, recommended)
+  - 🆕 **Phase 1 Quality Tracking**: Now includes automatic warnings and aggregate reports when leverage estimates are noisy
+- **[LEVERAGED_SAMPLING.md](docs/LEVERAGED_SAMPLING.md)** - IALM sampling (highest accuracy, slower)
+  - 🆕 **Phase 1 Quality Tracking**: Automatic quality warnings and aggregate reports for leverage estimation
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture (essential for AI agents)
+- **[CONFIGURATION.md](docs/CONFIGURATION.md)** - Configuration reference
+- **[ANALYSIS_GUIDES.md](docs/ANALYSIS_GUIDES.md)** - Analysis and visualization
+- **[METRICS.md](docs/METRICS.md)** - Metrics definitions
+
+**See [docs/INDEX.md](docs/INDEX.md) for the complete documentation map organized by task and topic.**
 
 ## Citation
 

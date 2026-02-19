@@ -4,6 +4,68 @@ All notable changes to the STDR framework are documented here.
 
 ---
 
+## [2026-02-18] Critical Bug Fix: Leverage Score Computation
+
+### Fixed
+
+**CRITICAL: sklearn TruncatedSVD normalization bug** (`src/core/sampling/leveraged/compute_leverage_scores.py:78-87`)
+
+**The Bug:**
+- `sklearn.TruncatedSVD.fit_transform()` returns **U*Σ** (coordinates in reduced space), NOT orthonormal **U**
+- Leverage scores were computed from scaled vectors: `μ_i = (n/r) * ||U*Σ[i,:]||²`
+- This squared the singular values into the leverage scores: `||U*Σ||² = ||U||² * σ²`
+- **Impact**: Leverage scores were astronomically wrong (billions instead of ~1.0)
+- **Symptom**: Negative correlation with ground truth, RMSE in billions (10⁹)
+
+**The Fix:**
+```python
+# Before (WRONG):
+U = svd_model.fit_transform(X_sparse)  # Returns U*Σ, not U!
+
+# After (CORRECT):
+U_sigma = svd_model.fit_transform(X_sparse)
+s = svd_model.singular_values_
+s_safe = s.copy()
+s_safe[s_safe < 1e-12] = 1.0  # Numerical stability
+U = U_sigma / s_safe[None, :]  # Normalize to get orthonormal U
+```
+
+**Why It Matters:**
+- Leverage scores should average ~1.0 (since they sum to n)
+- The bug caused a scaling chain: IPW amplification (X/p) → huge singular values → squared in leverage calculation
+- Phase 2 sampling probabilities were completely wrong, making LDS effectively random sampling
+
+**Validation:**
+- Ground truth comparison now shows **positive correlation** (r > 0.9)
+- RMSE reduced from 10⁹ to ~1.0
+- Leverage score distributions now match theoretical expectations
+
+**Discovered through:**
+- Comparative analysis in `analysis/notebooks/lds_experiment_comparison.ipynb`
+- Ground truth validation against full SVD leverage scores
+
+---
+
+## [2026-02-14] HLDT → LDS Rename
+
+### Changed
+- **Renamed HLDT → LDS (Leveraged Debiased Sampler)**
+  - More descriptive name capturing the algorithm's two phases (leveraged sampling → debiased estimator)
+  - Updated all code, documentation, and configuration files
+  - **Breaking Changes**:
+    - Configuration: `sampling_method="hldt"` → `sampling_method="lds"`
+    - Python imports: `from .leveraged.hldt_sampler import HLDTSampler` → `from .leveraged.lds_sampler import LDSSampler`
+    - Class name: `HLDTSampler` → `LDSSampler`
+    - Parameter: `force_hldt` → `force_lds`
+    - File renames:
+      - `hldt_sampler.py` → `lds_sampler.py`
+      - `HLDT_SAMPLING.md` → `LDS_SAMPLING.md`
+      - `HLDT_MIGRATION.md` → `LDS_MIGRATION.md`
+  - **Why**: "Leveraged Debiased Sampler" describes **what** the algorithm does, while "HLDT" only indicates **who** invented it
+  - **Historical Note**: Below entries use "HLDT" to reflect terminology at the time of implementation. The underlying algorithm (from Huang, Liu, Du, and Tao, 2018) remains unchanged.
+
+---
+
 ## [2026-02-14] Bug Fixes
 
 ### Fixed
