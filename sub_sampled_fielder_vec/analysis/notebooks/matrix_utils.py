@@ -458,6 +458,10 @@ def plot_coherence_distribution(matrix: np.ndarray, k: int = 2,
     mean_coherence = np.mean(row_max_squared)
     std_coherence = np.std(row_max_squared)
 
+    # Perfectly incoherent baseline: 1/n
+    n = matrix.shape[0]
+    incoherent_baseline = 1.0 / n
+
     # Determine number of subplots
     n_plots = 3 if fiedler_vector is not None else 2
     if figsize is None:
@@ -473,6 +477,8 @@ def plot_coherence_distribution(matrix: np.ndarray, k: int = 2,
     axes[0].hist(row_max_squared, bins=50, color='steelblue', alpha=0.7, edgecolor='black')
     axes[0].axvline(mean_coherence, color='red', linestyle='--',
                     linewidth=2, label=f'Mean: {mean_coherence:.4f}')
+    axes[0].axvline(incoherent_baseline, color='green', linestyle=':',
+                    linewidth=2, label=f'Perfectly incoherent (1/n={incoherent_baseline:.2e})')
     axes[0].set_xlabel('Row Max Squared (||uᵢ||²∞)', fontsize=11)
     axes[0].set_ylabel('Frequency', fontsize=11)
     axes[0].set_title('Coherence Distribution', fontsize=12, fontweight='bold')
@@ -483,6 +489,8 @@ def plot_coherence_distribution(matrix: np.ndarray, k: int = 2,
     axes[1].plot(row_max_squared, 'o-', markersize=3, linewidth=0.5, color='coral', alpha=0.6)
     axes[1].axhline(mean_coherence, color='red', linestyle='--',
                     linewidth=2, alpha=0.7, label='Mean')
+    axes[1].axhline(incoherent_baseline, color='green', linestyle=':',
+                    linewidth=2, alpha=0.7, label=f'Perfectly incoherent (1/n)')
     axes[1].set_xlabel('Row Index', fontsize=11)
     axes[1].set_ylabel('Row Max Squared', fontsize=11)
     axes[1].set_title('Per-Row Coherence', fontsize=12, fontweight='bold')
@@ -513,6 +521,8 @@ def plot_coherence_distribution(matrix: np.ndarray, k: int = 2,
             axes[2].axvspan(partition_idx - 0.5, len(coherence_sorted),
                            alpha=0.1, color='green', label='Partition 2')
 
+        axes[2].axhline(incoherent_baseline, color='green', linestyle=':',
+                        linewidth=2, alpha=0.7, label=f'Perfectly incoherent (1/n)')
         axes[2].set_xlabel('Index (Fiedler-ordered)', fontsize=11)
         axes[2].set_ylabel('Row Coherence (||uᵢ||²∞)', fontsize=11)
         axes[2].set_title('Coherence Spatial Pattern', fontsize=12, fontweight='bold')

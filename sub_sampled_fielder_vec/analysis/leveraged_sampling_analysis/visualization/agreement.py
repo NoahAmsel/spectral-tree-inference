@@ -103,6 +103,8 @@ def plot_merged_agreement_vs_p(
     config: Optional[Dict] = None,
     output_path: Optional[Path] = None,
     figsize: Tuple[int, int] = (10, 6),
+    global_n_taxa: Optional[List[int]] = None,
+    phase_threshold: float = 80.0,
 ) -> plt.Figure:
     """Plot partition agreement vs p for all n values in a single merged plot.
     
@@ -119,7 +121,13 @@ def plot_merged_agreement_vs_p(
             Accepts both flat dict and nested config structures.
         output_path: Optional path to save figure
         figsize: Figure size (width, height)
-    
+        global_n_taxa: Optional global sorted list of all n_taxa values across all
+            runs being compared. When provided, colors are assigned by position in
+            this global list so the same n value always gets the same color across
+            plots that may have different subsets of n values.
+        phase_threshold: Agreement level (%) at which to mark the phase transition.
+            The last point below this threshold is drawn as a filled dot. Default 80.
+
     Returns:
         matplotlib Figure
     """
@@ -183,25 +191,43 @@ def plot_merged_agreement_vs_p(
     
     # Get unique n_taxa values
     n_taxa_values = sorted(df["num_taxa"].unique())
-    
+
+    # Build a consistent color map: anchor by global_n_taxa when provided so the
+    # same n value always maps to the same color across plots with different subsets.
+    reference_list = sorted(global_n_taxa) if global_n_taxa is not None else n_taxa_values
+    palette = plt.cm.tab10(np.linspace(0, 0.9, max(len(reference_list), 1)))
+    color_map = {n: palette[i] for i, n in enumerate(reference_list)}
+    # Fallback for any n not in reference_list (shouldn't happen in normal use)
+    for i, n in enumerate(n_taxa_values):
+        if n not in color_map:
+            color_map[n] = plt.cm.tab10((i + len(reference_list)) / 10)
+
     # Create single figure
     fig, ax = plt.subplots(1, 1, figsize=figsize)
-    
-    # Color cycle for different n values
-    colors = plt.cm.tab10(np.linspace(0, 1, len(n_taxa_values)))
-    
+
     # Plot each n_taxa value
-    for idx, n in enumerate(n_taxa_values):
+    for n in n_taxa_values:
         n_df = df[df["num_taxa"] == n].sort_values("p")
-        
+
         if len(n_df) == 0:
             continue
-        
+
         # Extract data
         p_vals = n_df["p"].values
         agreement_vals = n_df["partition_agreement_M"].values
-        
-        # Plot line with markers
+        color = color_map[n]
+
+        # Compute phase transition point for label and filled dot
+        below_mask = agreement_vals < phase_threshold
+        if np.any(below_mask) and not np.all(below_mask):
+            last_below_idx = int(np.where(below_mask)[0][-1])
+            p_star = p_vals[last_below_idx]
+            label = f"n={n},  p*={p_star:.3g}"
+        else:
+            last_below_idx = None
+            label = f"n={n}"
+
+        # Plot line with hollow markers
         ax.plot(
             p_vals,
             agreement_vals,
@@ -209,19 +235,32 @@ def plot_merged_agreement_vs_p(
             marker="o",
             markerfacecolor="white",
             markeredgewidth=1.5,
-            markeredgecolor=colors[idx],
-            label=f"n={n}",
+            markeredgecolor=color,
+            label=label,
             linewidth=2,
             markersize=6,
-            color=colors[idx],
+            color=color,
             zorder=2,
         )
+
+        # Phase transition dot: filled solid dot on top of the hollow marker
+        if last_below_idx is not None:
+            ax.plot(
+                p_vals[last_below_idx],
+                agreement_vals[last_below_idx],
+                "o",
+                color=color,
+                markerfacecolor=color,
+                markeredgecolor=color,
+                markersize=9,
+                zorder=4,
+            )
     
     # Set axes properties
     ax.set_xscale("log")
     ax.set_xlabel("p", fontsize=14, fontweight="bold")
     ax.set_ylabel("Partition agreement (%)", fontsize=14, fontweight="bold")
-    ax.set_ylim([0, 105])
+    ax.set_ylim([40, 105])
     ax.grid(True, alpha=0.3)
     
     # Add 95% reference line
@@ -242,7 +281,7 @@ def plot_merged_agreement_vs_p(
             # Theoretical minimum p based on O(nr log(n)) sample complexity
             # Using conservative estimate: p_min = 4 * r * log(n) / n
             p_min_theoretical = 4 * r * np.log(n) / n if n > 1 else 0.01
-            
+
             # Only show if it's within the data range
             if p_min_theoretical >= p_min_data and p_min_theoretical <= p_max_data:
                 ax.axvline(
@@ -255,6 +294,7 @@ def plot_merged_agreement_vs_p(
                 )
                 # Add annotation at different y positions to avoid overlap
                 y_pos = 20 + (idx % 3) * 4  # Stagger annotations at ~20% height
+                # (idx kept for stagger positioning only)
                 ax.text(
                     p_min_theoretical,
                     y_pos,
