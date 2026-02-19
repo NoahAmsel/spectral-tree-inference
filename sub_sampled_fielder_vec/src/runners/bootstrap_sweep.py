@@ -244,7 +244,7 @@ def sweep_for_params(
     log_info('bootstrap', f"n={n_taxa}, L={seq_len} preparing experiment data…")
 
     # Create similarity builder with configured sampling method
-    # Build method-specific kwargs (avoid passing IALM params to HLDT)
+    # Build method-specific kwargs (avoid passing IALM params to LDS)
     method_kwargs = {
         'theta': cfg.sampling.theta,
         'target_rank': cfg.sampling.target_rank,
@@ -259,11 +259,11 @@ def sweep_for_params(
             'ialm_bypass_threshold': cfg.sampling.ialm_bypass_threshold,
             'force_leveraged': cfg.sampling.force_leveraged
         })
-    elif cfg.sampling.method == "hldt":
-        # HLDT-specific parameters
+    elif cfg.sampling.method == "lds":
+        # LDS-specific parameters
         method_kwargs.update({
             'tau_floor_multiplier': cfg.sampling.tau_floor_multiplier,
-            'force_hldt': cfg.sampling.force_leveraged  # Reuse force_leveraged flag
+            'force_lds': cfg.sampling.force_leveraged  # Reuse force_leveraged flag
         })
 
     similarity_builder = SimilarityMatrixBuilder(
@@ -392,6 +392,7 @@ def sweep_for_params(
         'phase1_s1', 'phase1_s2', 'phase1_s3',  # First 3 singular values from Phase 1 SVD
         'leverage_max', 'leverage_std', 'leverage_sum', 'leverage_symmetry_error',
         'ialm_iterations',  # Number of IALM iterations (0 if bypassed)
+        'phase1_sufficiency',  # Phase 1 actual samples / theoretical minimum (LDS quality indicator)
     ]
     metrics_dict: Dict[str, List[Tuple[float, float, float]]] = {
         key: [] for key in metric_keys
@@ -530,6 +531,9 @@ def sweep_for_params(
 
                         # Extract IALM iterations
                         metric_values['ialm_iterations'].append(metrics.get('ialm_iterations', float('nan')))
+
+                        # Extract Phase 1 sufficiency (LDS quality indicator)
+                        metric_values['phase1_sufficiency'].append(metrics.get('phase1_sufficiency', float('nan')))
                     else:
                         # No metrics available (e.g., uniform sampler)
                         metric_values['phase1_s1'].append(float('nan'))
@@ -540,6 +544,7 @@ def sweep_for_params(
                         metric_values['leverage_sum'].append(float('nan'))
                         metric_values['leverage_symmetry_error'].append(float('nan'))
                         metric_values['ialm_iterations'].append(float('nan'))
+                        metric_values['phase1_sufficiency'].append(float('nan'))
                 else:
                     # Not a leveraged sampler - append NaN for all new metrics
                     metric_values['phase1_s1'].append(float('nan'))
@@ -550,6 +555,7 @@ def sweep_for_params(
                     metric_values['leverage_sum'].append(float('nan'))
                     metric_values['leverage_symmetry_error'].append(float('nan'))
                     metric_values['ialm_iterations'].append(float('nan'))
+                    metric_values['phase1_sufficiency'].append(float('nan'))
 
                 # Update running average of S (streaming - no storage!)
                 # Uses Welford's online algorithm for numerical stability
@@ -707,9 +713,9 @@ def sweep_for_params(
             if bootstrap_pbar:
                 bootstrap_pbar.close()
 
-        # Save sampling diagnostics if enabled (leveraged/hldt sampling only)
+        # Save sampling diagnostics if enabled (leveraged/lds sampling only)
         if (cfg.sampling.log_sampling_diagnostics and
-            cfg.sampling.method in ["leveraged", "hldt"] and
+            cfg.sampling.method in ["leveraged", "lds"] and
             hasattr(similarity_builder, 'sampler') and
             hasattr(similarity_builder.sampler, 'last_sample_metrics')):
 
@@ -717,7 +723,7 @@ def sweep_for_params(
             if metrics is not None:
                 # Handle different key names for leverage scores
                 # - LeveragedSampler uses 'leverage_scores'
-                # - HLDTSampler uses 'leverage_scores_raw' and 'leverage_scores_regularized'
+                # - LDSSampler uses 'leverage_scores_raw' and 'leverage_scores_regularized'
                 leverage_scores = metrics.get('leverage_scores') or metrics.get('leverage_scores_regularized')
                 phase2_sampled_indices = metrics.get('phase2_sampled_indices')
                 phase2_sampling_probs = metrics.get('phase2_sampling_probs')
@@ -925,8 +931,8 @@ def sweep_for_params(
                 error_summary = error_msg.split(':')[0] if ':' in error_msg else error_msg
                 log_info('bootstrap', f"  p={p_val:.4g}: {error_summary}")
 
-    # Print sampling summary for leveraged/hldt sampling experiments
-    if cfg.sampling.method in ["leveraged", "hldt"] and hasattr(similarity_builder, 'sampler'):
+    # Print sampling summary for leveraged/lds sampling experiments
+    if cfg.sampling.method in ["leveraged", "lds"] and hasattr(similarity_builder, 'sampler'):
         # Count how many p-values used leveraged vs uniform sampling
         n_leveraged = 0
         n_uniform_fallback = 0
@@ -973,8 +979,35 @@ def sweep_for_params(
             log_info('bootstrap', f"  IALM converged: {n_ialm_converged}", force=True)
             if n_ialm_max_iter > 0:
                 log_info('bootstrap', f"  IALM hit max_iter: {n_ialm_max_iter}", force=True)
-        elif cfg.sampling.method == "hldt" and n_leveraged > 0:
-            log_info('bootstrap', f"  HLDT single-shot estimator used for all {cfg.sampling.method} p-values", force=True)
+        elif cfg.sampling.method == "lds" and n_leveraged > 0:
+            log_info('bootstrap', f"  LDS single-shot estimator used for all {cfg.sampling.method} p-values", force=True)
+
+            # Aggregate Phase 1 quality report for LDS
+            if 'phase1_sufficiency' in metrics_dict:
+                phase1_qualities = []
+                for i, p in enumerate(cfg.experiment.p_values):
+                    if result_source_list[i] == 'computed' and i < len(metrics_dict['phase1_sufficiency']):
+                        quality_mean = metrics_dict['phase1_sufficiency'][i][0]  # (mean, median, std)
+                        if not np.isnan(quality_mean) and quality_mean > 0:  # Valid LDS run (not fallback)
+                            phase1_qualities.append(quality_mean)
+
+                if len(phase1_qualities) > 0:
+                    mean_quality = np.mean(phase1_qualities) * 100  # Convert to percentage
+                    n_low = sum(1 for q in phase1_qualities if q < 0.10)  # <10%
+                    n_medium = sum(1 for q in phase1_qualities if 0.10 <= q < 0.50)  # 10-50%
+                    n_high = sum(1 for q in phase1_qualities if q >= 0.50)  # >=50%
+
+                    log_info('bootstrap', "", force=True)
+                    log_info('bootstrap', "  Phase 1 Quality Summary:", force=True)
+                    log_info('bootstrap', f"    Mean sufficiency: {mean_quality:.1f}%", force=True)
+                    log_info('bootstrap', f"    <10% (very noisy):  {n_low}/{len(phase1_qualities)} p-values", force=True)
+                    log_info('bootstrap', f"    10-50% (noisy):     {n_medium}/{len(phase1_qualities)} p-values", force=True)
+                    log_info('bootstrap', f"    ≥50% (good):        {n_high}/{len(phase1_qualities)} p-values", force=True)
+
+                    # Warning if most p-values are severely underpowered
+                    if mean_quality < 10.0:
+                        log_info('bootstrap', f"    ⚠ Most p-values ran with very noisy leverage estimates", force=True)
+                        log_info('bootstrap', f"       Consider: increase theta (currently {cfg.sampling.theta}) or focus on higher p-values", force=True)
 
         log_info('bootstrap', "="*60, force=True)
 

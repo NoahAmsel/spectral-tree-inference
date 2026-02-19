@@ -145,7 +145,8 @@ def save_single_results(
             # Phase A: Leveraged sampling diagnostics
             'phase1_s1', 'phase1_s2', 'phase1_s3',
             'leverage_max', 'leverage_std', 'leverage_sum', 'leverage_symmetry_error',
-            'ialm_iterations'
+            'ialm_iterations',
+            'phase1_sufficiency'  # HLDT Phase 1 quality indicator
         ]
         for metric_name in metric_names:
             if metric_name in metrics_dict and len(metrics_dict[metric_name]) == len(p_values):

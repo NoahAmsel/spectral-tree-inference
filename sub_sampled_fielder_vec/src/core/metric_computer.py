@@ -1,7 +1,8 @@
 """Metric computation class for spectral matrix analysis."""
 import numpy as np
 import scipy.linalg
-from typing import Dict, Tuple
+from scipy.sparse import issparse
+from typing import Dict, Tuple, Union
 
 from ..utils.logging import suppress_warnings, log_warning, log_error
 
@@ -9,45 +10,72 @@ from ..utils.logging import suppress_warnings, log_warning, log_error
 class MetricComputer:
     """
     Encapsulates all metric computation logic with efficient caching.
-    
+
     Keeps all existing math logic unchanged, just provides better organization.
+    Supports both dense and sparse matrices (converts sparse to dense for metrics).
     """
-    
+
     def __init__(self, empirical_rank_threshold: float = None, coherence_k: int = 2):
         """
         Initialize the metric computer.
-        
+
         Args:
             empirical_rank_threshold: Threshold for rank computation (None = auto)
             coherence_k: Number of top singular vectors for coherence
         """
         self.empirical_rank_threshold = empirical_rank_threshold
         self.coherence_k = coherence_k
+
+    @staticmethod
+    def _ensure_dense(matrix: Union[np.ndarray, 'scipy.sparse.spmatrix']) -> np.ndarray:
+        """
+        Convert sparse matrix to dense if needed.
+
+        Metric computation uses scipy.linalg functions that require dense matrices.
+        This conversion is acceptable since metrics are computed once per p-value.
+
+        Args:
+            matrix: Input matrix (dense or sparse)
+
+        Returns:
+            Dense numpy array
+        """
+        if issparse(matrix):
+            return matrix.toarray()
+        return matrix
     
-    def compute_all(self, M: np.ndarray, S: np.ndarray, L_M: np.ndarray, 
+    def compute_all(self, M: np.ndarray, S: np.ndarray, L_M: np.ndarray,
                    L_S: np.ndarray, p: float) -> Dict[str, float]:
         """
         Compute all metrics efficiently for M, S, L_M, and L_S.
-        
+
         This function optimizes computation by:
         - Computing SVD once per matrix and reusing for rank and coherence
         - Computing eigenvalues once per matrix and reusing for gap and min_separation
-        
+        - Converting sparse matrices to dense (metrics computed once per p-value)
+
         Args:
-            M: Full similarity matrix
-            S: Subsampled similarity matrix
-            L_M: Laplacian of M
-            L_S: Laplacian of S
+            M: Full similarity matrix (dense or sparse)
+            S: Subsampled similarity matrix (dense or sparse)
+            L_M: Laplacian of M (dense or sparse)
+            L_S: Laplacian of S (dense or sparse)
             p: Sampling probability
-            
+
         Returns:
             Dictionary with all metrics
         """
+        # Convert sparse matrices to dense for metric computation
+        # (scipy.linalg functions require dense matrices)
+        M = self._ensure_dense(M)
+        S = self._ensure_dense(S)
+        L_M = self._ensure_dense(L_M)
+        L_S = self._ensure_dense(L_S)
+
         metrics = {}
-        
+
         # 1. Operator norm error (comparison metric)
         metrics['operator_norm_error'] = self.compute_comparison_metrics(M, S, p)
-        
+
         # 2. Compute metrics for each matrix
         matrices = [
             ('M', M),
@@ -55,11 +83,11 @@ class MetricComputer:
             ('L_M', L_M),
             ('L_S', L_S)
         ]
-        
+
         for name, matrix in matrices:
             matrix_metrics = self.compute_matrix_metrics(matrix, name)
             metrics.update(matrix_metrics)
-        
+
         return metrics
     
     def compute_matrix_metrics(self, matrix: np.ndarray, name: str) -> Dict[str, float]:

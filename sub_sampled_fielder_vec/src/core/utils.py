@@ -36,19 +36,31 @@ def generate_sequences(num_taxa, sequence_length, mutation_rate, tree_model, seq
 def compute_laplacian(similarity_matrix: np.ndarray) -> np.ndarray:
     """
     Compute unnormalized Laplacian matrix from similarity matrix.
-    
+
     L = D - similarity_matrix, where D is diagonal degree matrix.
-    
+
+    Handles both dense and sparse similarity matrices. For sparse inputs,
+    returns a sparse Laplacian. For dense inputs, returns a dense Laplacian.
+
     Args:
-        similarity_matrix: Similarity matrix
-        
+        similarity_matrix: Similarity matrix (dense or sparse)
+
     Returns:
-        Laplacian matrix
+        Laplacian matrix (same format as input)
     """
-    degrees = np.sum(similarity_matrix, axis=0)
-    D = np.diag(degrees)
-    L = D - similarity_matrix
-    return L
+    from scipy.sparse import issparse, diags as sparse_diags
+
+    if issparse(similarity_matrix):
+        # Sparse computation
+        degrees = np.array(similarity_matrix.sum(axis=0)).flatten()
+        L = sparse_diags(degrees) - similarity_matrix
+        return L
+    else:
+        # Dense computation (original logic)
+        degrees = np.sum(similarity_matrix, axis=0)
+        D = np.diag(degrees)
+        L = D - similarity_matrix
+        return L
 
 
 def compute_fielder_vector(similarity_matrix: np.ndarray) -> np.ndarray:
