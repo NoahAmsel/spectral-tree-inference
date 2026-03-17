@@ -2,13 +2,26 @@
 
 This module provides functions to load experiment results from JSON files
 and convert them into structured formats for analysis.
+
+Updated to support new organized directory structure:
+    results/{tree_model}/{sampling_method}/{timestamp-experiment_name}/
+
+You can now load data by specifying:
+    1. Direct path (backward compatible): load_experiment_results(Path("results/..."))
+    2. Components: load_experiment_by_components(tree_model, sampling_method, experiment_name)
 """
 import json
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 import pandas as pd
 import numpy as np
+
+# Try relative import first (when used as package), fall back to direct import
+try:
+    from .path_utils import construct_results_path, get_latest_experiment, find_experiments
+except ImportError:
+    from path_utils import construct_results_path, get_latest_experiment, find_experiments
 
 
 DIR_PATTERN = re.compile(r"^n(?P<num>\d+)_L(?P<len>\d+)$")
@@ -257,3 +270,126 @@ def load_comparison_dataframe(comp_dir: Path) -> Dict[str, pd.DataFrame]:
         # Convert directly to DataFrame
         result[method] = to_dataframe(method_data, method=None)
     return result
+
+
+# ============================================================================
+# NEW FUNCTIONS: Component-based path construction
+# ============================================================================
+
+def load_experiment_by_components(
+    tree_model: str,
+    sampling_method: str,
+    experiment_name: Optional[str] = None,
+    results_dir: Optional[Union[str, Path]] = None,
+) -> Dict[int, Dict[str, Any]]:
+    """Load experiment results by specifying tree model, sampling method, and name.
+
+    Args:
+        tree_model: Tree model name (e.g., 'kingman_mean', 'balanced_binary')
+        sampling_method: Sampling method (e.g., 'uniform', 'leveraged', 'lds')
+        experiment_name: Experiment directory name (e.g., '20260220-120000-...')
+                       If None, loads the most recent experiment
+        results_dir: Optional base results directory
+
+    Returns:
+        Dict mapping n_taxa -> {sequence_length, columns, rows, ...}
+
+    Examples:
+        >>> # Load specific experiment
+        >>> data = load_experiment_by_components('kingman_mean', 'lds', '20260220-120000-kingman_mean_n512_mu_0p1_lds')
+
+        >>> # Load most recent experiment
+        >>> data = load_experiment_by_components('kingman_mean', 'lds')
+
+    Raises:
+        ValueError: If no experiment found with given components
+    """
+    if experiment_name is None:
+        # Get latest experiment
+        run_dir = get_latest_experiment(tree_model, sampling_method, results_dir)
+        if run_dir is None:
+            raise ValueError(
+                f"No experiments found for tree_model='{tree_model}', "
+                f"sampling_method='{sampling_method}'"
+            )
+    else:
+        run_dir = construct_results_path(tree_model, sampling_method, experiment_name, results_dir)
+
+    if not run_dir.exists():
+        raise ValueError(f"Experiment directory not found: {run_dir}")
+
+    return load_experiment_results(run_dir)
+
+
+def load_dataframe_by_components(
+    tree_model: str,
+    sampling_method: str,
+    experiment_name: Optional[str] = None,
+    results_dir: Optional[Union[str, Path]] = None,
+) -> pd.DataFrame:
+    """Load experiment as DataFrame by specifying tree model, sampling method, and name.
+
+    Args:
+        tree_model: Tree model name (e.g., 'kingman_mean', 'balanced_binary')
+        sampling_method: Sampling method (e.g., 'uniform', 'leveraged', 'lds')
+        experiment_name: Experiment directory name (e.g., '20260220-120000-...')
+                       If None, loads the most recent experiment
+        results_dir: Optional base results directory
+
+    Returns:
+        DataFrame with all experiment results
+
+    Examples:
+        >>> # Load latest LDS experiment for kingman_mean
+        >>> df = load_dataframe_by_components('kingman_mean', 'lds')
+
+        >>> # Load specific experiment
+        >>> df = load_dataframe_by_components('kingman_mean', 'uniform', '20260220-120000-...')
+    """
+    data = load_experiment_by_components(tree_model, sampling_method, experiment_name, results_dir)
+    return to_dataframe(data, method=None)
+
+
+def list_available_experiments(
+    tree_model: Optional[str] = None,
+    sampling_method: Optional[str] = None,
+    results_dir: Optional[Union[str, Path]] = None,
+) -> List[Dict[str, Any]]:
+    """List available experiments, optionally filtered by tree model and/or sampling method.
+
+    Args:
+        tree_model: Optional filter for tree model
+        sampling_method: Optional filter for sampling method
+        results_dir: Optional base results directory
+
+    Returns:
+        List of dicts with keys: path, tree_model, sampling_method, experiment_name, timestamp
+
+    Examples:
+        >>> # List all experiments
+        >>> all_exps = list_available_experiments()
+
+        >>> # List all kingman_mean experiments
+        >>> kingman_exps = list_available_experiments(tree_model='kingman_mean')
+
+        >>> # List all LDS experiments
+        >>> lds_exps = list_available_experiments(sampling_method='lds')
+
+        >>> # List kingman_mean + LDS experiments
+        >>> specific = list_available_experiments(tree_model='kingman_mean', sampling_method='lds')
+    """
+    try:
+        from .path_utils import list_all_experiments
+    except ImportError:
+        from path_utils import list_all_experiments
+
+    all_experiments = list_all_experiments(results_dir)
+
+    # Apply filters
+    if tree_model is not None:
+        all_experiments = [e for e in all_experiments if e['tree_model'] == tree_model]
+
+    if sampling_method is not None:
+        all_experiments = [e for e in all_experiments if e['sampling_method'] == sampling_method]
+
+    return all_experiments

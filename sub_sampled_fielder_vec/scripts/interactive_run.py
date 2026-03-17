@@ -187,6 +187,14 @@ def build_config_from_cache(cache_metadata: Dict[str, Any]) -> Dict[str, Any]:
         config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
         config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
 
+    # Truncation threshold
+    print()
+    use_truncation = confirm("Truncate low similarity values (remove noise)?", default=True)
+    if use_truncation:
+        config["truncation_threshold"] = float(get_input("Truncation threshold (0.0=off, 1e-4=recommended)", default="1e-4"))
+    else:
+        config["truncation_threshold"] = 0.0
+
     # Other defaults
     config["use_middle_out"] = False
     config["guardrails_enabled"] = False
@@ -282,6 +290,14 @@ def build_batch_config_from_caches(cache_entries: List[Dict[str, Any]]) -> Dict[
         config["sampling_tau_floor_multiplier"] = float(get_input("Tau floor multiplier", default="1.0"))
         config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
         config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
+
+    # Truncation threshold
+    print()
+    use_truncation = confirm("Truncate low similarity values (remove noise)?", default=True)
+    if use_truncation:
+        config["truncation_threshold"] = float(get_input("Truncation threshold (0.0=off, 1e-4=recommended)", default="1e-4"))
+    else:
+        config["truncation_threshold"] = 0.0
 
     # Other defaults
     config["use_middle_out"] = False
@@ -388,6 +404,14 @@ def create_new_config() -> Dict[str, Any]:
         config["sampling_tau_floor_multiplier"] = float(get_input("tau_floor_multiplier", default="1.0"))
         config["sampling_allow_uniform_fallback"] = confirm("Allow fallback to uniform sampling for low p?", default=False)
         config["log_sampling_diagnostics"] = confirm("Log sampling diagnostics (for analysis)?", default=True)
+
+    # Truncation threshold
+    print()
+    use_truncation = confirm("Truncate low similarity values (remove noise)?", default=True)
+    if use_truncation:
+        config["truncation_threshold"] = float(get_input("Truncation threshold (0.0=off, 1e-4=recommended)", default="1e-4"))
+    else:
+        config["truncation_threshold"] = 0.0
 
     # Enable persistent cache for new matrices
     config["use_persistent_cache"] = True
