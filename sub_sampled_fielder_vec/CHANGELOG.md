@@ -4,6 +4,43 @@ All notable changes to the STDR framework are documented here.
 
 ---
 
+## [2026-02-20] Critical Bug Fix: LDS Debiasing Probability
+
+### Fixed
+
+**CRITICAL: Incorrect debiasing probability in LDS** (`src/core/sampling/leveraged/lds_sampler.py:315-325, 339`)
+
+**The Bug:**
+- LDS uses two phases: Phase 1 (uniform, probability $p_0$) and Phase 2 (leveraged, probability $p_{ij}$)
+- Algorithm requires debiasing with **effective inclusion probability**: $\pi_{ij} = p_0 + (1-p_0) \cdot p_{ij}$
+- Code was debiasing **all entries** (both phases) with only Phase 2 probability $p_{ij}$
+- **Impact**: Biased estimator $\mathbb{E}[\hat{M}] \neq M$ → violates unbiasedness guarantee
+- **Symptom**: Worse performance at low p-values where Phase 1 dominates the sample
+
+**The Fix:**
+```python
+# Before (WRONG):
+X_hat_sparse = compute_debiased_estimator(matrix, Omega, p_matrix)  # Uses p_{ij} only
+
+# After (CORRECT):
+p_0 = phase1_actual / n_upper
+pi_matrix = p_0 + (1.0 - p_0) * p_matrix  # Effective inclusion probability
+X_hat_sparse = compute_debiased_estimator(matrix, Omega, pi_matrix)
+```
+
+**Why It Matters:**
+- **Unbiasedness**: The theoretical guarantee $\mathbb{E}[\hat{M}] = M$ is critical for Davis-Kahan eigenvector stability
+- **Inclusion-Exclusion**: Entry (i,j) is sampled if: (1) sampled in Phase 1 OR (2) missed in Phase 1 AND sampled in Phase 2
+- **Low p impact**: At low p-values, Phase 1 budget dominates (30% of total) → most entries debiased with wrong probability
+- **Bias direction**: Phase 1 entries debiased with $p_{ij}$ (high-leverage) instead of $p_0$ (uniform) → under-amplification → signal loss
+
+**Validation:**
+- Expected to improve partition agreement at low p-values (p < 0.01)
+- Should see more stable performance across p-value range
+- Theoretical properties now correctly implemented
+
+---
+
 ## [2026-02-18] Critical Bug Fix: Leverage Score Computation
 
 ### Fixed

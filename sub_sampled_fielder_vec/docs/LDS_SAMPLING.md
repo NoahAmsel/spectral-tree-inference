@@ -21,7 +21,9 @@
 - Trees are large (n > 500 taxa)
 - Speed is important
 - You need good accuracy without perfect recovery
-- Working at moderate-to-high p-values (p > 0.15)
+- Working at moderate-to-high p-values (p > 0.15 is a rough guide; the B1 fix means uniform
+  fallback now triggers more aggressively at low p because the threshold correctly reflects
+  HLDT: `p_critical ≈ 4·r·log²(n)/n`, which is larger than the old `4·r·log(n)/n`)
 
 ⚠️ **Use IALM when:**
 - Trees are small (n < 200 taxa)
@@ -106,17 +108,26 @@ run_dir, results = runner.run()
 4. Combine with Phase 1: `Ω = Ω_1 ∪ Ω_2`
 
 #### Phase 3: Debiased Estimator → Spectral Preservation
-1. For sampled entries: `X̂_ij = X_ij / p_ij`
-2. For unsampled entries: `X̂_ij = 0`
-3. Set diagonal: `X̂_ii = 1.0`
-4. Return sparse CSR matrix
+1. Compute effective inclusion probability per entry:
+   - `p_restricted_ij = p_ij / sum(p_restricted)` (normalized, excluding Phase 1 entries)
+   - `p2_ij = min(p_restricted_ij × phase2_budget, 1.0)`
+   - `π_ij = min(p_0 + (1 - p_0) × p2_ij, 1.0)` where `p_0 = phase1_actual / n_upper`
+2. For sampled entries: `X̂_ij = X_ij / π_ij`
+3. For unsampled entries: `X̂_ij = 0`
+4. Set diagonal: `X̂_ii = 1.0`
+5. Return sparse CSR matrix
+
+**Note**: `p_matrix` from Phase 2 is a PMF summing to 1 (a probability *distribution* over entries,
+not per-entry inclusion probabilities). The actual inclusion probability for entry (i,j) is
+`p_matrix[i,j] × phase2_budget / restricted_sum`. Phase 1 entries are excluded from the restricted
+pool before computing `p2` to avoid double-counting.
 
 **No IALM iterations!** This single-shot construction is what makes LDS fast.
 
 ### Theoretical Guarantee
 
-**LDS Theorem** (Huang et al.):
-With `m = O(nr log n)` samples using leverage scores:
+**LDS Theorem** (HLDT Theorem 3.1):
+With `m = O(nr log²(n))` samples using leverage scores (Phase 1 minimum: `4·n·r·log²(n)`):
 ```
 E[X̂] = X  (unbiased estimator)
 ```
@@ -242,12 +253,19 @@ print(f"Leverage max: {metrics['leverage_max']:.3f}")
 print(f"τ_floor: {metrics['tau_floor']:.3f}")
 print(f"Debiasing time: {metrics['debiasing_time']:.4f}s")
 print(f"Matrix sparsity: {metrics['matrix_sparsity']:.1%}")
+print(f"Spectral gap: {metrics['spectral_gap']:.3f}")  # s[1]/s[2]; inf if target_rank < 3
 ```
 
 ### Phase 1 Quality Tracking (NEW)
 
+**What is `spectral_gap`?**
+Ratio `s[1] / s[2]` of the first two Phase 1 singular values. This is the denominator in the
+Davis-Kahan bound: `‖v̂ - v‖ ≤ ‖X̂ - X‖ / gap`. A larger gap means eigenvectors are more
+stable under perturbation. Set `target_rank=3` to get a meaningful value; with `target_rank=2`
+only two singular values are computed so `spectral_gap = inf`.
+
 **What is `phase1_sufficiency`?**
-Ratio of actual Phase 1 samples to theoretical minimum: `phase1_actual / (4 × n × r × log(n))`
+Ratio of actual Phase 1 samples to theoretical minimum: `phase1_actual / (4 × n × r × log²(n))`
 
 **Interpretation**:
 - **< 10%**: Very noisy leverage estimates (essentially random sampling)
