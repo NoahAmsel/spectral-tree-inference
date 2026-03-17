@@ -1,0 +1,45 @@
+{
+  "experiment_name": "stability_demo",
+  "description": "Quick demo of stability analysis with smaller parameters",
+
+  "models": [
+    {
+      "name": "balanced_binary",
+      "tree": {
+        "model": "balanced_binary",
+        "params": {
+          "edge_length": 1.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "kingman_mean",
+      "tree": {
+        "model": "kingman_mean",
+        "params": {
+          "pop_size": 1000.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    }
+  ],
+
+  "configs": [
+    {"n": 128, "L": 1000, "mu": 0.1},
+    {"n": 128, "L": 1000, "mu": 0.2}
+  ],
+
+  "analysis_params": {
+    "num_gaps": 0,
+    "min_split": 2,
+    "k_scree": 10,
+    "coherence_k": 2
+  }
+}

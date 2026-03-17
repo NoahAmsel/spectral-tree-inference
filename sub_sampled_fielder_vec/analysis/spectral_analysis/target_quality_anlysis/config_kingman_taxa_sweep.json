@@ -1,0 +1,36 @@
+{
+  "experiment_name": "kingman_mean_taxa_sweep",
+  "description": "Taxa sweep experiment for Kingman mean model with Ne=1.0 and µ=0.1. Fixed sequence length L=10,000, varying number of taxa n=500,1000,3000,5000.",
+
+  "models": [
+    {
+      "name": "kingman_mean_Ne_1.0",
+      "description": "Kingman mean with pop_size=1.0 (Ne=1.0). Standard coalescent time scale.",
+      "tree": {
+        "model": "kingman_mean",
+        "params": {
+          "pop_size": 1.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    }
+  ],
+
+  "configs": [
+    {"n": 500, "L": 10000, "mu": 0.1},
+    {"n": 1000, "L": 10000, "mu": 0.1},
+    {"n": 3000, "L": 10000, "mu": 0.1},
+    {"n": 5000, "L": 10000, "mu": 0.1}
+  ],
+
+  "analysis_params": {
+    "num_gaps": 5,
+    "min_split": 2,
+    "k_scree": 10,
+    "coherence_k": 8
+  }
+}
+

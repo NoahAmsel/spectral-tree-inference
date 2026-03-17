@@ -1,0 +1,91 @@
+{
+  "experiment_name": "kingman_mean_pop_size_comparison_wide",
+  "description": "Comparison of Kingman mean trees with different population sizes (0.1, 1,10,100, 1000). Smaller pop_size creates shorter branch lengths (more signal), larger pop_size creates longer branches (more noise/saturation).",
+
+  "models": [
+    {
+      "name": "kingman_mean_pop_0.1",
+      "description": "Kingman mean with pop_size=0.1. Short branches, high phylogenetic signal.",
+      "tree": {
+        "model": "kingman_mean",
+        "params": {
+          "pop_size": 0.1
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "kingman_mean_pop_1",
+      "description": "Kingman mean with pop_size=1.0. Standard coalescent time scale.",
+      "tree": {
+        "model": "kingman_mean",
+        "params": {
+          "pop_size": 1.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "kingman_mean_pop_10",
+      "description": "Kingman mean with pop_size=1.0. Standard coalescent time scale.",
+      "tree": {
+        "model": "kingman_mean",
+        "params": {
+          "pop_size": 10.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "kingman_mean_pop_100",
+      "description": "Kingman mean with pop_size=1.0. Standard coalescent time scale.",
+      "tree": {
+        "model": "kingman_mean",
+        "params": {
+          "pop_size": 100.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    },
+    {
+      "name": "kingman_mean_pop_1000",
+      "description": "Kingman mean with pop_size=1000. Long branches, potential saturation effects.",
+      "tree": {
+        "model": "kingman_mean",
+        "params": {
+          "pop_size": 1000.0
+        }
+      },
+      "sequence": {
+        "model": "JC69",
+        "params": {}
+      }
+    }
+  ],
+
+  "configs": [
+    {"n": 3000, "L": 10000, "mu": 0.1},
+    {"n": 3000, "L": 10000, "mu": 0.2}
+  ],
+
+  "analysis_params": {
+    "num_gaps": 5,
+    "min_split": 2,
+    "k_scree": 10,
+    "coherence_k": 8
+  }
+}
+
+

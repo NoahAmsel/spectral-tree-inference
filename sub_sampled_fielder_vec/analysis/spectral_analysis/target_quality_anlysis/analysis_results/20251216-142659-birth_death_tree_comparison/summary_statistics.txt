@@ -1,0 +1,38 @@
+Summary Statistics Across All Configurations
+============================================================
+
+Coherence:
+  Mean:     0.154587
+  Median:   0.166501
+  Min:      0.050283
+  Max:      0.246663
+  Std:      0.059901
+
+Numerical Rank:
+  Mean:    69.406981
+  Median:  59.742072
+  Min:     14.268941
+  Max:    175.164912
+  Std:     48.869391
+
+Sigma2:
+  Mean:     0.000437
+  Median:   0.000036
+  Min:      0.000008
+  Max:      0.003127
+  Std:      0.000875
+
+Spectral Gap:
+  Mean:     0.010311
+  Median:   0.000017
+  Min:      0.000001
+  Max:      0.083672
+  Std:      0.024444
+
+Relative Spectral Gap:
+  Mean:     1.199510
+  Median:   0.151250
+  Min:     -0.393085
+  Max:      7.382677
+  Std:      2.570212
+

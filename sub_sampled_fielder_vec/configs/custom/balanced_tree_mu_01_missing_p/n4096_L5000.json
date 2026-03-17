@@ -1,0 +1,57 @@
+{
+  "tree": {
+    "model": "balanced_binary",
+    "params": {
+      "num_taxa": 4096,
+      "edge_length": 1.0
+    }
+  },
+  "sequence": {
+    "model": "JC69",
+    "len": 5000,
+    "params": {
+      "mutation_rate": 0.1,
+      "num_classes": 4
+    }
+  },
+  "experiment": {
+    "p_values": [
+      0.001,
+      0.0016378937069540646,
+      0.0026826957952797246,
+      0.004393970560760791,
+      0.005179474679231213,
+      0.0062,
+      0.0071968567300115215,
+      0.0072
+    ],
+    "bootstrap_reps": 10,
+    "seed": 42,
+    "run_name": "balanced_tree_mu_01_n4096_L5000_missing_p",
+    "display_mode": "progress",
+    "num_workers": 8,
+    "use_middle_out": false
+  },
+  "metrics": {
+    "empirical_rank_threshold": null,
+    "coherence_k": 4,
+    "num_gaps": 0,
+    "min_split": 1
+  },
+  "guardrails": {
+    "enabled": false,
+    "metric": "partition_agreement_M",
+    "low_side_threshold": 50.0,
+    "low_side_epsilon": 0.99,
+    "compute_metrics_on_trigger": false
+  },
+  "cache": {
+    "use_persistent_cache": false,
+    "cache_dir": null
+  },
+  "output": {
+    "dir": "results",
+    "save_matrices": false,
+    "save_fiedler_vectors": true
+  }
+}

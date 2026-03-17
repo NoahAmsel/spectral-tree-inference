@@ -1,0 +1,149 @@
+Detailed Stability Metrics - Full Statistics
+========================================================================================================================
+
+
+[1] yule_pure_birth, n=1000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0881  std=  0.0163  min=  0.0669  max=  0.1188
+  Numerical Rank           : mean= 38.0247  std=  3.5024  min= 33.9076  max= 44.4480
+  Sigma2                   : mean=  0.0029  std=  0.0016  min=  0.0009  max=  0.0057
+  Spectral Gap             : mean=  0.0102  std=  0.0059  min=  0.0026  max=  0.0208
+  Relative Spectral Gap    : mean=  0.2914  std=  0.3747  min=  0.0190  max=  1.1572
+  Lambda2                  : mean=  0.1236  std=  0.1240  min=  0.0095  max=  0.4498
+  Lambda3                  : mean=  0.1337  std=  0.1250  min=  0.0169  max=  0.4677
+  Partition Split          : 104.5|895.5 (std: 94.5|94.5, range: [3-321]|[679-997])
+  Partition Validity       : 10/10 (100.0%)
+
+[2] yule_pure_birth, n=2000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0819  std=  0.0205  min=  0.0447  max=  0.1169
+  Numerical Rank           : mean= 68.4060  std= 13.5176  min= 41.8343  max= 86.9415
+  Sigma2                   : mean=  0.0015  std=  0.0014  min=  0.0002  max=  0.0051
+  Spectral Gap             : mean=  0.0155  std=  0.0143  min=  0.0002  max=  0.0452
+  Relative Spectral Gap    : mean=  3.7203  std=  7.7526  min=  0.0045  max= 26.1282
+  Lambda2                  : mean=  0.0393  std=  0.0344  min=  0.0013  max=  0.1132
+  Lambda3                  : mean=  0.0548  std=  0.0391  min=  0.0162  max=  0.1362
+  Partition Split          : 219.5|1780.5 (std: 193.8|193.8, range: [3-600]|[1400-1997])
+  Partition Validity       : 10/10 (100.0%)
+
+[3] yule_pure_birth, n=3000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.0787  std=  0.0223  min=  0.0341  max=  0.1072
+  Numerical Rank           : mean= 98.5603  std= 12.2227  min= 76.6219  max=113.7881
+  Sigma2                   : mean=  0.0013  std=  0.0008  min=  0.0005  max=  0.0028
+  Spectral Gap             : mean=  0.0064  std=  0.0098  min=  0.0007  max=  0.0341
+  Relative Spectral Gap    : mean=  0.3849  std=  0.5367  min=  0.0323  max=  1.8163
+  Lambda2                  : mean=  0.0328  std=  0.0287  min=  0.0041  max=  0.0853
+  Lambda3                  : mean=  0.0391  std=  0.0317  min=  0.0051  max=  0.0888
+  Partition Split          : 156.9|2843.1 (std: 149.9|149.9, range: [2-525]|[2475-2998])
+  Partition Validity       : 9/10 (90.0%)
+
+[4] yule_pure_birth, n=1000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.2073  std=  0.0174  min=  0.1705  max=  0.2312
+  Numerical Rank           : mean= 77.2181  std= 13.1674  min= 55.9612  max= 93.3556
+  Sigma2                   : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0001
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0001
+  Relative Spectral Gap    : mean=  0.3425  std=  0.2608  min=  0.1078  max=  0.9215
+  Lambda2                  : mean=  0.0002  std=  0.0001  min=  0.0000  max=  0.0003
+  Lambda3                  : mean=  0.0002  std=  0.0001  min=  0.0000  max=  0.0004
+  Partition Split          : 60.6|939.4 (std: 86.5|86.5, range: [2-292]|[708-998])
+  Partition Validity       : 10/10 (100.0%)
+
+[5] yule_pure_birth, n=2000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.1910  std=  0.0277  min=  0.1475  max=  0.2426
+  Numerical Rank           : mean=137.4125  std= 35.6533  min= 78.4101  max=185.1153
+  Sigma2                   : mean=  0.0001  std=  0.0000  min=  0.0000  max=  0.0001
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0001
+  Relative Spectral Gap    : mean=  0.8001  std=  0.6616  min=  0.0588  max=  2.0592
+  Lambda2                  : mean=  0.0001  std=  0.0001  min=  0.0000  max=  0.0002
+  Lambda3                  : mean=  0.0001  std=  0.0001  min=  0.0000  max=  0.0003
+  Partition Split          : 30.6|1969.4 (std: 48.9|48.9, range: [2-172]|[1828-1998])
+  Partition Validity       : 9/10 (90.0%)
+
+[6] yule_pure_birth, n=3000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.1831  std=  0.0195  min=  0.1401  max=  0.2187
+  Numerical Rank           : mean=200.7329  std= 24.6691  min=156.1052  max=242.8075
+  Sigma2                   : mean=  0.0001  std=  0.0000  min=  0.0000  max=  0.0001
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0001
+  Relative Spectral Gap    : mean=  0.4608  std=  0.4474  min=  0.0464  max=  1.2822
+  Lambda2                  : mean=  0.0001  std=  0.0001  min=  0.0000  max=  0.0002
+  Lambda3                  : mean=  0.0001  std=  0.0001  min=  0.0000  max=  0.0002
+  Partition Split          : 129.8|2870.2 (std: 322.3|322.3, range: [2-1094]|[1906-2998])
+  Partition Validity       : 10/10 (100.0%)
+
+[7] extinction_heavy, n=1000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.1838  std=  0.0319  min=  0.1303  max=  0.2534
+  Numerical Rank           : mean= 14.1487  std=  3.6714  min=  6.9861  max= 19.2995
+  Sigma2                   : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean=     inf  std=     nan  min= -1.0000  max=     inf
+  Lambda2                  : mean=  0.0000  std=  0.0000  min= -0.0000  max=  0.0000
+  Lambda3                  : mean=  0.0000  std=  0.0000  min= -0.0000  max=  0.0000
+  Partition Split          : 25.7|173.4 (std: 23.1|41.3, range: [5-81]|[107-236])
+  Partition Validity       : 9/10 (90.0%)
+
+[8] extinction_heavy, n=2000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.1623  std=  0.0329  min=  0.1033  max=  0.2106
+  Numerical Rank           : mean= 28.9576  std=  4.9445  min= 20.1952  max= 36.8725
+  Sigma2                   : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.1399  std=  0.9433  min= -1.0000  max=  2.3102
+  Lambda2                  : mean= -0.0000  std=  0.0000  min= -0.0000  max=  0.0000
+  Lambda3                  : mean= -0.0000  std=  0.0000  min= -0.0000  max=  0.0000
+  Partition Split          : 14.7|416.4 (std: 11.7|12.4, range: [2-35]|[394-438])
+  Partition Validity       : 9/10 (90.0%)
+
+[9] extinction_heavy, n=3000, L=10000, μ=0.1 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.1697  std=  0.0203  min=  0.1349  max=  0.2021
+  Numerical Rank           : mean= 39.0594  std= 10.7760  min= 20.7269  max= 56.3764
+  Sigma2                   : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean=     inf  std=     nan  min= -1.0000  max=     inf
+  Lambda2                  : mean= -0.0000  std=  0.0000  min= -0.0000  max=  0.0000
+  Lambda3                  : mean= -0.0000  std=  0.0000  min= -0.0000  max=  0.0000
+  Partition Split          : 11.1|616.2 (std: 6.0|61.9, range: [5-20]|[535-716])
+  Partition Validity       : 8/10 (80.0%)
+
+[10] extinction_heavy, n=1000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.3028  std=  0.0459  min=  0.2484  max=  0.3859
+  Numerical Rank           : mean= 24.4892  std=  5.5606  min= 13.2375  max= 30.9514
+  Sigma2                   : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.2257  std=  0.1622  min= -0.5778  max= -0.0614
+  Lambda2                  : mean= -0.0000  std=  0.0000  min= -0.0000  max= -0.0000
+  Lambda3                  : mean= -0.0000  std=  0.0000  min= -0.0000  max= -0.0000
+  Partition Split          : 4.2|194.7 (std: 2.7|42.5, range: [2-11]|[142-260])
+  Partition Validity       : 8/10 (80.0%)
+
+[11] extinction_heavy, n=2000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.2662  std=  0.0394  min=  0.2198  max=  0.3361
+  Numerical Rank           : mean= 41.9160  std=  9.5029  min= 23.5426  max= 55.6088
+  Sigma2                   : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.1164  std=  0.0504  min= -0.1846  max= -0.0420
+  Lambda2                  : mean= -0.0000  std=  0.0000  min= -0.0000  max= -0.0000
+  Lambda3                  : mean= -0.0000  std=  0.0000  min= -0.0000  max= -0.0000
+  Partition Split          : 9.1|382.5 (std: 5.9|50.4, range: [2-18]|[294-457])
+  Partition Validity       : 5/10 (50.0%)
+
+[12] extinction_heavy, n=3000, L=10000, μ=0.2 (10 trials)
+--------------------------------------------------------------------------------
+  Coherence                : mean=  0.2416  std=  0.0372  min=  0.1864  max=  0.3089
+  Numerical Rank           : mean= 55.9745  std= 14.2948  min= 42.8275  max= 82.2727
+  Sigma2                   : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Spectral Gap             : mean=  0.0000  std=  0.0000  min=  0.0000  max=  0.0000
+  Relative Spectral Gap    : mean= -0.0650  std=  0.0478  min= -0.1616  max= -0.0044
+  Lambda2                  : mean= -0.0000  std=  0.0000  min= -0.0001  max= -0.0000
+  Lambda3                  : mean= -0.0000  std=  0.0000  min= -0.0001  max= -0.0000
+  Partition Split          : 3.9|604.1 (std: 1.9|49.0, range: [2-8]|[530-698])
+  Partition Validity       : 6/10 (60.0%)
+
+========================================================================================================================

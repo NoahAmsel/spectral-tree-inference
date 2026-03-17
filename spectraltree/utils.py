@@ -376,8 +376,17 @@ def compare_trees(reference_tree, inferred_tree):
     precision = true_positives / total_inferred
     recall = true_positives / total_reference
 
-    F1 = 100* 2*(precision * recall)/(precision + recall)
+    F1 = 100 * 2*(precision * recall)/(precision + recall)
     RF = false_positives + false_negatives
+    
+    # Calculate normalized RF
+    num_taxa = len(reference_tree.taxon_namespace)
+    normalized_RF = RF / (2 * num_taxa - 6)
+    
+    print(f"Raw RF distance: {RF}")
+    print(f"Normalized RF distance: {normalized_RF:.3f}")
+    print(f"F1 score: {F1:.1f}%")
+    
     return RF, F1
 
 def topos_equal(reference_tree, inferred_tree):

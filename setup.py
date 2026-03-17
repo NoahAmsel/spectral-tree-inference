@@ -18,12 +18,15 @@ setup(
         'numpy',
         'oct2py',
         'pandas',
+        'pydantic>=2.0.0',
         'python-igraph',
-        'scipy',
+        'scipy>=1.9.0',
         'scikit-learn',
         'seaborn',
         'sphinx',
-        'sphinx-rtd-theme'
+        'sphinx-rtd-theme',
+        'toytree',
+        'tqdm'
     ],
     include_package_data=True,
     zip_safe=False,

@@ -1,6 +1,7 @@
 import os
 from itertools import product
 import time
+import warnings
 
 import dendropy
 # Having trouble installing numba (https://github.com/numba/llvmlite/issues/527)
@@ -73,16 +74,60 @@ def partition_taxa(v,similarity,num_gaps = 1, min_split = 1):
     return partition_min
 
 SVD2_OBJ = TruncatedSVD(n_components=2, n_iter=7)
+
+# Track if we've already warned about degenerate matrices (avoid spam)
+_svd2_warned = False
+
 def svd2(mat, normalized = False):
+    """
+    Compute second singular value of a matrix using TruncatedSVD.
+
+    Note: For very thin/tall matrices (e.g., 998x2 from unbalanced partitions),
+    numerical instability may occur. This is expected and handled gracefully.
+    """
+    global _svd2_warned
+
     if (mat.shape[0] == 1) | (mat.shape[1] == 1):
         return 0
     elif (mat.shape[0] == 2) | (mat.shape[1] == 2):
         return np.linalg.svd(mat,False,False)[1]
     else:
-        sigmas = SVD2_OBJ.fit(mat).singular_values_
+        # Suppress sklearn's verbose RuntimeWarnings during SVD computation
+        # These occur for degenerate matrices (e.g., 998x2 from unbalanced partitions)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=RuntimeWarning, module='sklearn')
+
+            try:
+                sigmas = SVD2_OBJ.fit(mat).singular_values_
+
+                # Check if result is valid
+                if np.any(np.isnan(sigmas)) or np.any(np.isinf(sigmas)):
+                    if not _svd2_warned:
+                        warnings.warn(
+                            f"svd2: Numerical instability detected for matrix shape {mat.shape}. "
+                            f"This typically occurs with highly unbalanced partitions (e.g., 998|2 split). "
+                            f"Returning 0 for this partition. (This warning shown once per session)",
+                            RuntimeWarning,
+                            stacklevel=2
+                        )
+                        _svd2_warned = True
+                    return 0
+
+            except Exception as e:
+                if not _svd2_warned:
+                    warnings.warn(
+                        f"svd2: TruncatedSVD failed for matrix shape {mat.shape}: {e}. "
+                        f"This typically occurs with degenerate/unbalanced partitions. "
+                        f"Returning 0. (This warning shown once per session)",
+                        RuntimeWarning,
+                        stacklevel=2
+                    )
+                    _svd2_warned = True
+                return 0
+
         if normalized:
             return sigmas[1]**2/(sigmas[1]**2 + sigmas[0]**2)
-        else: 
+        else:
             return sigmas[1]
 
 def compute_alpha_tensor(S_11,S_12,u_12,v_12,bool_array,sigma):
@@ -219,7 +264,7 @@ def compute_merge_score(mask1A, mask1B, mask2, similarity_matrix, u_12,sigma_12,
         
         # 1. compute three eigenvectors of Laplacian matrix
         laplacian = np.diag(np.sum(similarity_matrix, axis = 0)) - similarity_matrix
-        e,V = scipy.linalg.eigh(laplacian, eigvals = (0,2))
+        e,V = scipy.linalg.eigh(laplacian, subset_by_index=(0,2))
                 
         # 2. Find largest gap in third eigenvector and compute boolearn vector  
         v_sort = np.sort(V[:,2])
@@ -303,10 +348,10 @@ def join_trees_with_spectral_root_finding_ls(similarity_matrix, T1, T2, merge_me
     if merge_method == 'partition':
         if laplacian_type == 'standard':
             laplacian = np.diag(np.sum(S_11, axis = 0)) - S_11            
-            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            e,V = scipy.linalg.eigh(laplacian, subset_by_index=(0,1))
             bool_bipartition_1 = partition_taxa(V[:,1],S_11,0,1)
             laplacian = np.diag(np.sum(S_22, axis = 0)) - S_22            
-            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            e,V = scipy.linalg.eigh(laplacian, subset_by_index=(0,1))
             bool_bipartition_2 = partition_taxa(V[:,1],S_22,0,1)
         if laplacian_type == 'rw':
             bool_bipartition_1 = partition_taxa_rw(S_11,min_split)
@@ -645,7 +690,7 @@ class STDR(ReconstructionMethod):
         #####################
         if laplacian_type == 'standard':
             laplacian = np.diag(np.sum(cur_similarity, axis = 0)) - cur_similarity            
-            e,V = scipy.linalg.eigh(laplacian, eigvals = (0,1))
+            e,V = scipy.linalg.eigh(laplacian, subset_by_index=(0,1))
             bool_bipartition = partition_taxa(V[:,1],cur_similarity,num_gaps,min_split)
         if laplacian_type == 'rw':
             bool_bipartition = partition_taxa_rw(cur_similarity,min_split)
