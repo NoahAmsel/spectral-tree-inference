@@ -50,13 +50,14 @@ class SimilarityMatrixBuilder:
     def build_subsampled(self, observations: np.ndarray, p: float, seed: int = None,
                         min_similarity: float = 0.0) -> np.ndarray:
         """
-        Build subsampled similarity matrix.
+        Build subsampled similarity matrix with optional truncation.
 
         Args:
             observations: Sequence observations (n_taxa x seq_len)
             p: Sampling probability (0 < p <= 1)
             seed: Random seed for reproducibility
-            min_similarity: Minimum similarity threshold (currently unused)
+            min_similarity: Minimum similarity threshold - values below this are set to 0.0
+                          (0.0 = no truncation, 1e-4 = remove noise, higher = more aggressive)
 
         Returns:
             Subsampled similarity matrix with diagonal = 1.0

@@ -10,7 +10,8 @@ def compute_leverage_scores(
     X: np.ndarray,
     Omega: np.ndarray,
     r: int,
-    apply_regularization: bool = False
+    apply_regularization: bool = False,
+    seed: int = None
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, float]:
     """
     Compute row and column leverage scores from rank-r SVD of observed entries.
@@ -73,7 +74,7 @@ def compute_leverage_scores(
     # For large matrices, use TruncatedSVD for efficiency
     if n > 1000:
         # Use sklearn's TruncatedSVD (supports sparse matrices efficiently)
-        svd_model = TruncatedSVD(n_components=r, random_state=42)
+        svd_model = TruncatedSVD(n_components=r, random_state=seed)
 
         # CRITICAL FIX: fit_transform() returns U*Σ, NOT orthonormal U
         # Without normalization, leverage scores are scaled by σ² → billion-scale values
@@ -83,8 +84,10 @@ def compute_leverage_scores(
         # Normalize columns by singular values to recover orthonormal U
         # Handle near-zero singular values for numerical stability
         s_safe = s.copy()
-        s_safe[s_safe < 1e-12] = 1.0
+        zero_mask = s_safe < 1e-12
+        s_safe[zero_mask] = 1.0
         U = U_sigma / s_safe[None, :]  # Broadcasting: (n, r) / (1, r) → (n, r)
+        U[:, zero_mask] = 0.0  # zero out columns with no signal
 
         # V is already orthonormal (svd_model.components_ returns Vt directly)
         Vt = svd_model.components_

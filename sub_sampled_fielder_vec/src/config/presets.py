@@ -158,6 +158,7 @@ def custom_config(
     sampling_force_leveraged: bool = False,
     sampling_allow_uniform_fallback: bool = True,
     log_sampling_diagnostics: bool = False,
+    truncation_threshold: float = 0.0,
     use_persistent_cache: bool = False,
     **kwargs
 ) -> StructuredConfig:
@@ -189,6 +190,7 @@ def custom_config(
         sampling_ialm_bypass_threshold: Skip IALM when p >= this threshold (default: 0.1)
         sampling_force_leveraged: Force leveraged sampling even when Phase 1 budget is insufficient
         sampling_allow_uniform_fallback: Allow fallback to uniform sampling when p is too small (default: True)
+        truncation_threshold: Minimum similarity threshold - values below this are set to 0.0 (default: 0.0, i.e., no truncation)
         use_persistent_cache: Enable disk-based caching of experiment data (tree, observations, matrices)
         **kwargs: Additional model-specific parameters (e.g., kappa, edge_length, etc.)
 
@@ -250,7 +252,8 @@ def custom_config(
         ialm_bypass_threshold=sampling_ialm_bypass_threshold,
         force_leveraged=sampling_force_leveraged,
         allow_uniform_fallback=sampling_allow_uniform_fallback,
-        log_sampling_diagnostics=log_sampling_diagnostics
+        log_sampling_diagnostics=log_sampling_diagnostics,
+        truncation_threshold=truncation_threshold
     )
 
     # Build cache config

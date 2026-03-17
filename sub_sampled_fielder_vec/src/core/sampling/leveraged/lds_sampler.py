@@ -82,7 +82,8 @@ class LDSSampler(BaseSampler):
         target_rank: int = 2,
         tau_floor_multiplier: float = 1.0,
         force_lds: bool = False,
-        allow_uniform_fallback: bool = True
+        allow_uniform_fallback: bool = True,
+        prob_formula: str = "additive"
     ):
         """
         Initialize LDS sampler.
@@ -94,18 +95,19 @@ class LDSSampler(BaseSampler):
                         Default 2 (sufficient for Fiedler vector)
             tau_floor_multiplier: Multiplier for regularization floor
                                  Default 1.0 (τ_floor = multiplier × mean(μ))
-            force_lds: If True, always use LDS even when Phase 1 budget is
-                       theoretically insufficient (useful for experimentation)
-                       Default False
-            allow_uniform_fallback: If True, fall back to uniform sampling when p
-                                   is too small for LDS. If False, raise error.
-                                   Default True (safe mode)
+            force_lds: Retained for API compatibility (no longer changes behavior)
+            allow_uniform_fallback: Retained for API compatibility (no longer changes behavior)
+            prob_formula: Formula for combining row/col leverage into p_ij.
+                         'additive': μ_i+μ_j (HLDT paper default)
+                         'multiplicative': μ_i×μ_j (concentrates on high-leverage pairs)
+                         'max': max(μ_i,μ_j)
         """
         self.theta = theta
         self.target_rank = target_rank
         self.tau_floor_multiplier = tau_floor_multiplier
         self.force_lds = force_lds
         self.allow_uniform_fallback = allow_uniform_fallback
+        self.prob_formula = prob_formula
 
         # Track which p-values have been logged (to log once per p, not per sample)
         self._logged_p_values = set()
@@ -162,79 +164,17 @@ class LDSSampler(BaseSampler):
         # Initialize random generator
         rng = get_rng(seed)
 
-        # Compute theoretical minimum samples for Phase 1 (from matrix completion theory)
-        # Paper requirement: m₁ ≥ C·n·r·log(n) for reliable leverage score estimation
-        # For symmetric rank-r matrices: 4·n·r·log(n) is conservative
-        theoretical_min_phase1 = int(4 * n * self.target_rank * np.log(n)) if n > 1 else 10
+        # Compute theoretical minimum samples for Phase 1 (DIAGNOSTIC ONLY — never overrides theta)
+        # Paper requirement: m₁ ≥ C·n·r·log²(n) for reliable leverage score estimation
+        theoretical_min_phase1 = int(4 * n * self.target_rank * np.log(n) ** 2) if n > 1 else 10
 
         # =============================================================================
         # PHASE 1: Uniform Sampling to Estimate Leverage Scores
         # =============================================================================
 
-        phase1_budget_naive = int(self.theta * total_budget)
-
-        if self.force_lds:
-            # Force LDS: use naive budget even if below theoretical minimum
-            phase1_budget = phase1_budget_naive
-            # Ensure at least 1 sample for Phase 1
-            if phase1_budget < 1:
-                phase1_budget = 1
-        else:
-            # Use max(theta*total, min_required) to ensure meaningful leverage scores
-            phase1_budget = max(phase1_budget_naive, theoretical_min_phase1)
-
-        # Check if total budget is sufficient for LDS sampling
-        if phase1_budget >= total_budget:
-            if self.force_lds or not self.allow_uniform_fallback:
-                # Force LDS or fallback disabled: proceed with whatever budget available
-                # Use 90% for Phase 1, 10% for Phase 2
-                phase1_budget = max(1, int(0.9 * total_budget))
-                if p not in self._logged_p_values:
-                    log_info('bootstrap',
-                        f"  p={p:.4f}: Proceeding with LDS despite insufficient budget "
-                        f"(using {phase1_budget:,}/{total_budget:,} for Phase 1, theoretical min: {theoretical_min_phase1:,})",
-                        force=True
-                    )
-                    self._logged_p_values.add(p)
-            else:
-                # Fallback to uniform sampling when budget insufficient
-                if p not in self._logged_p_values:
-                    log_info('bootstrap',
-                        f"  p={p:.4f}: Falling back to uniform sampling "
-                        f"(Phase 1 needs {phase1_budget:,} but budget is {total_budget:,}, requires p ≥ {theoretical_min_phase1/n_upper:.6f})",
-                        force=True
-                    )
-                    self._logged_p_values.add(p)
-                # Use uniform sampler logic instead
-                Omega = uniform_sample_upper_triangle(n, total_budget, rng)
-                L = np.zeros_like(matrix)
-                L[Omega] = matrix[Omega]
-                L = (L + L.T) / 2
-                np.fill_diagonal(L, 1.0)
-
-                # Set minimal metrics for uniform fallback case
-                self.last_sample_metrics = {
-                    'phase1_budget': 0,
-                    'phase1_actual': 0,
-                    'phase2_budget': 0,
-                    'phase2_actual': 0,
-                    'theoretical_min_phase1': theoretical_min_phase1,
-                    'phase1_sufficiency': 0.0,
-                    'phase1_singular_values': [],
-                    'leverage_max': float('nan'),
-                    'leverage_std': float('nan'),
-                    'leverage_sum': float('nan'),
-                    'leverage_scores_raw': None,
-                    'leverage_scores_regularized': None,
-                    'tau_floor': 0.0,
-                    'phase2_sampling_probs': None,
-                    'phase2_sampled_indices': [],
-                    'debiasing_time': 0.0,
-                    'matrix_sparsity': 0.0,
-                    'fallback_to_uniform': True  # Flag to indicate uniform fallback
-                }
-
-                return L
+        # Pure-theta split: theta controls Phase 1/Phase 2 budget directly.
+        # theoretical_min_phase1 is logged for diagnostics but never overrides theta.
+        phase1_budget = max(1, int(self.theta * total_budget))
 
         # Sample uniformly from upper triangle
         Omega1 = uniform_sample_upper_triangle(n, phase1_budget, rng)
@@ -245,7 +185,7 @@ class LDSSampler(BaseSampler):
         # Compute leverage scores from Phase 1 observations WITH regularization
         # Returns: (row_raw, col_raw, row_reg, col_reg, singular_values, tau_floor)
         row_leverage_raw, col_leverage_raw, row_leverage_reg, col_leverage_reg, phase1_singular_values, tau_floor = compute_leverage_scores(
-            matrix, Omega1, self.target_rank, apply_regularization=True
+            matrix, Omega1, self.target_rank, apply_regularization=True, seed=seed
         )
 
         # Apply tau_floor_multiplier scaling
@@ -288,7 +228,8 @@ class LDSSampler(BaseSampler):
         if phase2_budget > 0:
             # Compute sampling probabilities using REGULARIZED leverage scores
             p_matrix = compute_sampling_probabilities(
-                row_leverage_reg, col_leverage_reg, self.target_rank, n
+                row_leverage_reg, col_leverage_reg, self.target_rank, n,
+                prob_formula=self.prob_formula
             )
 
             # **CRITICAL**: Cap probabilities at 1.0
@@ -311,11 +252,26 @@ class LDSSampler(BaseSampler):
             # Omega = Omega_1 ∪ Omega_2 (disjoint by construction: Omega_2 ⊆ Omega_1^c)
             Omega = Omega1 | Omega2
             phase2_actual = np.sum(Omega2) // 2  # All entries in Omega_2 are new
+
+            # **CRITICAL**: Compute effective inclusion probability for debiasing
+            # π_{ij} = p_0 + (1 - p_0) · p2_{ij}
+            # p_matrix is a normalized PMF (sums to 1).
+            # Actual Phase 2 inclusion probability = weight × budget / restricted_sum
+            p_0 = phase1_actual / n_upper if n_upper > 0 else 0.0
+            p_restricted = np.triu(p_matrix, k=1).copy()
+            p_restricted[np.triu(Omega1, k=1)] = 0.0  # exclude Phase 1 entries
+            p_restricted_sum = p_restricted.sum()
+            if p_restricted_sum > 0:
+                p2 = np.minimum((p_restricted / p_restricted_sum) * phase2_budget, 1.0)
+            else:
+                p2 = np.zeros_like(p_matrix)
+            p2 = p2 + p2.T  # symmetrize
+            pi_matrix = np.minimum(p_0 + (1.0 - p_0) * p2, 1.0)
         else:
             Omega = Omega1
-            # Still need p_matrix for debiasing Phase 1 samples
-            # Use uniform probability as fallback
-            p_matrix = np.ones((n, n)) * (phase1_actual / n_upper) if n_upper > 0 else np.ones((n, n))
+            # Phase 1 only: effective probability is just p_0 (no Phase 2)
+            p_0 = phase1_actual / n_upper if n_upper > 0 else 1.0
+            pi_matrix = np.ones((n, n)) * p_0
 
         # Final check: ensure diagonal is excluded
         np.fill_diagonal(Omega, False)
@@ -329,7 +285,7 @@ class LDSSampler(BaseSampler):
         # - LDSSampler: Single-shot debiasing (O(n²))
 
         start_time = time.time()
-        X_hat_sparse = compute_debiased_estimator(matrix, Omega, p_matrix)
+        X_hat_sparse = compute_debiased_estimator(matrix, Omega, pi_matrix)
         debiasing_time = time.time() - start_time
 
         # Compute matrix sparsity for diagnostics
@@ -345,6 +301,10 @@ class LDSSampler(BaseSampler):
         leverage_max_raw = float(np.max(leverage_scores_raw))
         leverage_std_raw = float(np.std(leverage_scores_raw))
         leverage_sum_raw = float(np.sum(leverage_scores_raw))  # Should equal n
+
+        # Compute spectral gap (ratio s[1]/s[2]) for Davis-Kahan bound diagnostics
+        sv = phase1_singular_values
+        spectral_gap = float(sv[1] / sv[2]) if len(sv) >= 3 and sv[2] > 1e-12 else float('inf')
 
         # Store diagnostic metrics
         self.last_sample_metrics = {
@@ -368,8 +328,16 @@ class LDSSampler(BaseSampler):
             'tau_floor': tau_floor_scaled,
 
             # Phase 2 sampling details
-            'phase2_sampling_probs': p_matrix,
+            'phase2_sampling_probs': p_matrix,  # Leverage-based probabilities p_{ij}
             'phase2_sampled_indices': phase2_sampled_indices,
+
+            # Debiasing probabilities (effective inclusion probabilities)
+            'phase1_uniform_prob': p_0,  # Uniform probability from Phase 1
+            'effective_debiasing_probs': pi_matrix,  # π_{ij} = p_0 + (1-p_0)·p2_{ij}
+
+            # Spectral gap (s[1]/s[2]) — relevant for Davis-Kahan bound
+            # inf when target_rank < 3 (set target_rank=3 for a meaningful value)
+            'spectral_gap': spectral_gap,
 
             # Debiasing performance
             'debiasing_time': debiasing_time,
@@ -379,18 +347,22 @@ class LDSSampler(BaseSampler):
             'ialm_bypassed': True,
             'ialm_iterations': 0,
             'ialm_converged': True,  # Trivially converged (no iterations)
-            'fallback_to_uniform': False
+            'fallback_to_uniform': False,
+
+            # Probability formula used for Phase 2 sampling
+            'prob_formula': self.prob_formula,
         }
 
         # Log successful LDS sampling setup (only log once per p-value)
         if p not in self._logged_p_values:
+            satisfied_pct = phase1_actual / theoretical_min_phase1 if theoretical_min_phase1 > 0 else float('inf')
             log_info('bootstrap',
-                f"  p={p:.4f}: Using LDS sampling "
-                f"(Phase1: {phase1_actual:,}/{phase1_budget:,}, Phase2: {phase2_actual:,}/{phase2_budget:,})"
+                f"  p={p:.4f}: Phase1={phase1_actual:,}/{phase1_budget:,}, Phase2={phase2_actual:,}/{phase2_budget:,}, "
+                f"theoretical_min={theoretical_min_phase1:,} ({satisfied_pct:.1%} satisfied)"
             )
             log_info('bootstrap',
                 f"    Leverage scores: max={leverage_max_raw:.3f}, std={leverage_std_raw:.3f}, "
-                f"sum={leverage_sum_raw:.1f}, τ_floor={tau_floor_scaled:.3f}"
+                f"sum={leverage_sum_raw:.1f}, τ_floor={tau_floor_scaled:.3f}, formula={self.prob_formula}"
             )
             log_info('bootstrap',
                 f"    Debiased estimator: {X_hat_sparse.nnz:,} non-zeros ({matrix_sparsity:.1%} dense), "

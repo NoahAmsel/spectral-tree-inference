@@ -6,29 +6,34 @@ def compute_sampling_probabilities(
     row_leverage: np.ndarray,
     col_leverage: np.ndarray,
     r: int,
-    n: int
+    n: int,
+    prob_formula: str = "additive"
 ) -> np.ndarray:
     """
     Compute sampling probabilities p_ij from leverage scores.
-    
-    According to the paper: p_ij ∝ (μ_i + ν_j) * r * log²(n) / n
-    
+
     Args:
         row_leverage: Row leverage scores μ_i (n,)
         col_leverage: Column leverage scores ν_j (n,)
         r: Target rank
         n: Matrix dimension
-        
+        prob_formula: Formula for combining row/col leverage scores:
+            'additive': p_ij ∝ (μ_i + ν_j) — HLDT paper default
+            'multiplicative': p_ij ∝ μ_i × ν_j — concentrates on high-leverage pairs
+            'max': p_ij ∝ max(μ_i, ν_j)
+
     Returns:
         Sampling probability matrix (n x n) with p_ij proportional to importance
     """
-    # Compute unnormalized probabilities: p_ij ∝ (μ_i + ν_j) * r * log²(n) / n
-    # Use broadcasting: (n, 1) + (1, n) = (n, n)
     log_n_sq = (np.log(n) ** 2) if n > 1 else 1.0
     scale_factor = (r * log_n_sq) / n
-    
-    # Broadcast: row_leverage[:, None] is (n, 1), col_leverage[None, :] is (1, n)
-    p_unnormalized = (row_leverage[:, None] + col_leverage[None, :]) * scale_factor
+
+    if prob_formula == "multiplicative":
+        p_unnormalized = (row_leverage[:, None] * col_leverage[None, :]) * scale_factor
+    elif prob_formula == "max":
+        p_unnormalized = np.maximum(row_leverage[:, None], col_leverage[None, :]) * scale_factor
+    else:  # "additive" (default, HLDT paper formula)
+        p_unnormalized = (row_leverage[:, None] + col_leverage[None, :]) * scale_factor
     
     # For symmetric matrices, we only need upper triangle
     # But we'll compute full matrix and then extract upper triangle for sampling

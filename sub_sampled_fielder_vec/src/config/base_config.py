@@ -184,6 +184,8 @@ class SamplingConfig(BaseModel):
         force_leveraged: Force leveraged/lds sampling even when Phase 1 budget is insufficient
         allow_uniform_fallback: Allow fallback to uniform sampling when p is too small (default: True)
         log_sampling_diagnostics: Save detailed sampling diagnostics for analysis
+        truncation_threshold: Minimum similarity threshold - values below this are set to 0.0
+                            (0.0 = no truncation, 1e-4 = remove noise, higher = more aggressive)
     """
     method: Literal["uniform", "leveraged", "lds"] = "uniform"
     theta: float = Field(default=0.3, gt=0.0, lt=1.0, description="Phase 1 budget ratio")
@@ -195,6 +197,14 @@ class SamplingConfig(BaseModel):
     force_leveraged: bool = Field(default=False, description="Force leveraged sampling even when Phase 1 budget is insufficient")
     allow_uniform_fallback: bool = Field(default=True, description="Allow fallback to uniform sampling when p is too small")
     log_sampling_diagnostics: bool = Field(default=False, description="Save detailed sampling diagnostics for analysis")
+    truncation_threshold: float = Field(default=0.0, ge=0.0, description="Minimum similarity threshold for sparsification")
+    prob_formula: Literal["additive", "multiplicative", "max"] = Field(
+        default="additive",
+        description="Formula for combining row/col leverage into p_ij. "
+                    "'additive': μ_i+μ_j (HLDT paper default), "
+                    "'multiplicative': μ_i×μ_j (concentrates on high-leverage pairs), "
+                    "'max': max(μ_i,μ_j)"
+    )
 
     class Config:
         extra = "forbid"
