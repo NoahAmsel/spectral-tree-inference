@@ -61,7 +61,11 @@ class ExperimentRunner:
 
         # Setup: seed, create run directory, save config
         self._set_seed(cfg.experiment.seed)
-        self.run_dir = self._make_run_dir(cfg.experiment.run_name, base_dir, subdir_name)
+        # Extract tree_model and sampling_method from config for organized results
+        tree_model = cfg.tree.model
+        sampling_method = cfg.sampling.method
+        self.run_dir = self._make_run_dir(cfg.experiment.run_name, base_dir, subdir_name,
+                                          tree_model, sampling_method)
         self._save_config(cfg, self.run_dir)
 
         # Setup file-based logging
@@ -140,7 +144,14 @@ class ExperimentRunner:
             partition_split_M=partition_split_M_list,
             partition_split_S=partition_split_S_list,
             result_source=result_source_list,
-            metrics_dict=metrics_dict
+            metrics_dict=metrics_dict,
+            config_columns={
+                'sampling_method': self.cfg.sampling.method,
+                'sampling_theta': self.cfg.sampling.theta,
+                'sampling_target_rank': self.cfg.sampling.target_rank,
+                'sampling_tau_floor_multiplier': self.cfg.sampling.tau_floor_multiplier,
+                'sampling_prob_formula': self.cfg.sampling.prob_formula,
+            },
         )
 
         plot_from_json_simple(
@@ -510,13 +521,16 @@ class ExperimentRunner:
         np.random.seed(seed)
         os.environ["PYTHONHASHSEED"] = str(seed)
 
-    def _make_run_dir(self, run_name: str, base_dir: str = None, subdir_name: str = None) -> str:
+    def _make_run_dir(self, run_name: str, base_dir: str = None, subdir_name: str = None,
+                      tree_model: str = None, sampling_method: str = None) -> str:
         """Create a directory for experiment results.
 
         Args:
             run_name: Name of the experiment run
             base_dir: Optional base directory (for grid sweeps)
             subdir_name: Optional subdirectory within base_dir (for grid sweeps)
+            tree_model: Tree model name for organizing results (e.g., 'kingman_mean')
+            sampling_method: Sampling method for organizing results (e.g., 'uniform', 'lds')
 
         Returns:
             Absolute path to the run directory
@@ -525,11 +539,17 @@ class ExperimentRunner:
             # Grid sweep mode: use provided base_dir/subdir_name
             path = os.path.join(base_dir, subdir_name)
         else:
-            # Single experiment mode: create timestamped directory
+            # Single experiment mode: create timestamped directory with nested structure
             ts = time.strftime("%Y%m%d-%H%M%S")
             # Get the directory of the parent of src (sub_sampled_fielder_vec)
             repo_base = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            path = os.path.join(repo_base, "results", f"{ts}-{run_name}")
+
+            # Organize by tree_model/sampling_method if provided
+            if tree_model and sampling_method:
+                path = os.path.join(repo_base, "results", tree_model, sampling_method, f"{ts}-{run_name}")
+            else:
+                # Fallback to flat structure for backward compatibility
+                path = os.path.join(repo_base, "results", f"{ts}-{run_name}")
 
         os.makedirs(path, exist_ok=True)
         return os.path.abspath(path)

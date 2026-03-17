@@ -263,7 +263,8 @@ def sweep_for_params(
         # LDS-specific parameters
         method_kwargs.update({
             'tau_floor_multiplier': cfg.sampling.tau_floor_multiplier,
-            'force_lds': cfg.sampling.force_leveraged  # Reuse force_leveraged flag
+            'force_lds': cfg.sampling.force_leveraged,  # Reuse force_leveraged flag
+            'prob_formula': cfg.sampling.prob_formula,
         })
 
     similarity_builder = SimilarityMatrixBuilder(
@@ -393,6 +394,10 @@ def sweep_for_params(
         'leverage_max', 'leverage_std', 'leverage_sum', 'leverage_symmetry_error',
         'ialm_iterations',  # Number of IALM iterations (0 if bypassed)
         'phase1_sufficiency',  # Phase 1 actual samples / theoretical minimum (LDS quality indicator)
+        'spectral_gap',  # s[1]/s[2] from Phase 1 SVD — denominator in Davis-Kahan bound
+        # LDS budget diagnostics (Part A)
+        'phase1_actual', 'phase2_actual', 'fallback_to_uniform', 'tau_floor',
+        'phase1_budget_fraction',  # = phase1_actual / (phase1_actual + phase2_actual)
     ]
     metrics_dict: Dict[str, List[Tuple[float, float, float]]] = {
         key: [] for key in metric_keys
@@ -513,6 +518,13 @@ def sweep_for_params(
                 # Compute S once per bootstrap rep
                 S = _subsample_matrix_entries(M, p, seed=bootstrap_seed, builder=similarity_builder)
 
+                # Apply truncation if threshold > 0
+                if cfg.sampling.truncation_threshold > 0.0:
+                    if hasattr(S, 'toarray'):
+                        S = S.toarray()
+                    S[S < cfg.sampling.truncation_threshold] = 0.0
+                    np.fill_diagonal(S, 1.0)
+
                 # NEW: Collect leveraged sampling metrics if available
                 if hasattr(similarity_builder, 'sampler') and hasattr(similarity_builder.sampler, 'last_sample_metrics'):
                     metrics = similarity_builder.sampler.last_sample_metrics
@@ -534,6 +546,18 @@ def sweep_for_params(
 
                         # Extract Phase 1 sufficiency (LDS quality indicator)
                         metric_values['phase1_sufficiency'].append(metrics.get('phase1_sufficiency', float('nan')))
+                        metric_values['spectral_gap'].append(metrics.get('spectral_gap', float('nan')))
+
+                        # Extract LDS budget diagnostics (Part A)
+                        p1_actual = metrics.get('phase1_actual', float('nan'))
+                        p2_actual = metrics.get('phase2_actual', float('nan'))
+                        metric_values['phase1_actual'].append(p1_actual)
+                        metric_values['phase2_actual'].append(p2_actual)
+                        metric_values['fallback_to_uniform'].append(float(metrics.get('fallback_to_uniform', False)))
+                        metric_values['tau_floor'].append(metrics.get('tau_floor', float('nan')))
+                        total_actual = (p1_actual if not np.isnan(p1_actual) else 0) + (p2_actual if not np.isnan(p2_actual) else 0)
+                        frac = p1_actual / total_actual if total_actual > 0 and not np.isnan(p1_actual) else float('nan')
+                        metric_values['phase1_budget_fraction'].append(frac)
                     else:
                         # No metrics available (e.g., uniform sampler)
                         metric_values['phase1_s1'].append(float('nan'))
@@ -545,6 +569,12 @@ def sweep_for_params(
                         metric_values['leverage_symmetry_error'].append(float('nan'))
                         metric_values['ialm_iterations'].append(float('nan'))
                         metric_values['phase1_sufficiency'].append(float('nan'))
+                        metric_values['spectral_gap'].append(float('nan'))
+                        metric_values['phase1_actual'].append(float('nan'))
+                        metric_values['phase2_actual'].append(float('nan'))
+                        metric_values['fallback_to_uniform'].append(float('nan'))
+                        metric_values['tau_floor'].append(float('nan'))
+                        metric_values['phase1_budget_fraction'].append(float('nan'))
                 else:
                     # Not a leveraged sampler - append NaN for all new metrics
                     metric_values['phase1_s1'].append(float('nan'))
@@ -556,6 +586,12 @@ def sweep_for_params(
                     metric_values['leverage_symmetry_error'].append(float('nan'))
                     metric_values['ialm_iterations'].append(float('nan'))
                     metric_values['phase1_sufficiency'].append(float('nan'))
+                    metric_values['spectral_gap'].append(float('nan'))
+                    metric_values['phase1_actual'].append(float('nan'))
+                    metric_values['phase2_actual'].append(float('nan'))
+                    metric_values['fallback_to_uniform'].append(float('nan'))
+                    metric_values['tau_floor'].append(float('nan'))
+                    metric_values['phase1_budget_fraction'].append(float('nan'))
 
                 # Update running average of S (streaming - no storage!)
                 # Uses Welford's online algorithm for numerical stability
@@ -798,7 +834,10 @@ def sweep_for_params(
             # Leveraged sampling diagnostics (Phase A)
             'phase1_s1', 'phase1_s2', 'phase1_s3',
             'leverage_max', 'leverage_std', 'leverage_sum', 'leverage_symmetry_error',
-            'ialm_iterations'
+            'ialm_iterations',
+            # LDS budget diagnostics (Part A)
+            'phase1_actual', 'phase2_actual', 'fallback_to_uniform', 'tau_floor',
+            'phase1_budget_fraction',
         ]
         
         # Store constant metrics
@@ -888,6 +927,15 @@ def sweep_for_params(
                 for key, values in metrics_dict.items()
             }
 
+            # Build config columns (constant for all p-values in this run)
+            _config_cols = {
+                'sampling_method': cfg.sampling.method,
+                'sampling_theta': cfg.sampling.theta,
+                'sampling_target_rank': cfg.sampling.target_rank,
+                'sampling_tau_floor_multiplier': cfg.sampling.tau_floor_multiplier,
+                'sampling_prob_formula': cfg.sampling.prob_formula,
+            }
+
             # Save as both single and taxa format for compatibility
             save_single_results(
                 run_dir=run_dir,
@@ -896,7 +944,8 @@ def sweep_for_params(
                 partition_agreement_M=current_partition_agreement_M,  # NEW
                 partition_agreement_S=current_partition_agreement_S,  # NEW
                 dot_products=current_dot_products,                    # NEW
-                metrics_dict=current_metrics_dict
+                metrics_dict=current_metrics_dict,
+                config_columns=_config_cols,
             )
 
             # Also save individual p-value results

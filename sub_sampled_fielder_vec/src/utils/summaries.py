@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict
+from typing import Any, List, Tuple, Dict, Optional
 from dataclasses import dataclass
 import os, json
 import numpy as np
@@ -48,7 +48,8 @@ def save_single_results(
     partition_split_M: List[Tuple[int, int] | None] | None = None,
     partition_split_S: List[Tuple[int, int] | None] | None = None,
     result_source: List[str] | None = None,
-    metrics_dict: Dict[str, List[Tuple[float, float, float]]] | None = None
+    metrics_dict: Dict[str, List[Tuple[float, float, float]]] | None = None,
+    config_columns: Optional[Dict[str, Any]] = None,
 ):
     """
     Save single-parameter results with new partition metrics.
@@ -146,7 +147,10 @@ def save_single_results(
             'phase1_s1', 'phase1_s2', 'phase1_s3',
             'leverage_max', 'leverage_std', 'leverage_sum', 'leverage_symmetry_error',
             'ialm_iterations',
-            'phase1_sufficiency'  # HLDT Phase 1 quality indicator
+            'phase1_sufficiency',  # HLDT Phase 1 quality indicator
+            # LDS budget diagnostics (Part A)
+            'phase1_actual', 'phase2_actual', 'fallback_to_uniform', 'tau_floor',
+            'phase1_budget_fraction',
         ]
         for metric_name in metric_names:
             if metric_name in metrics_dict and len(metrics_dict[metric_name]) == len(p_values):
@@ -156,7 +160,15 @@ def save_single_results(
                     row[f"mean_{metric_name}"] = float(mu)
                     row[f"median_{metric_name}"] = float(med)
                     row[f"std_{metric_name}"] = float(std)
-    
+
+    # Add constant config columns (same value for all p-values, makes results self-describing)
+    if config_columns:
+        for col_name, col_val in config_columns.items():
+            if col_name not in columns:
+                columns.append(col_name)
+            for row in rows:
+                row[col_name] = col_val
+
     result = {
         "columns": columns,
         "rows": rows,
